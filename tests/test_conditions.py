@@ -79,7 +79,7 @@ def test_json_output_has_dropped_by_must(monkeypatch, capsys):
     rows = [{"repo": "a/ok", "stop": None, "score": 1, "pushed_days": 1},
             {"repo": "a/no", "stop": "нет обязательного: x", "score": 1, "pushed_days": 1}]
     monkeypatch.setattr(cli, "run", lambda *a, **k: rows)
-    monkeypatch.setattr(sys, "argv", ["repo-scout", "q", "--json"])
+    monkeypatch.setattr(sys, "argv", ["repo-scout", "q", "--task", "t", "--json"])
     cli.main()
     out = json.loads(capsys.readouterr().out)
     assert [r["repo"] for r in out["rows"]] == ["a/ok"] and [r["repo"] for r in out["dropped_by_must"]] == ["a/no"]

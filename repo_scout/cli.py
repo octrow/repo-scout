@@ -1,6 +1,6 @@
 """Шаг 1 из docs/repo-triage.md: найти репо на GitHub, применить стоп-правила, посчитать баллы.
 
-Usage: repo-scout "query one" "query two" [--months 6] [--new-days 60] [--limit 50] [--lang X] [--exclude RE] [--must RE] [--all] [--json]
+Usage: repo-scout --task "<English task description>" "query one" "query two" [--min-closeness 0.6] [--months 6] [--new-days 60] [--limit 50] [--lang X] [--exclude RE] [--must RE] [--all] [--json]
 Each query is GitHub search syntax (language:python, topic:x ...). Needs an authenticated `gh`.
 """
 import argparse
@@ -9,7 +9,7 @@ import re
 import sys
 from datetime import UTC, datetime, timedelta
 
-from repo_scout import github
+from repo_scout import github, semantic
 from repo_scout.commits import last_substantive
 from repo_scout.conditions import (
     compile_all,
@@ -57,10 +57,14 @@ def validate_query(q: str) -> None:
         raise ValueError(f"запрос {q!r}: {ops} операторов AND/OR/NOT, лимит GitHub {MAX_OPERATORS}")
 
 
+def _fmt_close(r: dict) -> str:
+    return "—" if r.get("closeness") is None else f"{r['closeness']:.2f}"
+
+
 def to_markdown(rows: list[dict]) -> str:
-    head = "| баллы | repo | ★ | forks | комм | push, дн | создан | язык | флаги / отсев | описание |\n" + "|---" * 10 + "|"
+    head = "| близ | баллы | repo | ★ | forks | комм | push, дн | создан | язык | флаги / отсев | описание |\n" + "|---" * 11 + "|"
     lines = [
-        f"| {r['score']} (свеж {r['fresh']}, поп {r['pop']}) | [{r['repo']}]({r['url']}) | {r['stars']} | {r['forks']} "
+        f"| {_fmt_close(r)} | {r['score']} (свеж {r['fresh']}, поп {r['pop']}) | [{r['repo']}]({r['url']}) | {r['stars']} | {r['forks']} "
         f"| {r['commits']} | {r['pushed_days']} | {r['created']} | {r['lang']} "
         f"| {verdict(r)} "
         f"| {r['desc'][:120]} |"
@@ -86,8 +90,9 @@ def _screen_meta(rows: list[dict], nodes: dict, lang: str | None, exclude: list[
 
 
 def _screen_details(rows: list[dict], nodes: dict, now: datetime, new_days: int,
-                    exclude: list[re.Pattern], must: list[re.Pattern]) -> None:
-    """README и коммиты выживших: пересчёт свежести, запрещённые и обязательные слова."""
+                    exclude: list[re.Pattern], must: list[re.Pattern]) -> dict[str, str | None]:
+    """README и коммиты выживших: пересчёт свежести, запрещённые и обязательные слова. Возвращает README."""
+    readmes: dict[str, str | None] = {}
     alive = [r for r in rows if not r["stop"]]
     info = github.details([r["repo"] for r in alive])
     for row in alive:
@@ -101,17 +106,40 @@ def _screen_details(rows: list[dict], nodes: dict, now: datetime, new_days: int,
             row.update({k: new[k] for k in ("pushed_days", "fresh", "score", "stop")})
             if cosmetic_only:
                 row["flags"].append("только косметика")
-        readme = d["readme"]
+        readme = readmes[row["repo"]] = d["readme"]
         if readme is None:
             row["flags"].append("нет README")
         _stop(row, exclude_stop(readme or "", exclude))
         if readme is not None:
             _stop(row, must_stop(" ".join([readme, meta_text(row)]), must))
+    return readmes
+
+
+def add_closeness(rows: list[dict], readmes: dict[str, str | None], task: str) -> None:
+    """Близость строкам, не отсеянным к этому моменту (нет README: имя, описание, topics)."""
+    todo = [r for r in rows if not r["stop"]]
+    if not todo:
+        return
+    docs = semantic.embed_docs([semantic.candidate_text(r, readmes.get(r["repo"])) for r in todo])
+    for r, c in zip(todo, semantic.closeness(semantic.embed_task(task), docs)):
+        r["closeness"] = float(c)
+
+
+def apply_closeness(rows: list[dict], min_closeness: float) -> None:
+    for r in rows:
+        if r.get("closeness") is not None and r["closeness"] < min_closeness:
+            _stop(r, f"не по теме ({r['closeness']:.2f})")
+
+
+def sort_key(r: dict) -> tuple:
+    c = r.get("closeness")
+    return (-(-1.0 if c is None else c), -r["score"], r["pushed_days"])
 
 
 def run(queries: list[str], *, months: int, new_days: int, limit: int, lang: str | None, now: datetime,
-        exclude: list[re.Pattern] = (), must: list[re.Pattern] = ()) -> list[dict]:
-    """Все строки триажа (включая отсеянные), отсортированы по баллам."""
+        exclude: list[re.Pattern] = (), must: list[re.Pattern] = (), task: str | None = None,
+        min_closeness: float = semantic.MIN_CLOSENESS) -> list[dict]:
+    """Все строки триажа (включая отсеянные), отсортированы по Близости, потом по баллам."""
     since = (now - timedelta(days=30 * months)).date().isoformat()
     nodes = {}
     for q in queries:
@@ -121,8 +149,11 @@ def run(queries: list[str], *, months: int, new_days: int, limit: int, lang: str
             nodes.setdefault(r["nameWithOwner"], r)
     rows = [triage(n, now, new_days) for n in nodes.values()]
     _screen_meta(rows, nodes, lang, list(exclude))
-    _screen_details(rows, nodes, now, new_days, list(exclude), list(must))
-    return sorted(rows, key=lambda x: (-x["score"], x["pushed_days"]))
+    readmes = _screen_details(rows, nodes, now, new_days, list(exclude), list(must))
+    if task:
+        add_closeness(rows, readmes, task)
+        apply_closeness(rows, min_closeness)
+    return sorted(rows, key=sort_key)
 
 
 def main() -> None:
@@ -131,6 +162,10 @@ def main() -> None:
         return evaluate.main(sys.argv[2:])
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("queries", nargs="+")
+    ap.add_argument("--task", required=True, metavar="TEXT",
+                    help="Описание задачи (1-3 фразы на английском): по нему считается Близость")
+    ap.add_argument("--min-closeness", type=float, default=semantic.MIN_CLOSENESS, metavar="FLOAT",
+                    help="ниже порога Близости: стоп «не по теме» (по умолчанию %(default)s)")
     ap.add_argument("--months", type=int, default=6, help="только репо с push за N месяцев (0 = без фильтра)")
     ap.add_argument("--new-days", type=int, default=60, help="флаг «новый» для репо младше N дней")
     ap.add_argument("--limit", type=int, default=50, help="результатов на запрос (макс 100)")
@@ -151,7 +186,7 @@ def main() -> None:
         github.configure("record" if a.record else "replay" if a.replay else None, a.record or a.replay)
         now = github.recorded_at() if a.replay else datetime.now(UTC)
         rows = run(a.queries, months=a.months, new_days=a.new_days, limit=a.limit, lang=a.lang, now=now,
-                   exclude=exclude, must=must)
+                   exclude=exclude, must=must, task=a.task, min_closeness=a.min_closeness)
     except ValueError as e:
         print(e, file=sys.stderr)
         sys.exit(2)
