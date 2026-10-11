@@ -1,6 +1,8 @@
 """GitHub GraphQL через `gh api graphql` с ретраями при rate limit."""
+import gzip
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import time
@@ -8,10 +10,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 MAX_RETRIES = 3
+TRANSIENT = (502, 503, 504)
+README_MAX_CHARS = 6_000  # хватает для регэкспов и эмбеддинга; держит снапшоты небольшими
 
 SEARCH_GQL = """query($q:String!,$n:Int!){rateLimit{cost remaining resetAt}
 search(query:$q,type:REPOSITORY,first:$n){nodes{... on Repository{
-nameWithOwner url description stargazerCount forkCount pushedAt createdAt isArchived isFork
+nameWithOwner url description stargazerCount forkCount pushedAt createdAt isArchived isFork isTemplate
+repositoryTopics(first:20){nodes{topic{name}}}
 parent{nameWithOwner} primaryLanguage{name}
 defaultBranchRef{target{... on Commit{history{totalCount}}}}}}}}"""
 
@@ -48,7 +53,7 @@ def _attempt(query: str, variables: dict) -> tuple[dict | None, str | None]:
         print(f"предупреждение GraphQL: {msgs}", file=sys.stderr)
         return data, None
     if out.returncode:
-        if "429" in err or "rate limit" in err.lower():
+        if "429" in err or "rate limit" in err.lower() or any(f"HTTP {c}" in err for c in TRANSIENT):
             return None, err
         raise GitHubError(f"gh завершился с ошибкой: {err or out.stdout.strip()}")
     if data is None:
@@ -64,7 +69,9 @@ def configure(mode: str | None, directory: Path | str | None) -> None:
     _mode, _dir = mode, Path(directory) if directory else None
     if mode == "record":
         _dir.mkdir(parents=True, exist_ok=True)
-        (_dir / "meta.json").write_text(json.dumps({"recorded_at": datetime.now(UTC).isoformat()}))
+        meta = _dir / "meta.json"
+        if not meta.exists():  # повторная запись дописывает недостающее, дата снимка остаётся
+            meta.write_text(json.dumps({"recorded_at": datetime.now(UTC).isoformat()}))
 
 
 def recorded_at() -> datetime:
@@ -74,21 +81,43 @@ def recorded_at() -> datetime:
     return datetime.fromisoformat(json.loads(path.read_text())["recorded_at"])
 
 
+def _key(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()[:16]
+
+
 def _snapshot_path(query: str, variables: dict) -> Path:
-    blob = json.dumps({"query": query, "variables": variables}, sort_keys=True)
-    return _dir / f"{hashlib.sha256(blob.encode()).hexdigest()[:16]}.json"
+    return _dir / f"{_key(json.dumps({'query': query, 'variables': variables}, sort_keys=True))}.json.gz"
+
+
+def _write(path: Path, obj) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "wb") as f, gzip.GzipFile(fileobj=f, mode="wb", mtime=0) as g:
+        g.write(json.dumps(obj, ensure_ascii=False, separators=(",", ":")).encode())
+
+
+def _read(path: Path):
+    with gzip.open(path, "rt", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _cap_text(node):
+    """Обрезать тексты README (поле text) до README_MAX_CHARS."""
+    if isinstance(node, dict):
+        return {k: v[:README_MAX_CHARS] if k == "text" and isinstance(v, str) else _cap_text(v)
+                for k, v in node.items()}
+    return [_cap_text(v) for v in node] if isinstance(node, list) else node
 
 
 def graphql(query: str, variables: dict) -> dict:
     if _mode:
         path = _snapshot_path(query, variables)
-    if _mode == "replay":
-        if not path.exists():
+        if path.exists():
+            return _read(path)
+        if _mode == "replay":
             raise GitHubError(f"нет снапшота {path.name} для запроса {variables} (--record)")
-        return json.loads(path.read_text())
-    data = _graphql_live(query, variables)
+    data = _cap_text(_graphql_live(query, variables))
     if _mode == "record":
-        path.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")))
+        _write(path, data)
     return data
 
 
@@ -108,3 +137,56 @@ def search(query: str, limit: int) -> list[dict]:
     data = graphql(SEARCH_GQL, {"q": query, "n": limit})["data"]
     last_rate_limit = data.get("rateLimit")
     return [n for n in data["search"]["nodes"] if n]
+
+
+README_NAMES = ["README.md", "readme.md", "README.rst", "README", "Readme.md"]
+DETAILS_CHUNK = 10  # 25 алиасов с README и историей дают HTTP 502 (таймаут GitHub)
+_NAME = re.compile(r"[\w.-]+/[\w.-]+")
+
+
+def _alias(i: int, name: str) -> str:
+    owner, repo = name.split("/")
+    readmes = " ".join(f'm{k}: object(expression: "HEAD:{n}") {{ ... on Blob {{ text }} }}'
+                       for k, n in enumerate(README_NAMES))
+    return (f"r{i}: repository(owner: {json.dumps(owner)}, name: {json.dumps(repo)}) {{ {readmes} "
+            "defaultBranchRef{target{... on Commit{history(first:20){nodes{committedDate message: messageHeadline additions "
+            "deletions author{name user{login}}}}}}}}")
+
+
+def _fetch_details(chunk: list[str]) -> dict[str, dict | None]:
+    q = "query{rateLimit{cost remaining resetAt} " + " ".join(_alias(i, n) for i, n in enumerate(chunk)) + "}"
+    data = _cap_text(_graphql_live(q, {}))["data"]
+    out: dict[str, dict | None] = {}
+    for i, name in enumerate(chunk):
+        repo = data.get(f"r{i}")
+        if not repo:
+            out[name] = None
+            continue
+        texts = (repo.get(f"m{k}") for k in range(len(README_NAMES)))
+        target = (repo.get("defaultBranchRef") or {}).get("target") or {}
+        out[name] = {"readme": next((t["text"] for t in texts if t), None),
+                     "commits": (target.get("history") or {}).get("nodes") or []}
+    return out
+
+
+def details(names: list[str]) -> dict[str, dict]:
+    """README и последние 20 коммитов. Снапшот по репо (details/<хэш имени>.json.gz), пачки по DETAILS_CHUNK
+    только для недостающих. {name: {"readme": str|None, "commits": list}}; удалённые репо не попадают в ответ."""
+    out: dict[str, dict] = {}
+    missing = []
+    for n in (n for n in names if _NAME.fullmatch(n)):
+        path = _dir / "details" / f"{_key(n.lower())}.json.gz" if _mode else None
+        if path and path.exists():
+            if (d := _read(path)) is not None:
+                out[n] = d
+        elif _mode == "replay":
+            raise GitHubError(f"нет снапшота деталей {n} (--record)")
+        else:
+            missing.append(n)
+    for start in range(0, len(missing), DETAILS_CHUNK):
+        for name, d in _fetch_details(missing[start:start + DETAILS_CHUNK]).items():
+            if _mode == "record":
+                _write(_dir / "details" / f"{_key(name.lower())}.json.gz", d)
+            if d is not None:
+                out[name] = d
+    return out

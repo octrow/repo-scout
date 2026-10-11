@@ -2,11 +2,11 @@
 import argparse
 import sys
 import tomllib
-from datetime import UTC, datetime
 from pathlib import Path
 
 from repo_scout import github
 from repo_scout.cli import run
+from repo_scout.conditions import compile_all
 from repo_scout.github import GitHubError
 
 COLUMNS = ["набор", "позитивов", "найдено", "прошло", "позиции", "ложный отсев", "не найдено", "«отсев» прошли"]
@@ -51,11 +51,12 @@ def detail(m: dict) -> str:
 
 def eval_set(path: Path, mode: str) -> dict:
     spec = tomllib.loads(path.read_text())
-    if spec.get("must") or spec.get("exclude"):
-        print(f"{spec['name']}: must/exclude пока не применяются (Фаза 3)", file=sys.stderr)
+    exclude = compile_all("--exclude", spec.get("exclude", []))
+    must = compile_all("--must", spec.get("must", []))
     github.configure(mode, path.parent / "snapshots" / spec["name"])
-    now = github.recorded_at() if mode == "replay" else datetime.now(UTC)
-    rows = run(spec["queries"], months=6, new_days=60, limit=50, lang=spec.get("lang") or None, now=now)
+    now = github.recorded_at()  # дата снимка и при дозаписи: сравнимость с baseline
+    rows = run(spec["queries"], months=6, new_days=60, limit=50, lang=spec.get("lang") or None, now=now,
+               exclude=exclude, must=must)
     return metrics(spec, rows)
 
 

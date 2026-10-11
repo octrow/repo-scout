@@ -44,11 +44,11 @@
 
 ## Фаза 3 — Шум, Жёсткие условия, содержательные коммиты
 
-- [ ] Шум: awesome / tutorial / demo / homework / spam по имени, описанию, topics; отсев только при ≥2 независимых сигналах, причина в выводе. Основа — `external_examples/github-hidden-gems/src/hidden_gems/filtering/rules.py:200-576`. Шаблон — флаг «шаблон», не Шум.
-- [ ] Жёсткие условия: `--lang` (primaryLanguage), `--exclude` (регэксп → отсев), `--must` (группы регэкспов по README+topics; README нет → флаг, не отсев). Отсеянные по `--must` — отдельной строкой в выводе.
-- [ ] Пакетный GraphQL для выживших (алиасы `r1: repository(...)`, 20–50 за запрос): README (алиасы README.md/readme.md/README.rst…), `history(first:20){committedDate message additions deletions author{user{login}}}`.
-- [ ] Содержательный коммит: не служебный бот (dependabot, renovate, github-actions, pre-commit-ci, allcontributors, imgbot, semantic-release-bot) и не косметика (сообщение `docs:|chore(deps)|ci:|style:|bump|release|typo|readme|merge` или крошечная правка текста). Коммиты AI-агентов — обычные. Идеи: `github-hidden-gems/.../light_analysis/activity.py:26-177`.
-- [ ] Свежесть и «мёртвый» пересчитываются по последнему содержательному коммиту; нет ни одного среди 20 → дата самого старого + флаг «только косметика».
+- [x] Шум: awesome / tutorial / demo / homework / spam по имени, описанию, topics; отсев только при ≥2 независимых сигналах, причина в выводе. Основа — `external_examples/github-hidden-gems/src/hidden_gems/filtering/rules.py:200-576`. Шаблон — флаг «шаблон», не Шум.
+- [x] Жёсткие условия: `--lang` (primaryLanguage), `--exclude` (регэксп → отсев), `--must` (группы регэкспов по README+topics; README нет → флаг, не отсев). Отсеянные по `--must` — отдельной строкой в выводе.
+- [x] Пакетный GraphQL для выживших (алиасы `r1: repository(...)`, 20–50 за запрос): README (алиасы README.md/readme.md/README.rst…), `history(first:20){committedDate message additions deletions author{user{login}}}`.
+- [x] Содержательный коммит: не служебный бот (dependabot, renovate, github-actions, pre-commit-ci, allcontributors, imgbot, semantic-release-bot) и не косметика (сообщение `docs:|chore(deps)|ci:|style:|bump|release|typo|readme|merge` или крошечная правка текста). Коммиты AI-агентов — обычные. Идеи: `github-hidden-gems/.../light_analysis/activity.py:26-177`.
+- [x] Свежесть и «мёртвый» пересчитываются по последнему содержательному коммиту; нет ни одного среди 20 → дата самого старого + флаг «только косметика».
 
 Готово: тесты на правила Шума, условий и коммитов; eval: Шум из прошлых прогонов (awesome-листы) ушёл, «→ Разбор» не потеряны.
 

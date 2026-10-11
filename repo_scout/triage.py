@@ -7,12 +7,19 @@ HYPE_RATIO, HYPE_MIN_STARS = 20, 1_000  # "stars≫commits"
 
 
 def days_since(iso: str, now: datetime) -> int:
-    return (now - datetime.fromisoformat(iso)).days
+    return max(0, (now - datetime.fromisoformat(iso)).days)
 
 
-def triage(r: dict, now: datetime, new_days: int) -> dict:
-    """Return the row dict with score, flags and stop reason (None = passes)."""
-    stars, pushed = r["stargazerCount"], days_since(r["pushedAt"], now)
+def topics_of(r: dict) -> list[str]:
+    nodes = (r.get("repositoryTopics") or {}).get("nodes") or []
+    return [n["topic"]["name"] for n in nodes]
+
+
+def triage(r: dict, now: datetime, new_days: int, last_push: str | None = None) -> dict:
+    """Return the row dict with score, flags and stop reason (None = passes).
+
+    last_push: дата последнего содержательного коммита вместо pushedAt."""
+    stars, pushed = r["stargazerCount"], days_since(last_push or r["pushedAt"], now)
     target = (r.get("defaultBranchRef") or {}).get("target") or {}
     commits = (target.get("history") or {}).get("totalCount", 0)
 
@@ -39,7 +46,7 @@ def triage(r: dict, now: datetime, new_days: int) -> dict:
     return {
         "repo": r["nameWithOwner"], "url": r["url"], "stars": stars, "forks": r["forkCount"],
         "commits": commits, "pushed_days": pushed, "created": r["createdAt"][:10],
-        "lang": (r.get("primaryLanguage") or {}).get("name", ""),
+        "topics": topics_of(r), "lang": (r.get("primaryLanguage") or {}).get("name", ""),
         "desc": (r.get("description") or "").replace("|", "/").replace("\n", " "),
         "score": fresh + pop, "fresh": fresh, "pop": pop, "flags": flags, "stop": stop,
     }

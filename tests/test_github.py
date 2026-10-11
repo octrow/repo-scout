@@ -70,3 +70,9 @@ def test_partial_errors_return_data(monkeypatch, capsys):
     run_with(monkeypatch, [(1, body, "")])
     assert github.search("q", 5) == [{"nameWithOwner": "a/b"}]
     assert "boom" in capsys.readouterr().err
+
+
+def test_retry_on_502(monkeypatch):
+    calls, _ = run_with(monkeypatch, [(1, "", "gh: HTTP 502"), (0, OK, "")])
+    assert github.search("q", 5)
+    assert len(calls) == 2
