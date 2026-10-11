@@ -1,7 +1,8 @@
 [project]
 name = "repo-scout"
 version = "0.1.0"
-description = "Поиск готовых решений на GitHub: стоп-правила, флаги, баллы"
+description = "Find reusable GitHub projects before writing your own: search, triage, semantic closeness, no LLM"
+license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
     "fastembed>=0.9.0",
