@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 import time
+from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -21,6 +22,7 @@ SEARCH_GQL = ("query($q:String!,$n:Int!){rateLimit{cost remaining resetAt}\n"
               "search(query:$q,type:REPOSITORY,first:$n){nodes{... on Repository{\n" + NODE_FIELDS + "}}}}")
 
 last_rate_limit: dict | None = None
+calls: Counter = Counter()  # логические вызовы: search, details (пачки по DETAILS_CHUNK, и из снапшотов тоже)
 _mode: str | None = None  # "record" | "replay" | None
 _dir: Path | None = None
 
@@ -134,6 +136,7 @@ def _graphql_live(query: str, variables: dict) -> dict:
 
 def search(query: str, limit: int) -> list[dict]:
     global last_rate_limit
+    calls["search"] += 1
     data = graphql(SEARCH_GQL, {"q": query, "n": limit})["data"]
     last_rate_limit = data.get("rateLimit")
     return [n for n in data["search"]["nodes"] if n]
@@ -174,6 +177,7 @@ def details(names: list[str]) -> dict[str, dict]:
     только для недостающих. {name: {"readme": str|None, "commits": list}}; удалённые репо не попадают в ответ."""
     out: dict[str, dict] = {}
     missing = []
+    calls["details"] += -(-len([n for n in names if _NAME.fullmatch(n)]) // DETAILS_CHUNK)
     for n in (n for n in names if _NAME.fullmatch(n)):
         path = _dir / "details" / f"{_key(n.lower())}.json.gz" if _mode else None
         if path and path.exists():
@@ -215,6 +219,7 @@ def refresh(names: list[str]) -> dict[str, dict]:
     Снапшот по репо (refresh/<хэш имени>.json.gz); удалённые репо не попадают в ответ."""
     out: dict[str, dict] = {}
     missing = []
+    calls["details"] += -(-len([n for n in names if _NAME.fullmatch(n)]) // DETAILS_CHUNK)
     for n in (n for n in names if _NAME.fullmatch(n)):
         path = _dir / "refresh" / f"{_key(n.lower())}.json.gz" if _mode else None
         if path and path.exists():

@@ -1,6 +1,6 @@
 """Шаг 1 из docs/repo-triage.md: найти репо на GitHub, применить стоп-правила, посчитать баллы.
 
-Usage: repo-scout --task "<English task description>" "query one" "query two" [--min-closeness 0.6] [--months 6] [--new-days 60] [--limit 50] [--lang X] [--exclude RE] [--must RE] [--all] [--json]
+Usage: repo-scout --task "<English task description>" "query one" "query two" [--min-closeness 0.6] [--months 6] [--new-days 60] [--limit 50] [--lang X] [--exclude RE] [--must RE] [--no-round2] [--round2-k 10] [--all] [--json]
 Each query is GitHub search syntax (language:python, topic:x ...). Needs an authenticated `gh`.
 """
 import argparse
@@ -23,6 +23,7 @@ from repo_scout.conditions import (
 from repo_scout.github import GitHubError
 from repo_scout.index import Index, default_path, validate_verdict
 from repo_scout.noise import is_template, noise_stop
+from repo_scout.round2 import ROUND2_K, pick_topics
 from repo_scout.triage import triage, verdict
 
 MAX_TEXT_CHARS, MAX_OPERATORS = 256, 5
@@ -40,7 +41,7 @@ def _has(tokens: list[str], name: str) -> bool:
 def build_query(q: str, *, months: int, since: str, lang: str | None) -> str:
     tokens = TOKEN.findall(q)
     parts = [q]
-    if not _has(tokens, "in"):
+    if not _has(tokens, "in") and not all(QUALIFIER.fullmatch(t) for t in tokens):  # `in:` относится к тексту
         parts.append("in:name,description,topics,readme")
     if not _has(tokens, "mirror"):
         parts.append("mirror:false")
@@ -159,25 +160,15 @@ def sort_key(r: dict) -> tuple:
     return (-(-1.0 if c is None else c), -r["score"], r["pushed_days"])
 
 
-def run(queries: list[str], *, months: int, new_days: int, limit: int, lang: str | None, now: datetime,
-        exclude: list[re.Pattern] = (), must: list[re.Pattern] = (), task: str | None = None,
-        min_closeness: float = semantic.MIN_CLOSENESS, index: Index | None = None,
-        from_index: int = FROM_INDEX) -> list[dict]:
-    """Все строки триажа (включая отсеянные), отсортированы по Близости, потом по баллам."""
-    since = (now - timedelta(days=30 * months)).date().isoformat()
-    nodes = {}
-    for q in queries:
-        full = build_query(q, months=months, since=since, lang=lang)
-        validate_query(full)
-        for r in github.search(full, min(limit, 100)):
-            nodes.setdefault(r["nameWithOwner"], r)
-    live = set(nodes)
-    known = _from_index(index, task, nodes, from_index) if index and task and from_index else {}
+def _process(nodes: dict, live: set[str], source: str, *, now: datetime, new_days: int, lang: str | None,
+             exclude: list[re.Pattern], must: list[re.Pattern], task: str | None, min_closeness: float,
+             index: Index | None, known: dict[str, dict]) -> list[dict]:
+    """Конвейер для набора узлов: триаж, шум, условия, детали, Близость, порог, запись в Индекс."""
     rows = [triage(n, now, new_days) for n in nodes.values()]
     for r in rows:
-        r["source"] = "запрос" if r["repo"] in live else "индекс"
-    _screen_meta(rows, nodes, lang, list(exclude))
-    readmes = _screen_details(rows, nodes, now, new_days, list(exclude), list(must), known)
+        r["source"] = source if r["repo"] in live else "индекс"
+    _screen_meta(rows, nodes, lang, exclude)
+    readmes = _screen_details(rows, nodes, now, new_days, exclude, must, known)
     if task:
         vecs = add_closeness(rows, readmes, task)
         if index:
@@ -185,6 +176,46 @@ def run(queries: list[str], *, months: int, new_days: int, limit: int, lang: str
                 if r["repo"] in vecs and readmes.get(r["repo"]):
                     index.upsert(r, readmes[r["repo"]], vecs[r["repo"]], now)
         apply_closeness(rows, min_closeness)
+    return rows
+
+
+def _search_all(queries: list[str], *, months: int, since: str, lang: str | None, limit: int, into: dict) -> None:
+    for q in queries:
+        full = build_query(q, months=months, since=since, lang=lang)
+        validate_query(full)
+        for r in github.search(full, min(limit, 100)):
+            into.setdefault(r["nameWithOwner"], r)
+
+
+def _round2(rows: list[dict], queries: list[str], pool: dict, *, k: int, floor: float, lang: str | None,
+            months: int, since: str, limit: int) -> tuple[dict, list[str]]:
+    """Новые узлы по `topic:`-Запросам из топ-k прошедших строк (Близость не ниже floor)."""
+    top = sorted((r for r in rows if not r["stop"] and (r.get("closeness") or 0) >= floor), key=sort_key)[:k]
+    topics = pick_topics(top, queries)
+    found: dict = {}
+    _search_all([f"topic:{t}" for t in topics], months=months, since=since, lang=lang, limit=limit, into=found)
+    lower = {n.lower() for n in pool}
+    return {n: v for n, v in found.items() if n.lower() not in lower}, topics
+
+
+def run(queries: list[str], *, months: int, new_days: int, limit: int, lang: str | None, now: datetime,
+        exclude: list[re.Pattern] = (), must: list[re.Pattern] = (), task: str | None = None,
+        min_closeness: float = semantic.MIN_CLOSENESS, index: Index | None = None,
+        from_index: int = FROM_INDEX, round2: bool = True, round2_k: int = ROUND2_K) -> list[dict]:
+    """Все строки триажа (включая отсеянные), отсортированы по Близости, потом по баллам."""
+    since = (now - timedelta(days=30 * months)).date().isoformat()
+    nodes: dict = {}
+    _search_all(queries, months=months, since=since, lang=lang, limit=limit, into=nodes)
+    live = set(nodes)
+    known = _from_index(index, task, nodes, from_index) if index and task and from_index else {}
+    kw = {"now": now, "new_days": new_days, "lang": lang, "exclude": list(exclude), "must": list(must),
+          "task": task, "min_closeness": min_closeness, "index": index}
+    rows = _process(nodes, live, "запрос", known=known, **kw)
+    if task and round2:
+        extra, topics = _round2(rows, queries, nodes, k=round2_k, floor=max(min_closeness, semantic.MIN_CLOSENESS),
+                                lang=lang, months=months, since=since, limit=limit)
+        print("второй круг: topics " + (", ".join(topics) or "—"), file=sys.stderr)
+        rows += _process(extra, set(extra), "второй круг", known={}, **kw)
     if index:
         seen = index.seen([r["repo"] for r in rows])
         for r in rows:
@@ -213,6 +244,11 @@ def main() -> None:
         return evaluate.main(sys.argv[2:])
     if sys.argv[1:2] == ["verdict"]:
         return verdict_main(sys.argv[2:])
+    a = _parser().parse_args()
+    _main(a)
+
+
+def _parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("queries", nargs="+")
     ap.add_argument("--task", required=True, metavar="TEXT",
@@ -229,20 +265,26 @@ def main() -> None:
                     help="группа обязательных слов в README, topics, описании; нужны все группы (можно повторять)")
     ap.add_argument("--from-index", type=int, default=FROM_INDEX, metavar="N",
                     help="добавить в Пул N ближайших из Индекса (0 = выключить, по умолчанию %(default)s)")
+    ap.add_argument("--round2-k", type=int, default=ROUND2_K, metavar="K",
+                    help="второй круг берёт topics из топ-K (по умолчанию %(default)s)")
+    ap.add_argument("--no-round2", action="store_true", help="без второго круга (`topic:` из топ-K)")
     ap.add_argument("--all", action="store_true", help="показать и отсеянных стоп-правилами")
     ap.add_argument("--json", action="store_true")
     snap = ap.add_mutually_exclusive_group()
     snap.add_argument("--record", metavar="DIR", help="писать ответы GitHub в DIR")
     snap.add_argument("--replay", metavar="DIR", help="читать ответы из DIR без сети")
-    a = ap.parse_args()
+    return ap
 
+
+def _main(a: argparse.Namespace) -> None:
     try:
         exclude, must = compile_all("--exclude", a.exclude), compile_all("--must", a.must)
         github.configure("record" if a.record else "replay" if a.replay else None, a.record or a.replay)
         now = github.recorded_at() if a.replay else datetime.now(UTC)
         rows = run(a.queries, months=a.months, new_days=a.new_days, limit=a.limit, lang=a.lang, now=now,
                    exclude=exclude, must=must, task=a.task, min_closeness=a.min_closeness,
-                   index=None if a.record or a.replay else Index(default_path()), from_index=a.from_index)
+                   index=None if a.record or a.replay else Index(default_path()), from_index=a.from_index,
+                   round2=not a.no_round2, round2_k=a.round2_k)
     except ValueError as e:
         print(e, file=sys.stderr)
         sys.exit(2)

@@ -77,20 +77,23 @@ def sweep(sets: list[tuple[dict, list[dict]]]) -> str:
 
 
 def eval_set(path: Path, mode: str, task: str | None = None, queries: list[str] | None = None,
-             index: Index | None = None, from_index: int = FROM_INDEX) -> tuple[dict, list[dict]]:
+             index: Index | None = None, from_index: int = FROM_INDEX,
+             round2: bool = True) -> tuple[dict, list[dict]]:
     """Прогон набора. Индекс по умолчанию свежий временный: числа сравнимы, пользовательский Индекс не трогаем."""
     spec = tomllib.loads(path.read_text())
     exclude = compile_all("--exclude", spec.get("exclude", []))
     must = compile_all("--must", spec.get("must", []))
     github.configure(mode, path.parent / "snapshots" / spec["name"])
+    github.calls.clear()
     now = github.recorded_at()  # дата снимка и при дозаписи: сравнимость с baseline
     with tempfile.TemporaryDirectory() as tmp:
         idx = index or Index(Path(tmp) / "index.db")
         rows = run(queries or spec["queries"], months=6, new_days=60, limit=50, lang=spec.get("lang") or None,
                    now=now, exclude=exclude, must=must, task=task or spec["task"], min_closeness=0, index=idx,
-                   from_index=from_index)
+                   from_index=from_index, round2=round2)
         if not index:
             idx.db.close()
+    spec["calls"] = dict(github.calls)
     return spec, rows
 
 
@@ -98,10 +101,10 @@ def index_check(path: Path, mode: str, from_index: int = FROM_INDEX) -> str:
     """Критерий Фазы 5: другая формулировка и меньше Запросов поднимают из Индекса репо, которых нет в живой выдаче."""
     with tempfile.TemporaryDirectory() as tmp:
         idx = Index(Path(tmp) / "index.db")
-        spec, first = eval_set(path, mode, index=idx)
+        spec, first = eval_set(path, mode, index=idx, round2=False)
         if not spec.get("alt_task"):
             return ""
-        _, rows = eval_set(path, mode, spec["alt_task"], spec["queries"][:2], idx, from_index)
+        _, rows = eval_set(path, mode, spec["alt_task"], spec["queries"][:2], idx, from_index, round2=False)
         idx.db.close()
     pos = {e["repo"].lower() for e in spec["expected"] if e["verdict"].startswith("→")}
     live = [r for r in rows if r["source"] == "запрос"]
@@ -139,6 +142,8 @@ def main(argv: list[str]) -> None:
     ap.add_argument("--sweep", action="store_true", help="таблица порогов Близости 0.50..0.90")
     ap.add_argument("--top", type=int, metavar="N", help="вывести топ-N выдачи каждого набора")
     ap.add_argument("--task", metavar="TEXT", help="подменить Описание задачи (проверка устойчивости формулировок)")
+    ap.add_argument("--no-round2", action="store_true", help="без второго круга (сравнение)")
+    ap.add_argument("--calls", action="store_true", help="число вызовов API (поиск, детали) по наборам")
     ap.add_argument("--index-check", action="store_true", help="критерий Фазы 5: перефразировка + Индекс")
     ap.add_argument("--export-verdicts", action="store_true", help="Вердикты Индекса как [[expected]] (TOML)")
     ap.add_argument("--from-index", type=int, default=FROM_INDEX, metavar="N", help="с --index-check")
@@ -151,7 +156,7 @@ def main(argv: list[str]) -> None:
     try:
         if a.index_check:
             return print("\n".join(filter(None, (index_check(p, "record" if a.record else "replay", a.from_index) for p in a.sets))))
-        sets = [eval_set(p, "record" if a.record else "replay", a.task) for p in a.sets]
+        sets = [eval_set(p, "record" if a.record else "replay", a.task, round2=not a.no_round2) for p in a.sets]
     except (ValueError, GitHubError) as e:
         sys.exit(f"eval: {e}")
     ms, tops = [], []
@@ -161,6 +166,9 @@ def main(argv: list[str]) -> None:
         ms.append(metrics(spec, capped))
         tops.append([r["repo"] for r in capped if not r["stop"]][:a.top or 0])
     print(summary_table(ms))
+    if a.calls:
+        print("\n" + "\n".join(f"{s['name']}: поиск {s['calls'].get('search', 0)}, детали {s['calls'].get('details', 0)}"
+                              for s, _ in sets))
     if a.sweep:
         print("\n" + sweep(sets))
     for m, top in zip(ms, tops):
