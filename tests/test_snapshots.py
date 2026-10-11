@@ -55,7 +55,7 @@ def test_record_reuses_existing_and_keeps_meta(monkeypatch, tmp_path):
 
 
 def fake_live(sent):
-    def live(query, variables):
+    def live(query, variables, **_):
         sent.append(query)
         aliases = [i for i in range(10) if f"r{i}:" in query]
         repo = {"m0": None, "m1": {"text": "hello"}, "defaultBranchRef": {"target": {

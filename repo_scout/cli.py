@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 import numpy as np
 
 from repo_scout import github, semantic
+from repo_scout import log as logmod
 from repo_scout.commits import last_substantive
 from repo_scout.conditions import (
     compile_all,
@@ -22,6 +23,7 @@ from repo_scout.conditions import (
 )
 from repo_scout.github import GitHubError
 from repo_scout.index import Index, default_path, validate_verdict
+from repo_scout.log import log
 from repo_scout.noise import is_template, noise_stop
 from repo_scout.round2 import ROUND2_K, pick_topics
 from repo_scout.triage import triage, verdict
@@ -128,6 +130,7 @@ def add_closeness(rows: list[dict], readmes: dict[str, str | None], task: str) -
     todo = [r for r in rows if not r["stop"]]
     if not todo:
         return {}
+    log.info("Близость: эмбеддинг %d кандидатов", len(todo))
     docs = semantic.embed_docs([semantic.candidate_text(r, readmes.get(r["repo"])) for r in todo])
     for r, c in zip(todo, semantic.closeness(semantic.embed_task(task), docs)):
         r["closeness"] = float(c)
@@ -140,8 +143,8 @@ def _from_index(index: Index, task: str, nodes: dict, n: int) -> dict[str, dict]
     wanted = [m for m in index.top(task, n) if m.lower() not in live]
     fresh = github.refresh(wanted)
     for name in wanted:
-        if name not in fresh:
-            index.forget(name)  # удалено (или недоступно) на GitHub
+        if name not in fresh and name not in github.last_failed:
+            index.forget(name)  # удалено на GitHub
         elif (new := fresh[name]["node"]["nameWithOwner"]).lower() != name.lower():
             index.rename(name, new)
     for d in fresh.values():
@@ -164,6 +167,7 @@ def _process(nodes: dict, live: set[str], source: str, *, now: datetime, new_day
              exclude: list[re.Pattern], must: list[re.Pattern], task: str | None, min_closeness: float,
              index: Index | None, known: dict[str, dict]) -> list[dict]:
     """Конвейер для набора узлов: триаж, шум, условия, детали, Близость, порог, запись в Индекс."""
+    log.info("конвейер (%s): %d кандидатов", source, len(nodes))
     rows = [triage(n, now, new_days) for n in nodes.values()]
     for r in rows:
         r["source"] = source if r["repo"] in live else "индекс"
@@ -180,11 +184,13 @@ def _process(nodes: dict, live: set[str], source: str, *, now: datetime, new_day
 
 
 def _search_all(queries: list[str], *, months: int, since: str, lang: str | None, limit: int, into: dict) -> None:
-    for q in queries:
+    for i, q in enumerate(queries, 1):
         full = build_query(q, months=months, since=since, lang=lang)
         validate_query(full)
-        for r in github.search(full, min(limit, 100)):
+        found = github.search(full, min(limit, 100))
+        for r in found:
             into.setdefault(r["nameWithOwner"], r)
+        log.info("поиск %d/%d: %s → %d (пул %d)", i, len(queries), q, len(found), len(into))
 
 
 def _round2(rows: list[dict], queries: list[str], pool: dict, *, k: int, floor: float, lang: str | None,
@@ -214,7 +220,7 @@ def run(queries: list[str], *, months: int, new_days: int, limit: int, lang: str
     if task and round2:
         extra, topics = _round2(rows, queries, nodes, k=round2_k, floor=max(min_closeness, semantic.MIN_CLOSENESS),
                                 lang=lang, months=months, since=since, limit=limit)
-        print("второй круг: topics " + (", ".join(topics) or "—"), file=sys.stderr)
+        log.info("второй круг: topics %s → новых %d", ", ".join(topics) or "—", len(extra))
         rows += _process(extra, set(extra), "второй круг", known={}, **kw)
     if index:
         seen = index.seen([r["repo"] for r in rows])
@@ -245,6 +251,7 @@ def main() -> None:
     if sys.argv[1:2] == ["verdict"]:
         return verdict_main(sys.argv[2:])
     a = _parser().parse_args()
+    logmod.setup(quiet=a.quiet)
     _main(a)
 
 
@@ -273,6 +280,7 @@ def _parser() -> argparse.ArgumentParser:
     snap = ap.add_mutually_exclusive_group()
     snap.add_argument("--record", metavar="DIR", help="писать ответы GitHub в DIR")
     snap.add_argument("--replay", metavar="DIR", help="читать ответы из DIR без сети")
+    ap.add_argument("-q", "--quiet", action="store_true", help="ход работы только в лог-файл, в stderr — предупреждения")
     return ap
 
 
@@ -292,7 +300,7 @@ def _main(a: argparse.Namespace) -> None:
         sys.exit(f"GitHub: {e}")
     if github.last_rate_limit and not a.replay:
         rl = github.last_rate_limit
-        print(f"rate limit: осталось {rl['remaining']}, сброс {rl['resetAt']}", file=sys.stderr)
+        log.info("rate limit: осталось %s, сброс %s", rl["remaining"], rl["resetAt"])
 
     kept = [r for r in rows if not r["stop"]]
     by_must = [r for r in rows if (r["stop"] or "").startswith(MUST_STOP)]

@@ -4,11 +4,12 @@ import hashlib
 import json
 import re
 import subprocess
-import sys
 import time
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
+
+from repo_scout.log import log
 
 MAX_RETRIES = 3
 TRANSIENT = (502, 503, 504)
@@ -22,6 +23,7 @@ SEARCH_GQL = ("query($q:String!,$n:Int!){rateLimit{cost remaining resetAt}\n"
               "search(query:$q,type:REPOSITORY,first:$n){nodes{... on Repository{\n" + NODE_FIELDS + "}}}}")
 
 last_rate_limit: dict | None = None
+last_failed: set[str] = set()  # репо, которые GitHub так и не отдал в details/refresh (не путать с удалёнными)
 calls: Counter = Counter()  # логические вызовы: search, details (пачки по DETAILS_CHUNK, и из снапшотов тоже)
 _mode: str | None = None  # "record" | "replay" | None
 _dir: Path | None = None
@@ -52,7 +54,7 @@ def _attempt(query: str, variables: dict) -> tuple[dict | None, str | None]:
         return None, "RATE_LIMITED"
     if data and data.get("data") is not None and errors:
         msgs = "; ".join(str(e.get("message", e)) for e in errors)
-        print(f"предупреждение GraphQL: {msgs}", file=sys.stderr)
+        log.warning("предупреждение GraphQL: %s", msgs)
         return data, None
     if out.returncode:
         if "429" in err or "rate limit" in err.lower() or any(f"HTTP {c}" in err for c in TRANSIENT):
@@ -123,15 +125,35 @@ def graphql(query: str, variables: dict) -> dict:
     return data
 
 
-def _graphql_live(query: str, variables: dict) -> dict:
+def _graphql_live(query: str, variables: dict, retries: int = MAX_RETRIES) -> dict:
     reason = None
-    for attempt in range(MAX_RETRIES + 1):
+    for attempt in range(retries + 1):
         data, reason = _attempt(query, variables)
         if data is not None:
             return data
-        if attempt < MAX_RETRIES:
-            time.sleep(min(2**attempt * 5, 60))
-    raise GitHubError(f"лимит GitHub, {MAX_RETRIES} повтора не помогли: {reason}")
+        if attempt < retries:
+            wait = min(2**attempt * 5, 60)
+            log.info("GitHub: %s — повтор %d/%d через %d с", reason, attempt + 1, retries, wait)
+            time.sleep(wait)
+    raise GitHubError(f"GitHub не ответил после {retries} повторов: {reason}")
+
+
+def _batch(chunk: list[str], alias) -> dict[str, dict | None]:
+    """{name: узел | None (удалён)}. Пачка падает (502 — таймаут тяжёлого запроса) → делим пополам без
+    повторов; одиночный репо — с повторами, не вышло → пропуск с предупреждением и в last_failed."""
+    q = "query{rateLimit{cost remaining resetAt} " + " ".join(alias(i, n) for i, n in enumerate(chunk)) + "}"
+    try:
+        data = _cap_text(_graphql_live(q, {}, retries=MAX_RETRIES if len(chunk) == 1 else 0))["data"]
+    except GitHubError as e:
+        if len(chunk) > 1:
+            log.info("пачка из %d не прошла (%s), делю пополам", len(chunk), e)
+        if len(chunk) == 1:
+            log.warning("предупреждение: %s пропущен: %s", chunk[0], e)
+            last_failed.add(chunk[0])
+            return {}
+        mid = len(chunk) // 2
+        return _batch(chunk[:mid], alias) | _batch(chunk[mid:], alias)
+    return {name: data.get(f"r{i}") for i, name in enumerate(chunk)}
 
 
 def search(query: str, limit: int) -> list[dict]:
@@ -157,11 +179,8 @@ def _alias(i: int, name: str) -> str:
 
 
 def _fetch_details(chunk: list[str]) -> dict[str, dict | None]:
-    q = "query{rateLimit{cost remaining resetAt} " + " ".join(_alias(i, n) for i, n in enumerate(chunk)) + "}"
-    data = _cap_text(_graphql_live(q, {}))["data"]
     out: dict[str, dict | None] = {}
-    for i, name in enumerate(chunk):
-        repo = data.get(f"r{i}")
+    for name, repo in _batch(chunk, _alias).items():
         if not repo:
             out[name] = None
             continue
@@ -188,6 +207,7 @@ def details(names: list[str]) -> dict[str, dict]:
         else:
             missing.append(n)
     for start in range(0, len(missing), DETAILS_CHUNK):
+        log.info("детали: %d–%d из %d", start + 1, min(start + DETAILS_CHUNK, len(missing)), len(missing))
         for name, d in _fetch_details(missing[start:start + DETAILS_CHUNK]).items():
             if _mode == "record":
                 _write(_dir / "details" / f"{_key(name.lower())}.json.gz", d)
@@ -230,11 +250,9 @@ def refresh(names: list[str]) -> dict[str, dict]:
         else:
             missing.append(n)
     for start in range(0, len(missing), DETAILS_CHUNK):
-        chunk = missing[start:start + DETAILS_CHUNK]
-        q = "query{rateLimit{cost remaining resetAt} " + " ".join(_alias_full(i, n) for i, n in enumerate(chunk)) + "}"
-        data = _cap_text(_graphql_live(q, {}))["data"]
-        for i, name in enumerate(chunk):
-            d = _split_full(data[f"r{i}"]) if data.get(f"r{i}") else None
+        log.info("обновление из Индекса: %d–%d из %d", start + 1, min(start + DETAILS_CHUNK, len(missing)), len(missing))
+        for name, repo in _batch(missing[start:start + DETAILS_CHUNK], _alias_full).items():
+            d = _split_full(repo) if repo else None
             if _mode == "record":
                 _write(_dir / "refresh" / f"{_key(name.lower())}.json.gz", d)
             if d is not None:

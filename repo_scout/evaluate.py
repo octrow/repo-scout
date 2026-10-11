@@ -133,6 +133,8 @@ def export_verdicts(index: Index, project: str | None) -> str:
 
 
 def main(argv: list[str]) -> None:
+    from repo_scout import log
+    log.setup(quiet=True)  # ponytail: eval печатает таблицы; ход работы — в лог-файл
     ap = argparse.ArgumentParser(prog="repo-scout eval")
     ap.add_argument("sets", nargs="*", type=Path)
     mode = ap.add_mutually_exclusive_group()

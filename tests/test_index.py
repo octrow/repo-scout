@@ -107,7 +107,7 @@ def test_run_writes_index_pulls_from_index_and_marks_seen(tmp_path, fake_embed, 
 def test_refresh_splits_node_and_details(monkeypatch):
     repo = {**node("a/b"), "m0": {"text": "# hi"}, "m1": None,
             "recent": {"target": {"history": {"nodes": [{"message": "x"}]}}}}
-    monkeypatch.setattr(github, "_graphql_live", lambda q, v: {"data": {"r0": repo, "r1": None}})
+    monkeypatch.setattr(github, "_graphql_live", lambda q, v, **_: {"data": {"r0": repo, "r1": None}})
     out = github.refresh(["a/b", "a/gone"])
     assert list(out) == ["a/b"] and out["a/b"]["details"] == {"readme": "# hi", "commits": [{"message": "x"}]}
     assert out["a/b"]["node"]["nameWithOwner"] == "a/b" and "m0" not in out["a/b"]["node"]

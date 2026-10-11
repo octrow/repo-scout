@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 
 import pytest
@@ -76,3 +77,26 @@ def test_retry_on_502(monkeypatch):
     calls, _ = run_with(monkeypatch, [(1, "", "gh: HTTP 502"), (0, OK, "")])
     assert github.search("q", 5)
     assert len(calls) == 2
+
+
+def _flaky_live(bad: set[str]):
+    """Пачка, где есть репо из bad, падает как 502; одиночные bad тоже."""
+    def live(query, variables, **_):
+        names = re.findall(r'r(\d+): repository\(owner: "(\w+)", name: "(\w+)"\)', query)
+        if any(f"{o}/{n}" in bad for _, o, n in names):
+            raise github.GitHubError("GitHub не ответил: gh: HTTP 502")
+        return {"data": {f"r{i}": {"m0": {"text": f"{o}/{n}"}} for i, o, n in names}}
+    return live
+
+
+def test_details_splits_chunk_on_502_and_skips_failing_repo(monkeypatch, capsys):
+    monkeypatch.setattr(github, "_graphql_live", _flaky_live({"a/bad"}))
+    out = github.details(["a/one", "a/bad", "a/two", "a/three"])
+    assert set(out) == {"a/one", "a/two", "a/three"}
+    assert "a/bad" in capsys.readouterr().err
+
+
+def test_refresh_failed_repo_is_not_reported_as_deleted(monkeypatch):
+    monkeypatch.setattr(github, "_graphql_live", _flaky_live({"a/bad"}))
+    out = github.refresh(["a/one", "a/bad"])
+    assert "a/bad" not in out and github.last_failed == {"a/bad"}

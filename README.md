@@ -11,3 +11,5 @@ uv tool install --editable .   # команда repo-scout в PATH
 ```
 
 Зависимости: Python 3.11+ (uv) и авторизованный `gh`. Второй круг (один раз `topic:<slug>` из частых topics топ-10) и Индекс работают сами; колонка `источник` показывает, откуда строка. Скилл для агента лежит в `skill/SKILL.md` и подключён симлинком `~/.agents/skills/repo-scout`.
+
+Ход работы: stderr и `~/.local/state/repo-scout/run.log` (`tail -f` из другого терминала; `$REPO_SCOUT_LOG`, `-q`).
