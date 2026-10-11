@@ -20,12 +20,12 @@
 
 ## Фаза 1 — пакет и перенос
 
-- [ ] `pyproject.toml` (uv, Python ≥3.11), пакет `repo_scout/`: `github.py` (GraphQL, rate limit), `triage.py` (стоп-правила, флаги, баллы), `cli.py`; точка входа `repo-scout`.
-- [ ] Перенести `scout.py` в модули без изменения поведения; `test_scout.py` → `tests/test_triage.py` (pytest).
-- [ ] `uv tool install --editable .`; скилл зовёт `repo-scout` вместо `scout.py`.
-- [ ] Перенести `~/dev/docs/repo-triage.md` → `docs/repo-triage.md`, на старом месте симлинк.
-- [ ] Поправки поиска из `docs/search-advices.md`: `in:name,description,topics,readme`, `mirror:false`, `--lang` → `language:` в Запросе; проверка лимитов (256 символов текста, ≤5 AND/OR/NOT) до отправки, понятная ошибка.
-- [ ] В каждом GraphQL-запросе `rateLimit{cost remaining resetAt}`; ретраи 403/429/«200 без JSON» с backoff (DeepGit `graphql.py:177-209`), 403 считать лимитом только при remaining==0 / Retry-After (repohunt `github.ts:150-160`).
+- [x] `pyproject.toml` (uv, Python ≥3.11), пакет `repo_scout/`: `github.py` (GraphQL, rate limit), `triage.py` (стоп-правила, флаги, баллы), `cli.py`; точка входа `repo-scout`.
+- [x] Перенести `scout.py` в модули без изменения поведения; `test_scout.py` → `tests/test_triage.py` (pytest).
+- [x] `uv tool install --editable .`; скилл зовёт `repo-scout` вместо `scout.py`.
+- [x] Перенести `~/dev/docs/repo-triage.md` → `docs/repo-triage.md`, на старом месте симлинк.
+- [x] Поправки поиска из `docs/search-advices.md`: `in:name,description,topics,readme`, `mirror:false`, `--lang` → `language:` в Запросе; проверка лимитов (256 символов текста, ≤5 AND/OR/NOT) до отправки, понятная ошибка.
+- [x] В каждом GraphQL-запросе `rateLimit{cost remaining resetAt}`; ретраи 403/429/«200 без JSON» с backoff (DeepGit `graphql.py:177-209`), 403 считается лимитом по тексту ответа gh (rate limit / secondary rate limit), прочий 403 — сразу ошибка; ожидание фиксированное 5/10/20 с (ponytail: до resetAt — через `gh api -i`, если упрёмся в часовой лимит) (repohunt `github.ts:150-160`).
 
 Готово: `repo-scout "q1" "q2"` даёт ту же таблицу, что старый `scout.py`, плюс находит репо, у которых совпадение только в README; тесты зелёные.
 

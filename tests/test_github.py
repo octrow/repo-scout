@@ -1,0 +1,72 @@
+import json
+import subprocess
+
+import pytest
+
+from repo_scout import github
+
+OK = json.dumps({"data": {"search": {"nodes": [{"nameWithOwner": "a/b"}, None]},
+                          "rateLimit": {"cost": 1, "remaining": 9, "resetAt": "t"}}})
+
+
+def run_with(monkeypatch, results):
+    """results: list of (returncode, stdout, stderr); returns (calls, sleeps)."""
+    calls, sleeps = [], []
+    it = iter(results)
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        rc, out, err = next(it)
+        return subprocess.CompletedProcess(cmd, rc, out, err)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(github.time, "sleep", sleeps.append)
+    return calls, sleeps
+
+
+def test_ok_and_args(monkeypatch):
+    calls, _ = run_with(monkeypatch, [(0, OK, "")])
+    assert github.search("q", 5) == [{"nameWithOwner": "a/b"}]
+    assert "-F" in calls[0] and "n=5" in calls[0] and "q=q" in calls[0]
+    assert github.last_rate_limit["remaining"] == 9
+
+
+def test_retry_on_429_then_ok(monkeypatch):
+    calls, sleeps = run_with(monkeypatch, [(1, "", "HTTP 429"), (1, "", "secondary rate limit"), (0, OK, "")])
+    assert github.search("q", 5)
+    assert len(calls) == 3 and sleeps == [5, 10]
+
+
+def test_retry_on_non_json(monkeypatch):
+    calls, _ = run_with(monkeypatch, [(0, "<html>", ""), (0, OK, "")])
+    assert github.search("q", 5)
+    assert len(calls) == 2
+
+
+def test_retry_on_graphql_rate_limited(monkeypatch):
+    err = json.dumps({"errors": [{"type": "RATE_LIMITED", "message": "x"}]})
+    calls, _ = run_with(monkeypatch, [(1, err, ""), (0, OK, "")])
+    assert github.search("q", 5)
+    assert len(calls) == 2
+
+
+def test_plain_403_fails_fast(monkeypatch):
+    calls, sleeps = run_with(monkeypatch, [(1, "", "HTTP 403: Forbidden")])
+    with pytest.raises(github.GitHubError, match="403"):
+        github.search("q", 5)
+    assert len(calls) == 1 and not sleeps
+
+
+def test_gives_up_after_max_retries(monkeypatch):
+    calls, sleeps = run_with(monkeypatch, [(1, "", "HTTP 429")] * 4)
+    with pytest.raises(github.GitHubError):
+        github.search("q", 5)
+    assert len(calls) == 4 and sleeps == [5, 10, 20]
+
+
+def test_partial_errors_return_data(monkeypatch, capsys):
+    body = json.dumps({"data": {"search": {"nodes": [{"nameWithOwner": "a/b"}]}},
+                       "errors": [{"type": "FORBIDDEN", "message": "boom"}]})
+    run_with(monkeypatch, [(1, body, "")])
+    assert github.search("q", 5) == [{"nameWithOwner": "a/b"}]
+    assert "boom" in capsys.readouterr().err
