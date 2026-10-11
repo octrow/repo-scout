@@ -1,0 +1,38 @@
+name = "persona-crm"
+source = "~/dev/persona-crm/docs/INIT_DATA.md, ~/dev/persona-crm/CLAUDE.md, ~/dev/persona-crm/README.md"
+analysis_date = ""
+task = "Find self-hosted open-source personal CRM tools that track communication with friends and family across WhatsApp, Telegram and Instagram and remind who to contact next (usable by an ADHD user), plus libraries for reading Instagram DMs."
+queries = ["personal CRM self-hosted friends family", "personal CRM whatsapp telegram instagram", "keep in touch reminders open source", "instagram direct messages python private api", "whatsapp message history analysis local LLM", "relationship manager self-hosted open source"]
+lang = ""
+must = []
+exclude = []
+
+[[expected]]
+repo = "sneg55/pingcrm"
+verdict = "→ Разбор (база форка)"
+note = "README.md/FORK.md: persona-crm — форк PingCRM; INIT_DATA.md §A «best automatic tracking»"
+
+[[expected]]
+repo = "subzeroid/instagrapi"
+verdict = "→ Разбор (зависимость для Instagram DM)"
+note = "CLAUDE.md: instagrapi vendored 2.17.1 HEAD, единственная зрелая обёртка для DM"
+
+[[expected]]
+repo = "monicahq/monica"
+verdict = "→ Разбор (клон без разбора)"
+note = "INIT_DATA.md §B: ручной лог, нет интеграций; в README — колонка сравнения; отдельного разбора нет"
+
+[[expected]]
+repo = "mattogodoy/nametag"
+verdict = "→ Разбор (клон без разбора)"
+note = "INIT_DATA.md §D: лёгкий ручной менеджер, AGPL-3.0; отдельного разбора нет"
+
+[[expected]]
+repo = "JacobEvelyn/friends"
+verdict = "→ Разбор (клон без разбора)"
+note = "INIT_DATA.md §D: CLI с Markdown-файлом; отдельного разбора нет"
+
+[[expected]]
+repo = "fahadhasin/whatsapp-crm"
+verdict = "→ Разбор (клон без разбора)"
+note = "INIT_DATA.md §C: локальный анализ WhatsApp через Ollama; отдельного разбора нет"

@@ -1,0 +1,33 @@
+name = "get_cool_event"
+source = "~/dev/get_cool_event/CLAUDE.md (Alternatives Considered), ~/dev/get_cool_event/docs/PRODJECT.md"
+analysis_date = ""
+task = "Find open-source scrapers/downloaders for Instagram posts, reels, stories and highlights (session auth, rate limiting) to collect event announcements from accounts into a weekly digest."
+queries = ["instagram scraper stories highlights reels", "instagram downloader python session", "instagram posts downloader cli", "instaloader alternative", "instagram media downloader no login", "gallery-dl instagram"]
+lang = ""
+must = []
+exclude = []
+
+[[expected]]
+repo = "instaloader/instaloader"
+verdict = "→ Разбор (выбран: самый зрелый IG-скрейпер)"
+note = "CLAUDE.md: instaloader 4.15 рекомендован; PLAN.md: collector instaloader"
+
+[[expected]]
+repo = "mikf/gallery-dl"
+verdict = "спорно (альтернатива, если instaloader не хватит)"
+note = "CLAUDE.md Alternatives: «use gallery-dl only if you outgrow instaloader»"
+
+[[expected]]
+repo = "subzeroid/insta-dl"
+verdict = "спорно (пересмотреть, если instaloader сломается)"
+note = "CLAUDE.md Alternatives: новее, менее проверен, aiograpi"
+
+[[expected]]
+repo = "siongui/instago"
+verdict = "→ Разбор (клон без разбора)"
+note = "docs/PRODJECT.md #6: Go, stories/highlights; разбора нет"
+
+[[expected]]
+repo = "yasinatesim/instagram-media-downloader"
+verdict = "→ Разбор (клон без разбора)"
+note = "docs/PRODJECT.md #5: без аутентификации; разбора нет"

@@ -1,0 +1,63 @@
+name = "buy-smarter-vision"
+source = "~/dev/buy-smarter/docs/llm-vision/buy-smarter-fashion-vision-research.md"
+analysis_date = "2026-08-24"
+task = "Find open-source local vision-embedding models and fashion-recommendation projects: image embeddings for product photos (1-6 views of one item), multi-view aggregation, learning personal visual taste from like/dislike feedback, running on a single consumer GPU."
+queries = ["fashion CLIP embeddings", "fashion image embedding SigLIP", "multi-view product image retrieval", "personalized fashion recommendation visual", "DINOv3 image embeddings", "visual taste preference learning from likes"]
+lang = ""
+must = []
+exclude = []
+
+[[expected]]
+repo = "facebookresearch/dinov3"
+verdict = "→ Разбор (MVP-кандидат #1, общий визуальный энкодер)"
+note = "research.md §6.1 и §18"
+
+[[expected]]
+repo = "marqo-ai/marqo-FashionCLIP"
+verdict = "→ Разбор (MVP-кандидат #2, FashionSigLIP)"
+note = "research.md §6.2 и §18"
+
+[[expected]]
+repo = "mlfoundations/open_clip"
+verdict = "→ Разбор (инфраструктура CLIP, Keep)"
+note = "research.md §6.3, §18: Keep"
+
+[[expected]]
+repo = "huggingface/transformers"
+verdict = "→ Разбор (рантайм моделей, Core)"
+note = "research.md §6.4, §18: Core"
+
+[[expected]]
+repo = "huggingface/peft"
+verdict = "спорно (на будущее: дообучение LoRA, не в MVP)"
+note = "research.md §18: Future"
+
+[[expected]]
+repo = "lightly-ai/lightly-train"
+verdict = "спорно (опционально: обучение представлений)"
+note = "research.md §18: Optional / research"
+
+[[expected]]
+repo = "facebookresearch/sam2"
+verdict = "спорно (позже, для выделения товара в OLX)"
+note = "research.md §6.7, §18: Later / OLX"
+
+[[expected]]
+repo = "ultralytics/ultralytics"
+verdict = "спорно (опционально; AGPL-3.0 — проверить лицензию)"
+note = "research.md §6.8, §18: Optional"
+
+[[expected]]
+repo = "yuandaxia2001/FashionMV"
+verdict = "→ Разбор (изучить архитектуру multi-view, не зависимость)"
+note = "research.md §7: rejected by strict filter (16 stars), «Study, don't depend on it»"
+
+[[expected]]
+repo = "kang205/DVBPR"
+verdict = "отсев (TF1-эра; только референс)"
+note = "research.md §7 и §18: Reference only"
+
+[[expected]]
+repo = "patrickjohncyh/fashion-clip"
+verdict = "отсев (старый; только baseline)"
+note = "research.md §7 и §18: Reference / baseline only"

@@ -1,0 +1,108 @@
+name = "linux-coding"
+source = "~/dev/linux-coding/docs/research/opensource-analogs.md"
+analysis_date = "2026-10-05"
+task = "Find open-source real-time interview/meeting assistants (live speech recognition, question detection, LLM answer suggestions, screen OCR, screen-share-invisible overlay) that run on Linux (Ubuntu, KDE/Wayland or X11), ideally with Russian + English support, to use as a base or to borrow audio-capture and ASR code."
+queries = ["interview assistant real-time transcription overlay", "AI interview copilot open source live transcription", "cluely alternative open source", "live interview hints faster-whisper", "meeting assistant overlay invisible screen share linux", "real-time speech recognition question detection answer suggestions"]
+lang = ""
+must = []
+exclude = []
+
+[[expected]]
+repo = "Natively-AI-assistant/natively-cluely-ai-assistant"
+verdict = "→ Разбор (логика ответа, ASR-гигиена, RAG)"
+note = "opensource-analogs.md #1: шаг 2 → Разбор (цель — уточнить), analogs/Natively.md"
+
+[[expected]]
+repo = "screenpipe/screenpipe"
+verdict = "→ Разбор (Linux-аудио и OCR-кэш)"
+note = "opensource-analogs.md #2: шаг 2 → Разбор (цель — уточнить); коммерческая лицензия, analogs/screenpipe.md"
+
+[[expected]]
+repo = "Rkcr7/Aura-AI"
+verdict = "отсев (баллы 4 < 8)"
+note = "opensource-analogs.md #3: шаг 1, вердикт: отсев (< 8)"
+
+[[expected]]
+repo = "Artasov/xexamai"
+verdict = "отсев (баллы 3 < 8)"
+note = "opensource-analogs.md #4: шаг 1, вердикт: отсев (< 8)"
+
+[[expected]]
+repo = "elias-soykat/interview-copilot"
+verdict = "отсев (баллы 4 < 8)"
+note = "opensource-analogs.md #5: шаг 1, вердикт: отсев (< 8)"
+
+[[expected]]
+repo = "FarzamHejaziK/AnswerCue"
+verdict = "отсев (форк Natively, дельта не ценна)"
+note = "opensource-analogs.md #6: шаг 1 → Осмотр (только если дельта), шаг 2 → отсев (смотреть промпты при Разборе Natively)"
+
+[[expected]]
+repo = "PowerInterviewAI/client-app"
+verdict = "отсев (тонкий клиент к платному SaaS)"
+note = "opensource-analogs.md #7: шаг 1 → Осмотр, шаг 2 → отсев (Linux нет, идея: стриминговый показ вопроса)"
+
+[[expected]]
+repo = "Mockingbird-go-on/mockingbird"
+verdict = "→ Разбор (база форка: faster-whisper, VAD, endpointing)"
+note = "opensource-analogs.md #8: шаг 3 «берём»; CLAUDE.md: база с 2026-10-05; analogs/mockingbird.md"
+
+[[expected]]
+repo = "cflarios/Tayori"
+verdict = "спорно (README прочитан, не дотянул — смотреть ли?)"
+note = "opensource-analogs.md #9: шаг 1 баллы 7, вердикт: спорно"
+
+[[expected]]
+repo = "PavelLizunov/suflyor"
+verdict = "→ Разбор (узкий: trigger_detect.rs, GigaAM-v3)"
+note = "opensource-analogs.md #10: шаг 2 → Разбор, узкий; analogs/suflyor.md"
+
+[[expected]]
+repo = "markoblogo/CoqPi"
+verdict = "отсев (баллы 4 < 8)"
+note = "opensource-analogs.md #11: шаг 1, вердикт: отсев (< 8)"
+
+[[expected]]
+repo = "R0D10Nq/live-hints"
+verdict = "отсев (баллы 4 < 8)"
+note = "opensource-analogs.md #12: шаг 1, вердикт: отсев (< 8)"
+
+[[expected]]
+repo = "justQrius/live_interview_agent"
+verdict = "отсев (баллы 4 < 8)"
+note = "opensource-analogs.md #13: шаг 1, вердикт: отсев (< 8)"
+
+[[expected]]
+repo = "innovatorved/realtime-interview-copilot"
+verdict = "отсев (баллы 5 < 8)"
+note = "opensource-analogs.md #14: шаг 1, вердикт: отсев (< 8)"
+
+[[expected]]
+repo = "sohzm/cheating-daddy"
+verdict = "отсев (баллы 3 < 8, stars≫commits)"
+note = "opensource-analogs.md #14 (второй): шаг 1, вердикт: отсев (< 8)"
+
+[[expected]]
+repo = "Zackriya-Solutions/meetily"
+verdict = "→ Разбор (узкий: Tauri v2, Parakeet, libpulse)"
+note = "opensource-analogs.md #15: шаг 2 → Разбор, узкий; analogs/meetily.md"
+
+[[expected]]
+repo = "umairinayat/Specter-AI"
+verdict = "→ Разбор (детект вопроса, JD/CV grounding, xdotool)"
+note = "opensource-analogs.md #16: шаг 2 → Разбор (цель — уточнить); analogs/Specter-AI.md"
+
+[[expected]]
+repo = "bykof/conversationaly"
+verdict = "отсев (баллы 5 < 8)"
+note = "opensource-analogs.md #17: шаг 1, вердикт: отсев (< 8)"
+
+[[expected]]
+repo = "Hankanman/Parley"
+verdict = "→ Разбор (PipeWire-захват + ASR/VAD в процессе)"
+note = "opensource-analogs.md #18: шаг 3 «берём» pw/mod.rs, vad.rs; analogs/Parley.md"
+
+[[expected]]
+repo = "iamsrikanthnani/pluely"
+verdict = "→ Разбор (Tauri v2: window.rs, shortcuts.rs, libpulse)"
+note = "opensource-analogs.md (proprietary/closed-source #2): шаг 2 → Разбор (цель — уточнить); analogs/Pluely.md"

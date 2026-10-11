@@ -1,0 +1,38 @@
+name = "repo-scout"
+source = "~/dev/repo-scout/docs/analogs/README.md"
+analysis_date = "2026-10-11"
+task = "Find GitHub repo-discovery tools to reuse: semantic/vector search over GitHub repositories, hidden-gems finders for low-star projects, ranking by recent activity, noise filtering and README cleaning, without relying on an LLM."
+queries = ["github repository discovery semantic search", "find hidden gem github repositories", "github repo search embeddings", "github repository ranking activity score", "similar github repositories recommender", "github search multi-query ranking"]
+lang = ""
+must = []
+exclude = []
+
+[[expected]]
+repo = "danielrltan/repohunt"
+verdict = "→ Разбор (ранжирование мульти-запросов, чистка README)"
+note = "docs/analogs/README.md: Сводка, «триаж: → Разбор»"
+
+[[expected]]
+repo = "JoanAbad82/github-hidden-gems"
+verdict = "→ Разбор (фильтр шума, активность без бот-коммитов)"
+note = "docs/analogs/README.md: Сводка, «триаж: → Разбор (фильтр шума)»"
+
+[[expected]]
+repo = "fulvian/github-discovery"
+verdict = "отсев (мёртвый, 107 дн / 59 комм; константы ценные)"
+note = "docs/analogs/README.md: Сводка, «триаж: отсев», формулы взяты"
+
+[[expected]]
+repo = "mak100186/git-crawler"
+verdict = "→ Разбор (скоринг, rateLimit в GraphQL)"
+note = "docs/analogs/README.md: Сводка, «триаж: → Разбор (скоринг)»"
+
+[[expected]]
+repo = "Mubelotix/SimRepo"
+verdict = "отсев (нет кода similar_repos, GPL-3.0)"
+note = "docs/analogs/README.md: Сводка, «отсев, брать нечего»"
+
+[[expected]]
+repo = "zamalali/DeepGit"
+verdict = "→ Разбор (векторный слой)"
+note = "docs/analogs/README.md: раздел DeepGit, «вердикт: → Разбор (векторный слой)»"

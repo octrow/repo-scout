@@ -1,0 +1,33 @@
+name = "finance-insights"
+source = "~/dev/finance-insights/external_examples (клоны без письменного разбора; docs/INIT_DATA.md — устаревшая заметка)"
+analysis_date = ""
+task = "Find self-hosted open-source personal finance tools: budgeting and double-entry ledgers (Beancount/Fava, Firefly III, Actual) and investment portfolio trackers, to use as a base for a local-first personal CFO over bank statements."
+queries = ["personal finance self-hosted open source", "double-entry accounting plain text beancount", "beancount web interface fava", "budgeting app open source local-first", "portfolio tracker self-hosted wealth management", "bank statement import ledger"]
+lang = ""
+must = []
+exclude = []
+
+[[expected]]
+repo = "actualbudget/actual"
+verdict = "→ Разбор (клон без разбора)"
+note = "external_examples/actual"
+
+[[expected]]
+repo = "beancount/beancount"
+verdict = "→ Разбор (клон без разбора)"
+note = "external_examples/beancount; README: на нём построен леджер"
+
+[[expected]]
+repo = "beancount/fava"
+verdict = "→ Разбор (клон без разбора)"
+note = "external_examples/fava; README: UI — расширение Fava"
+
+[[expected]]
+repo = "firefly-iii/firefly-iii"
+verdict = "→ Разбор (клон без разбора)"
+note = "external_examples/firefly-iii; INIT_DATA.md (SUPERSEDED) рассматривал как основу"
+
+[[expected]]
+repo = "ghostfolio/ghostfolio"
+verdict = "→ Разбор (клон без разбора)"
+note = "external_examples/ghostfolio"

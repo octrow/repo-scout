@@ -1,0 +1,58 @@
+name = "buy-smarter"
+source = "~/dev/buy-smarter/docs/PLAN.md (раздел «Источники»), ~/dev/buy-smarter/docs/INIT_DATA.md"
+analysis_date = ""
+task = "Find open-source parsers, API wrappers and MCP servers for the Kazakhstan marketplaces Kaspi.kz, Ozon (kz) and OLX.kz: product search, offers/sellers, reviews, specs, prices by city, anti-bot handling; used as a base for a shopping recommendation assistant."
+queries = ["kaspi.kz parser", "kaspi api python", "kaspi mcp server", "ozon parser python", "ozon mcp server", "olx.kz parser"]
+lang = ""
+must = ["(?i)kaspi|ozon|olx"]
+exclude = []
+
+[[expected]]
+repo = "mkhamzanov/kaspi-mcp-free"
+verdict = "→ Разбор (порт endpoints Kaspi, лучший фундамент)"
+note = "PLAN.md: «Kaspi — порт kaspi-mcp-free/shop.py (лучший фундамент)»; лицензии нет, код переписываем"
+
+[[expected]]
+repo = "Scraller/kaspi-api-wrapper"
+verdict = "→ Разбор (анти-детект AntiDetection/, MIT)"
+note = "PLAN.md: паттерн ротации UA + jitter из kaspi-api-wrapper/AntiDetection/"
+
+[[expected]]
+repo = "eduard256/ozon-mcp-server"
+verdict = "→ Разбор (паттерн headless Chromium + composer-api)"
+note = "PLAN.md: «Ozon — порт паттерна ozon-mcp-server (MIT, Node → Python/Playwright)»"
+
+[[expected]]
+repo = "NurjahonErgashevMe/ozon-parser"
+verdict = "→ Разбор (seller-details endpoint)"
+note = "PLAN.md: Seller-детали entrypoint-api.bx/... (из ozon-parser)"
+
+[[expected]]
+repo = "lerdem/olx-parser"
+verdict = "отсев (GPL-3, селекторы olx.ua; только структура)"
+note = "PLAN.md: «OLX — переписать с нуля под OLX.kz; код не копировать»"
+
+[[expected]]
+repo = "an-bo-23/kaspi-parser-api"
+verdict = "→ Разбор (клон без разбора)"
+note = "external_examples/kaspi-parser-api; INIT_DATA.md: «parser architecture, persistence», письменного разбора нет"
+
+[[expected]]
+repo = "robotickz/kaspi_price_bot_worker"
+verdict = "→ Разбор (клон без разбора)"
+note = "external_examples/kaspi_price_bot_worker; INIT_DATA.md: «distributed parsing, city price comparison»"
+
+[[expected]]
+repo = "EclipseReign/shopiq"
+verdict = "→ Разбор (клон без разбора)"
+note = "external_examples/shopiq; INIT_DATA.md: «analytics ideas»"
+
+[[expected]]
+repo = "ardanmykametkan-eng/ai-super-agent"
+verdict = "→ Разбор (клон без разбора)"
+note = "external_examples/ai-super-agent; INIT_DATA.md: «browser automation, multi-LLM, Kaspi + OLX parsing»"
+
+[[expected]]
+repo = "a-ulianov/OzonAPI"
+verdict = "→ Разбор (клон без разбора)"
+note = "external_examples/OzonAPI; INIT_DATA.md: «Seller API ideas»"

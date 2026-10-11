@@ -1,0 +1,33 @@
+name = "tiktok-lazy-follower"
+source = "~/dev/tiktok-lazy-follower/INIT_DATA.md (клоны в external_examples/, письменного разбора нет)"
+analysis_date = ""
+task = "Find open-source tools to track TikTok creators and the user's favorites, download new videos incrementally and transcribe them to text (Whisper / subtitles), to build a weekly digest."
+queries = ["tiktok downloader creator favorites", "tiktok video transcription whisper", "tiktok scraper user videos", "tiktok api python unofficial", "tiktok to text transcript", "douyin tiktok download api"]
+lang = ""
+must = ["(?i)tiktok|douyin"]
+exclude = []
+
+[[expected]]
+repo = "JoeanAmier/TikTokDownloader"
+verdict = "→ Разбор (клон без разбора)"
+note = "INIT_DATA.md: рекомендован как слой загрузки (creators + favorites); итоговый проект идёт на yt-dlp"
+
+[[expected]]
+repo = "wendy7756/AI-Video-Transcriber"
+verdict = "→ Разбор (клон без разбора)"
+note = "INIT_DATA.md: рекомендован как транскрайбер (subtitle-first + faster-whisper)"
+
+[[expected]]
+repo = "davidteather/TikTok-Api"
+verdict = "→ Разбор (клон без разбора)"
+note = "INIT_DATA.md: опциональный скрейпер; клон external_examples/tiktok-api; нет доступа к favorites"
+
+[[expected]]
+repo = "drawrowfly/tiktok-scraper"
+verdict = "→ Разбор (клон без разбора)"
+note = "INIT_DATA.md: опциональный скрейпер, поддержка смешанная"
+
+[[expected]]
+repo = "Evil0ctal/Douyin_TikTok_Download_API"
+verdict = "→ Разбор (клон без разбора)"
+note = "клон в external_examples/, в INIT_DATA.md не упомянут"
