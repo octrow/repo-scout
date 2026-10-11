@@ -59,7 +59,22 @@ def to_markdown(rows: list[dict]) -> str:
     return "\n".join([head, *lines])
 
 
+def run(queries: list[str], *, months: int, new_days: int, limit: int, lang: str | None, now: datetime) -> list[dict]:
+    """Все строки триажа (включая отсеянные), отсортированы по баллам."""
+    since = (now - timedelta(days=30 * months)).date().isoformat()
+    seen = {}
+    for q in queries:
+        full = build_query(q, months=months, since=since, lang=lang)
+        validate_query(full)
+        for r in github.search(full, min(limit, 100)):
+            seen.setdefault(r["nameWithOwner"], r)
+    return sorted((triage(r, now, new_days) for r in seen.values()), key=lambda x: (-x["score"], x["pushed_days"]))
+
+
 def main() -> None:
+    if sys.argv[1:2] == ["eval"]:
+        from repo_scout import evaluate
+        return evaluate.main(sys.argv[2:])
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("queries", nargs="+")
     ap.add_argument("--months", type=int, default=6, help="только репо с push за N месяцев (0 = без фильтра)")
@@ -68,27 +83,24 @@ def main() -> None:
     ap.add_argument("--lang", help="добавить language:<X> к каждому запросу")
     ap.add_argument("--all", action="store_true", help="показать и отсеянных стоп-правилами")
     ap.add_argument("--json", action="store_true")
+    snap = ap.add_mutually_exclusive_group()
+    snap.add_argument("--record", metavar="DIR", help="писать ответы GitHub в DIR")
+    snap.add_argument("--replay", metavar="DIR", help="читать ответы из DIR без сети")
     a = ap.parse_args()
 
-    now = datetime.now(UTC)
-    since = (now - timedelta(days=30 * a.months)).date().isoformat()
-    seen = {}
     try:
-        for q in a.queries:
-            full = build_query(q, months=a.months, since=since, lang=a.lang)
-            validate_query(full)
-            for r in github.search(full, min(a.limit, 100)):
-                seen.setdefault(r["nameWithOwner"], r)
+        github.configure("record" if a.record else "replay" if a.replay else None, a.record or a.replay)
+        now = github.recorded_at() if a.replay else datetime.now(UTC)
+        rows = run(a.queries, months=a.months, new_days=a.new_days, limit=a.limit, lang=a.lang, now=now)
     except ValueError as e:
         print(e, file=sys.stderr)
         sys.exit(2)
     except GitHubError as e:
         sys.exit(f"GitHub: {e}")
-    if github.last_rate_limit:
+    if github.last_rate_limit and not a.replay:
         rl = github.last_rate_limit
         print(f"rate limit: осталось {rl['remaining']}, сброс {rl['resetAt']}", file=sys.stderr)
 
-    rows = sorted((triage(r, now, a.new_days) for r in seen.values()), key=lambda x: (-x["score"], x["pushed_days"]))
     kept = [r for r in rows if not r["stop"]]
     shown = rows if a.all else kept
     if a.json:

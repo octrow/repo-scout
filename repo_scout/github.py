@@ -1,8 +1,11 @@
 """GitHub GraphQL через `gh api graphql` с ретраями при rate limit."""
+import hashlib
 import json
 import subprocess
 import sys
 import time
+from datetime import UTC, datetime
+from pathlib import Path
 
 MAX_RETRIES = 3
 
@@ -13,6 +16,8 @@ parent{nameWithOwner} primaryLanguage{name}
 defaultBranchRef{target{... on Commit{history{totalCount}}}}}}}}"""
 
 last_rate_limit: dict | None = None
+_mode: str | None = None  # "record" | "replay" | None
+_dir: Path | None = None
 
 
 class GitHubError(Exception):
@@ -53,7 +58,41 @@ def _attempt(query: str, variables: dict) -> tuple[dict | None, str | None]:
     return data, None
 
 
+def configure(mode: str | None, directory: Path | str | None) -> None:
+    """Включить запись/воспроизведение снапшотов ответов GitHub (None = сеть как обычно)."""
+    global _mode, _dir
+    _mode, _dir = mode, Path(directory) if directory else None
+    if mode == "record":
+        _dir.mkdir(parents=True, exist_ok=True)
+        (_dir / "meta.json").write_text(json.dumps({"recorded_at": datetime.now(UTC).isoformat()}))
+
+
+def recorded_at() -> datetime:
+    path = _dir / "meta.json"
+    if not path.exists():
+        raise GitHubError(f"нет снапшота {path}: сначала --record")
+    return datetime.fromisoformat(json.loads(path.read_text())["recorded_at"])
+
+
+def _snapshot_path(query: str, variables: dict) -> Path:
+    blob = json.dumps({"query": query, "variables": variables}, sort_keys=True)
+    return _dir / f"{hashlib.sha256(blob.encode()).hexdigest()[:16]}.json"
+
+
 def graphql(query: str, variables: dict) -> dict:
+    if _mode:
+        path = _snapshot_path(query, variables)
+    if _mode == "replay":
+        if not path.exists():
+            raise GitHubError(f"нет снапшота {path.name} для запроса {variables} (--record)")
+        return json.loads(path.read_text())
+    data = _graphql_live(query, variables)
+    if _mode == "record":
+        path.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")))
+    return data
+
+
+def _graphql_live(query: str, variables: dict) -> dict:
     reason = None
     for attempt in range(MAX_RETRIES + 1):
         data, reason = _attempt(query, variables)
