@@ -9,6 +9,8 @@ import re
 import sys
 from datetime import UTC, datetime, timedelta
 
+import numpy as np
+
 from repo_scout import github, semantic
 from repo_scout.commits import last_substantive
 from repo_scout.conditions import (
@@ -19,6 +21,7 @@ from repo_scout.conditions import (
     must_stop,
 )
 from repo_scout.github import GitHubError
+from repo_scout.index import Index, default_path, validate_verdict
 from repo_scout.noise import is_template, noise_stop
 from repo_scout.triage import triage, verdict
 
@@ -27,6 +30,7 @@ TOKEN = re.compile(r'-?[\w-]+:"[^"]*"|"[^"]*"|\S+')
 QUALIFIER = re.compile(r"-?[A-Za-z-]+:(?!//).+")
 OPERATORS = {"AND", "OR", "NOT"}
 MUST_STOP = "нет обязательного"
+FROM_INDEX = 50  # сколько ближайших из Индекса добавлять в Пул
 
 
 def _has(tokens: list[str], name: str) -> bool:
@@ -62,11 +66,11 @@ def _fmt_close(r: dict) -> str:
 
 
 def to_markdown(rows: list[dict]) -> str:
-    head = "| близ | баллы | repo | ★ | forks | комм | push, дн | создан | язык | флаги / отсев | описание |\n" + "|---" * 11 + "|"
+    head = "| близ | источник | баллы | repo | ★ | forks | комм | push, дн | создан | язык | флаги / отсев | уже смотрели | описание |\n" + "|---" * 13 + "|"
     lines = [
-        f"| {_fmt_close(r)} | {r['score']} (свеж {r['fresh']}, поп {r['pop']}) | [{r['repo']}]({r['url']}) | {r['stars']} | {r['forks']} "
+        f"| {_fmt_close(r)} | {r['source']} | {r['score']} (свеж {r['fresh']}, поп {r['pop']}) | [{r['repo']}]({r['url']}) | {r['stars']} | {r['forks']} "
         f"| {r['commits']} | {r['pushed_days']} | {r['created']} | {r['lang']} "
-        f"| {verdict(r)} "
+        f"| {verdict(r)} | {r.get('seen') or '—'} "
         f"| {r['desc'][:120]} |"
         for r in rows
     ]
@@ -90,11 +94,14 @@ def _screen_meta(rows: list[dict], nodes: dict, lang: str | None, exclude: list[
 
 
 def _screen_details(rows: list[dict], nodes: dict, now: datetime, new_days: int,
-                    exclude: list[re.Pattern], must: list[re.Pattern]) -> dict[str, str | None]:
+                    exclude: list[re.Pattern], must: list[re.Pattern],
+                    known: dict[str, dict]) -> dict[str, str | None]:
     """README и коммиты выживших: пересчёт свежести, запрещённые и обязательные слова. Возвращает README."""
     readmes: dict[str, str | None] = {}
     alive = [r for r in rows if not r["stop"]]
-    info = github.details([r["repo"] for r in alive])
+    names = [r["repo"] for r in alive]
+    info = {n: known[n] for n in names if n in known}
+    info.update(github.details([n for n in names if n not in known]))
     for row in alive:
         d = info.get(row["repo"])
         if d is None:
@@ -115,14 +122,30 @@ def _screen_details(rows: list[dict], nodes: dict, now: datetime, new_days: int,
     return readmes
 
 
-def add_closeness(rows: list[dict], readmes: dict[str, str | None], task: str) -> None:
-    """Близость строкам, не отсеянным к этому моменту (нет README: имя, описание, topics)."""
+def add_closeness(rows: list[dict], readmes: dict[str, str | None], task: str) -> dict[str, np.ndarray]:
+    """Близость строкам, не отсеянным к этому моменту (нет README: имя, описание, topics). Возвращает векторы."""
     todo = [r for r in rows if not r["stop"]]
     if not todo:
-        return
+        return {}
     docs = semantic.embed_docs([semantic.candidate_text(r, readmes.get(r["repo"])) for r in todo])
     for r, c in zip(todo, semantic.closeness(semantic.embed_task(task), docs)):
         r["closeness"] = float(c)
+    return {r["repo"]: d for r, d in zip(todo, docs)}
+
+
+def _from_index(index: Index, task: str, nodes: dict, n: int) -> dict[str, dict]:
+    """Топ-n из Индекса, которых нет в живой выдаче: свежие метаданные и детали одним пакетным запросом."""
+    live = {k.lower() for k in nodes}
+    wanted = [m for m in index.top(task, n) if m.lower() not in live]
+    fresh = github.refresh(wanted)
+    for name in wanted:
+        if name not in fresh:
+            index.forget(name)  # удалено (или недоступно) на GitHub
+        elif (new := fresh[name]["node"]["nameWithOwner"]).lower() != name.lower():
+            index.rename(name, new)
+    for d in fresh.values():
+        nodes.setdefault(d["node"]["nameWithOwner"], d["node"])
+    return {d["node"]["nameWithOwner"]: d["details"] for d in fresh.values()}
 
 
 def apply_closeness(rows: list[dict], min_closeness: float) -> None:
@@ -138,7 +161,8 @@ def sort_key(r: dict) -> tuple:
 
 def run(queries: list[str], *, months: int, new_days: int, limit: int, lang: str | None, now: datetime,
         exclude: list[re.Pattern] = (), must: list[re.Pattern] = (), task: str | None = None,
-        min_closeness: float = semantic.MIN_CLOSENESS) -> list[dict]:
+        min_closeness: float = semantic.MIN_CLOSENESS, index: Index | None = None,
+        from_index: int = FROM_INDEX) -> list[dict]:
     """Все строки триажа (включая отсеянные), отсортированы по Близости, потом по баллам."""
     since = (now - timedelta(days=30 * months)).date().isoformat()
     nodes = {}
@@ -147,19 +171,48 @@ def run(queries: list[str], *, months: int, new_days: int, limit: int, lang: str
         validate_query(full)
         for r in github.search(full, min(limit, 100)):
             nodes.setdefault(r["nameWithOwner"], r)
+    live = set(nodes)
+    known = _from_index(index, task, nodes, from_index) if index and task and from_index else {}
     rows = [triage(n, now, new_days) for n in nodes.values()]
+    for r in rows:
+        r["source"] = "запрос" if r["repo"] in live else "индекс"
     _screen_meta(rows, nodes, lang, list(exclude))
-    readmes = _screen_details(rows, nodes, now, new_days, list(exclude), list(must))
+    readmes = _screen_details(rows, nodes, now, new_days, list(exclude), list(must), known)
     if task:
-        add_closeness(rows, readmes, task)
+        vecs = add_closeness(rows, readmes, task)
+        if index:
+            for r in rows:
+                if r["repo"] in vecs and readmes.get(r["repo"]):
+                    index.upsert(r, readmes[r["repo"]], vecs[r["repo"]], now)
         apply_closeness(rows, min_closeness)
+    if index:
+        seen = index.seen([r["repo"] for r in rows])
+        for r in rows:
+            r["seen"] = seen.get(r["repo"].lower(), "")
     return sorted(rows, key=sort_key)
+
+
+def verdict_main(argv: list[str]) -> None:
+    ap = argparse.ArgumentParser(prog="repo-scout verdict")
+    ap.add_argument("repo", metavar="owner/repo")
+    ap.add_argument("verdict", help="«→ Осмотр», «→ Разбор (цель)», «отсев (причина)», «спорно (что уточнить)»")
+    ap.add_argument("--project", required=True)
+    ap.add_argument("--task", required=True, help="кратко, о какой задаче проекта")
+    a = ap.parse_args(argv)
+    try:
+        validate_verdict(a.repo, a.verdict, a.project, a.task)
+    except ValueError as e:
+        sys.exit(f"verdict: {e}")
+    Index(default_path()).add_verdict(a.repo, a.verdict, a.project, a.task)
+    print(f"записано: {a.repo} — {a.verdict} ({a.project})")
 
 
 def main() -> None:
     if sys.argv[1:2] == ["eval"]:
         from repo_scout import evaluate
         return evaluate.main(sys.argv[2:])
+    if sys.argv[1:2] == ["verdict"]:
+        return verdict_main(sys.argv[2:])
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("queries", nargs="+")
     ap.add_argument("--task", required=True, metavar="TEXT",
@@ -174,6 +227,8 @@ def main() -> None:
                     help="отсев, если REGEX найден в имени, описании, topics или README (можно повторять)")
     ap.add_argument("--must", action="append", default=[], metavar="REGEX",
                     help="группа обязательных слов в README, topics, описании; нужны все группы (можно повторять)")
+    ap.add_argument("--from-index", type=int, default=FROM_INDEX, metavar="N",
+                    help="добавить в Пул N ближайших из Индекса (0 = выключить, по умолчанию %(default)s)")
     ap.add_argument("--all", action="store_true", help="показать и отсеянных стоп-правилами")
     ap.add_argument("--json", action="store_true")
     snap = ap.add_mutually_exclusive_group()
@@ -186,7 +241,8 @@ def main() -> None:
         github.configure("record" if a.record else "replay" if a.replay else None, a.record or a.replay)
         now = github.recorded_at() if a.replay else datetime.now(UTC)
         rows = run(a.queries, months=a.months, new_days=a.new_days, limit=a.limit, lang=a.lang, now=now,
-                   exclude=exclude, must=must, task=a.task, min_closeness=a.min_closeness)
+                   exclude=exclude, must=must, task=a.task, min_closeness=a.min_closeness,
+                   index=None if a.record or a.replay else Index(default_path()), from_index=a.from_index)
     except ValueError as e:
         print(e, file=sys.stderr)
         sys.exit(2)

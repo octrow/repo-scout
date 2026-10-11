@@ -13,12 +13,12 @@ MAX_RETRIES = 3
 TRANSIENT = (502, 503, 504)
 README_MAX_CHARS = 6_000  # хватает для регэкспов и эмбеддинга; держит снапшоты небольшими
 
-SEARCH_GQL = """query($q:String!,$n:Int!){rateLimit{cost remaining resetAt}
-search(query:$q,type:REPOSITORY,first:$n){nodes{... on Repository{
-nameWithOwner url description stargazerCount forkCount pushedAt createdAt isArchived isFork isTemplate
+NODE_FIELDS = """nameWithOwner url description stargazerCount forkCount pushedAt createdAt isArchived isFork isTemplate
 repositoryTopics(first:20){nodes{topic{name}}}
 parent{nameWithOwner} primaryLanguage{name}
-defaultBranchRef{target{... on Commit{history{totalCount}}}}}}}}"""
+defaultBranchRef{target{... on Commit{history{totalCount}}}}"""
+SEARCH_GQL = ("query($q:String!,$n:Int!){rateLimit{cost remaining resetAt}\n"
+              "search(query:$q,type:REPOSITORY,first:$n){nodes{... on Repository{\n" + NODE_FIELDS + "}}}}")
 
 last_rate_limit: dict | None = None
 _mode: str | None = None  # "record" | "replay" | None
@@ -187,6 +187,51 @@ def details(names: list[str]) -> dict[str, dict]:
         for name, d in _fetch_details(missing[start:start + DETAILS_CHUNK]).items():
             if _mode == "record":
                 _write(_dir / "details" / f"{_key(name.lower())}.json.gz", d)
+            if d is not None:
+                out[name] = d
+    return out
+
+
+def _alias_full(i: int, name: str) -> str:
+    """Метаданные как в поиске + README + коммиты одним алиасом (commits под алиасом recent)."""
+    owner, repo = name.split("/")
+    readmes = " ".join(f'm{k}: object(expression: "HEAD:{n}") {{ ... on Blob {{ text }} }}'
+                       for k, n in enumerate(README_NAMES))
+    return (f"r{i}: repository(owner: {json.dumps(owner)}, name: {json.dumps(repo)}) {{ {NODE_FIELDS} {readmes} "
+            "recent: defaultBranchRef{target{... on Commit{history(first:20){nodes{committedDate message: messageHeadline "
+            "additions deletions author{name user{login}}}}}}}}")
+
+
+def _split_full(repo: dict) -> dict:
+    texts = (repo.get(f"m{k}") for k in range(len(README_NAMES)))
+    target = (repo.get("recent") or {}).get("target") or {}
+    node = {k: v for k, v in repo.items() if k != "recent" and not re.fullmatch(r"m\d+", k)}
+    return {"node": node, "details": {"readme": next((t["text"] for t in texts if t), None),
+                                      "commits": (target.get("history") or {}).get("nodes") or []}}
+
+
+def refresh(names: list[str]) -> dict[str, dict]:
+    """Свежие метаданные + README + коммиты по именам (для строк из Индекса): {name: {"node", "details"}}.
+    Снапшот по репо (refresh/<хэш имени>.json.gz); удалённые репо не попадают в ответ."""
+    out: dict[str, dict] = {}
+    missing = []
+    for n in (n for n in names if _NAME.fullmatch(n)):
+        path = _dir / "refresh" / f"{_key(n.lower())}.json.gz" if _mode else None
+        if path and path.exists():
+            if (d := _read(path)) is not None:
+                out[n] = d
+        elif _mode == "replay":
+            raise GitHubError(f"нет снапшота обновления {n} (--record)")
+        else:
+            missing.append(n)
+    for start in range(0, len(missing), DETAILS_CHUNK):
+        chunk = missing[start:start + DETAILS_CHUNK]
+        q = "query{rateLimit{cost remaining resetAt} " + " ".join(_alias_full(i, n) for i, n in enumerate(chunk)) + "}"
+        data = _cap_text(_graphql_live(q, {}))["data"]
+        for i, name in enumerate(chunk):
+            d = _split_full(data[f"r{i}"]) if data.get(f"r{i}") else None
+            if _mode == "record":
+                _write(_dir / "refresh" / f"{_key(name.lower())}.json.gz", d)
             if d is not None:
                 out[name] = d
     return out

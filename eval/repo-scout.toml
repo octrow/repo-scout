@@ -2,6 +2,7 @@ name = "repo-scout"
 source = "~/dev/repo-scout/docs/analogs/README.md"
 analysis_date = "2026-10-11"
 task = "Find GitHub repo-discovery tools to reuse: semantic/vector search over GitHub repositories, hidden-gems finders for low-star projects, ranking by recent activity, noise filtering and README cleaning, without relying on an LLM."
+alt_task = "Existing GitHub tools for discovering repositories: semantic embedding search over repos, finding hidden gems with few stars, ranking and filtering candidates, to reuse instead of building our own."
 queries = ["github repository discovery semantic search", "find hidden gem github repositories", "github repo search embeddings", "github repository ranking activity score", "similar github repositories recommender", "github search multi-query ranking"]
 lang = ""
 must = []

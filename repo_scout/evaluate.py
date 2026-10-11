@@ -1,13 +1,16 @@
 """`repo-scout eval`: прогон золотых наборов eval/*.toml и метрики полноты."""
 import argparse
+import json
 import sys
+import tempfile
 import tomllib
 from pathlib import Path
 
 from repo_scout import github
-from repo_scout.cli import apply_closeness, run
+from repo_scout.cli import FROM_INDEX, apply_closeness, run
 from repo_scout.conditions import compile_all
 from repo_scout.github import GitHubError
+from repo_scout.index import Index, default_path
 from repo_scout.semantic import MIN_CLOSENESS
 
 SWEEP = [round(0.50 + 0.01 * i, 2) for i in range(41)]
@@ -73,20 +76,62 @@ def sweep(sets: list[tuple[dict, list[dict]]]) -> str:
     return "\n".join(lines)
 
 
-def eval_set(path: Path, mode: str, task: str | None = None) -> tuple[dict, list[dict]]:
+def eval_set(path: Path, mode: str, task: str | None = None, queries: list[str] | None = None,
+             index: Index | None = None, from_index: int = FROM_INDEX) -> tuple[dict, list[dict]]:
+    """Прогон набора. Индекс по умолчанию свежий временный: числа сравнимы, пользовательский Индекс не трогаем."""
     spec = tomllib.loads(path.read_text())
     exclude = compile_all("--exclude", spec.get("exclude", []))
     must = compile_all("--must", spec.get("must", []))
     github.configure(mode, path.parent / "snapshots" / spec["name"])
     now = github.recorded_at()  # дата снимка и при дозаписи: сравнимость с baseline
-    rows = run(spec["queries"], months=6, new_days=60, limit=50, lang=spec.get("lang") or None, now=now,
-               exclude=exclude, must=must, task=task or spec["task"], min_closeness=0)
+    with tempfile.TemporaryDirectory() as tmp:
+        idx = index or Index(Path(tmp) / "index.db")
+        rows = run(queries or spec["queries"], months=6, new_days=60, limit=50, lang=spec.get("lang") or None,
+                   now=now, exclude=exclude, must=must, task=task or spec["task"], min_closeness=0, index=idx,
+                   from_index=from_index)
+        if not index:
+            idx.db.close()
     return spec, rows
+
+
+def index_check(path: Path, mode: str, from_index: int = FROM_INDEX) -> str:
+    """Критерий Фазы 5: другая формулировка и меньше Запросов поднимают из Индекса репо, которых нет в живой выдаче."""
+    with tempfile.TemporaryDirectory() as tmp:
+        idx = Index(Path(tmp) / "index.db")
+        spec, first = eval_set(path, mode, index=idx)
+        if not spec.get("alt_task"):
+            return ""
+        _, rows = eval_set(path, mode, spec["alt_task"], spec["queries"][:2], idx, from_index)
+        idx.db.close()
+    pos = {e["repo"].lower() for e in spec["expected"] if e["verdict"].startswith("→")}
+    live = [r for r in rows if r["source"] == "запрос"]
+    from_idx = [r for r in rows if r["source"] == "индекс"]
+    hit = lambda rs: sorted(r["repo"] for r in rs if r["repo"].lower() in pos and not r["stop"])
+    return (f"{spec['name']}: Индекс после первого прогона {sum(not r['stop'] for r in first)} строк; второй прогон "
+            f"(2 Запроса, другая формулировка): живая выдача {len(live)}, из Индекса {len(from_idx)} "
+            f"(прошли стоп-правила {sum(not r['stop'] for r in from_idx)}); позитивы в живой {hit(live) or '—'}, "
+            f"позитивы из Индекса {hit(from_idx) or '—'} из {len(pos)}")
+
+
+def _one_line(text: str) -> str:
+    return " ".join(text.split())
+
+
+def export_verdicts(index: Index, project: str | None) -> str:
+    """Вердикты Индекса как блоки [[expected]] для Золотых наборов, по проектам."""
+    out, current = [], None
+    for proj, name, verdict, task, date in index.verdicts(project):
+        if proj != current:
+            out.append(f"\n# проект: {_one_line(proj)}")
+            current = proj
+        out += ["[[expected]]", f"repo = {json.dumps(name, ensure_ascii=False)}",
+                f"verdict = {json.dumps(verdict, ensure_ascii=False)}", f"# {date}: {_one_line(task)}"]
+    return "\n".join(out).strip()
 
 
 def main(argv: list[str]) -> None:
     ap = argparse.ArgumentParser(prog="repo-scout eval")
-    ap.add_argument("sets", nargs="+", type=Path)
+    ap.add_argument("sets", nargs="*", type=Path)
     mode = ap.add_mutually_exclusive_group()
     mode.add_argument("--record", action="store_true", help="писать снапшоты (сеть)")
     mode.add_argument("--replay", action="store_true", help="читать снапшоты (по умолчанию)")
@@ -94,8 +139,18 @@ def main(argv: list[str]) -> None:
     ap.add_argument("--sweep", action="store_true", help="таблица порогов Близости 0.50..0.90")
     ap.add_argument("--top", type=int, metavar="N", help="вывести топ-N выдачи каждого набора")
     ap.add_argument("--task", metavar="TEXT", help="подменить Описание задачи (проверка устойчивости формулировок)")
+    ap.add_argument("--index-check", action="store_true", help="критерий Фазы 5: перефразировка + Индекс")
+    ap.add_argument("--export-verdicts", action="store_true", help="Вердикты Индекса как [[expected]] (TOML)")
+    ap.add_argument("--from-index", type=int, default=FROM_INDEX, metavar="N", help="с --index-check")
+    ap.add_argument("--project", help="с --export-verdicts: только этот проект")
     a = ap.parse_args(argv)
+    if a.export_verdicts:
+        return print(export_verdicts(Index(default_path()), a.project))
+    if not a.sets:
+        ap.error("нужны наборы eval/*.toml")
     try:
+        if a.index_check:
+            return print("\n".join(filter(None, (index_check(p, "record" if a.record else "replay", a.from_index) for p in a.sets))))
         sets = [eval_set(p, "record" if a.record else "replay", a.task) for p in a.sets]
     except (ValueError, GitHubError) as e:
         sys.exit(f"eval: {e}")
