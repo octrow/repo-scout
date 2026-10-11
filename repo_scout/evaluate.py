@@ -148,11 +148,19 @@ def main(argv: list[str]) -> None:
     ap.add_argument("--calls", action="store_true", help="число вызовов API (поиск, детали) по наборам")
     ap.add_argument("--index-check", action="store_true", help="критерий Фазы 5: перефразировка + Индекс")
     ap.add_argument("--export-verdicts", action="store_true", help="Вердикты Индекса как [[expected]] (TOML)")
+    ap.add_argument("--fake-stars", action="store_true", help="Фаза 7: precision/recall/FPR флага «всплеск★» на eval/fake-stars (сеть с --record)")
+    ap.add_argument("--all-grid", action="store_true", help="с --fake-stars: вся сетка порогов")
     ap.add_argument("--from-index", type=int, default=FROM_INDEX, metavar="N", help="с --index-check")
     ap.add_argument("--project", help="с --export-verdicts: только этот проект")
     a = ap.parse_args(argv)
     if a.export_verdicts:
         return print(export_verdicts(Index(default_path()), a.project))
+    if a.fake_stars:
+        from repo_scout import fake_stars
+        try:
+            return print(fake_stars.run("record" if a.record else "replay", a.all_grid))
+        except (ValueError, GitHubError) as e:
+            sys.exit(f"eval: {e}")
     if not a.sets:
         ap.error("нужны наборы eval/*.toml")
     try:

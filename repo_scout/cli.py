@@ -1,6 +1,6 @@
 """Шаг 1 из docs/repo-triage.md: найти репо на GitHub, применить стоп-правила, посчитать баллы.
 
-Usage: repo-scout --task "<English task description>" "query one" "query two" [--min-closeness 0.6] [--months 6] [--new-days 60] [--limit 50] [--lang X] [--exclude RE] [--must RE] [--no-round2] [--round2-k 10] [--all] [--json]
+Usage: repo-scout --task "<English task description>" "query one" "query two" [--min-closeness 0.6] [--months 6] [--new-days 60] [--limit 50] [--lang X] [--exclude RE] [--must RE] [--no-round2] [--round2-k 10] [--stars-k 10] [--no-stars-check] [--all] [--json]
 Each query is GitHub search syntax (language:python, topic:x ...). Needs an authenticated `gh`.
 """
 import argparse
@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 
 import numpy as np
 
-from repo_scout import github, semantic
+from repo_scout import github, semantic, stars
 from repo_scout import log as logmod
 from repo_scout.commits import last_substantive
 from repo_scout.conditions import (
@@ -33,6 +33,7 @@ TOKEN = re.compile(r'-?[\w-]+:"[^"]*"|"[^"]*"|\S+')
 QUALIFIER = re.compile(r"-?[A-Za-z-]+:(?!//).+")
 OPERATORS = {"AND", "OR", "NOT"}
 MUST_STOP = "нет обязательного"
+STARS_K = 10
 FROM_INDEX = 50  # сколько ближайших из Индекса добавлять в Пул
 
 
@@ -207,7 +208,7 @@ def _round2(rows: list[dict], queries: list[str], pool: dict, *, k: int, floor: 
 def run(queries: list[str], *, months: int, new_days: int, limit: int, lang: str | None, now: datetime,
         exclude: list[re.Pattern] = (), must: list[re.Pattern] = (), task: str | None = None,
         min_closeness: float = semantic.MIN_CLOSENESS, index: Index | None = None,
-        from_index: int = FROM_INDEX, round2: bool = True, round2_k: int = ROUND2_K) -> list[dict]:
+        from_index: int = FROM_INDEX, round2: bool = True, round2_k: int = ROUND2_K, stars_k: int = 0) -> list[dict]:
     """Все строки триажа (включая отсеянные), отсортированы по Близости, потом по баллам."""
     since = (now - timedelta(days=30 * months)).date().isoformat()
     nodes: dict = {}
@@ -226,7 +227,22 @@ def run(queries: list[str], *, months: int, new_days: int, limit: int, lang: str
         seen = index.seen([r["repo"] for r in rows])
         for r in rows:
             r["seen"] = seen.get(r["repo"].lower(), "")
-    return sorted(rows, key=sort_key)
+    rows.sort(key=sort_key)
+    add_stars_flag(rows, stars_k, now)
+    return rows
+
+
+def add_stars_flag(rows: list[dict], k: int, now: datetime) -> None:
+    """Флаг «всплеск★» топ-k выжившим строкам с ≥50★ (после Близости; баллы не меняет)."""
+    top = [r for r in rows if not r["stop"] and r["stars"] >= stars.MIN_STARS][:k]
+    for r in top:
+        try:
+            text = stars.flag(stars.history(r["repo"], now))
+        except GitHubError as e:  # флаг вторичен: сбой не должен ронять прогон
+            log.warning("предупреждение: флаг «всплеск★» для %s пропущен: %s", r["repo"], e)
+            continue
+        if text:
+            r["flags"].append(text)
 
 
 def verdict_main(argv: list[str]) -> None:
@@ -274,6 +290,9 @@ def _parser() -> argparse.ArgumentParser:
                     help="добавить в Пул N ближайших из Индекса (0 = выключить, по умолчанию %(default)s)")
     ap.add_argument("--round2-k", type=int, default=ROUND2_K, metavar="K",
                     help="второй круг берёт topics из топ-K (по умолчанию %(default)s)")
+    ap.add_argument("--stars-k", type=int, default=STARS_K, metavar="K",
+                    help="флаг «всплеск★» для топ-K с ≥50★ (по умолчанию %(default)s)")
+    ap.add_argument("--no-stars-check", action="store_true", help="без флага «всплеск★» (REST-история звёзд)")
     ap.add_argument("--no-round2", action="store_true", help="без второго круга (`topic:` из топ-K)")
     ap.add_argument("--all", action="store_true", help="показать и отсеянных стоп-правилами")
     ap.add_argument("--json", action="store_true")
@@ -292,7 +311,8 @@ def _main(a: argparse.Namespace) -> None:
         rows = run(a.queries, months=a.months, new_days=a.new_days, limit=a.limit, lang=a.lang, now=now,
                    exclude=exclude, must=must, task=a.task, min_closeness=a.min_closeness,
                    index=None if a.record or a.replay else Index(default_path()), from_index=a.from_index,
-                   round2=not a.no_round2, round2_k=a.round2_k)
+                   round2=not a.no_round2, round2_k=a.round2_k,
+                   stars_k=0 if a.no_stars_check else a.stars_k)
     except ValueError as e:
         print(e, file=sys.stderr)
         sys.exit(2)
