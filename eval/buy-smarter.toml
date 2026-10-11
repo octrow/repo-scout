@@ -1,5 +1,6 @@
 name = "buy-smarter"
 source = "~/dev/buy-smarter/docs/PLAN.md (раздел «Источники»), ~/dev/buy-smarter/docs/INIT_DATA.md"
+need = "Хочу ассистента, который помогает выбрать лучший товар под мои условия (бюджет, город, наличие), а не просто самый дешёвый или с лучшим рейтингом. Нужны готовые парсеры, обёртки API или MCP-серверы для Kaspi.kz, Ozon и OLX.kz: поиск товаров, предложения продавцов, отзывы, характеристики, цены по городам, обход анти-бот защиты."
 analysis_date = ""
 task = "Find open-source parsers, API wrappers and MCP servers for the Kazakhstan marketplaces Kaspi.kz, Ozon (kz) and OLX.kz: product search, offers/sellers, reviews, specs, prices by city, anti-bot handling; used as a base for a shopping recommendation assistant."
 queries = ["kaspi.kz parser", "kaspi api python", "kaspi mcp server", "ozon parser python", "ozon mcp server", "olx.kz parser"]

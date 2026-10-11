@@ -28,3 +28,10 @@ def test_metrics():
 def test_summary_table():
     t = summary_table([metrics(SPEC, ROWS)])
     assert "| s | 4 | 2 | 1 | 2 | 1 | 2 | 1 |" in t
+
+
+def test_eval_out_file(tmp_path, capsys):
+    from repo_scout import evaluate
+    out = tmp_path / "rep.txt"
+    evaluate.main(["--export-verdicts", "--out", str(out)])
+    assert capsys.readouterr().out == "" and out.exists()

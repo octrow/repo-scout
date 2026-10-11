@@ -1,5 +1,6 @@
 name = "get_cool_event"
 source = "~/dev/get_cool_event/CLAUDE.md (Alternatives Considered), ~/dev/get_cool_event/docs/PRODJECT.md"
+need = "Хочу автоматически собирать анонсы мероприятий из Instagram-аккаунтов (посты, reels, сторис, хайлайты) и сводить их в еженедельный дайджест. Ищу инструменты для выгрузки контента из Instagram с авторизацией по сессии и учётом лимитов запросов."
 analysis_date = ""
 task = "Find open-source scrapers/downloaders for Instagram posts, reels, stories and highlights (session auth, rate limiting) to collect event announcements from accounts into a weekly digest."
 queries = ["instagram scraper stories highlights reels", "instagram downloader python session", "instagram posts downloader cli", "instaloader alternative", "instagram media downloader no login", "gallery-dl instagram"]

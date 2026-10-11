@@ -78,6 +78,11 @@ def configure(mode: str | None, directory: Path | str | None) -> None:
             meta.write_text(json.dumps({"recorded_at": datetime.now(UTC).isoformat()}))
 
 
+def snapshot() -> tuple[str | None, Path | None]:
+    """Текущий режим снапшотов и каталог (для llm: ответы модели лежат рядом, в llm/)."""
+    return _mode, _dir
+
+
 def recorded_at() -> datetime:
     path = _dir / "meta.json"
     if not path.exists():
@@ -208,12 +213,24 @@ def details(names: list[str]) -> dict[str, dict]:
             missing.append(n)
     for start in range(0, len(missing), DETAILS_CHUNK):
         log.info("детали: %d–%d из %d", start + 1, min(start + DETAILS_CHUNK, len(missing)), len(missing))
-        for name, d in _fetch_details(missing[start:start + DETAILS_CHUNK]).items():
+        chunk = missing[start:start + DETAILS_CHUNK]
+        got = _fetch_details(chunk)
+        for name, d in got.items():
             if _mode == "record":
                 _write(_dir / "details" / f"{_key(name.lower())}.json.gz", d)
             if d is not None:
                 out[name] = d
+        _record_skipped(chunk, got, "details")
     return out
+
+
+def _record_skipped(chunk: list[str], got: dict, kind: str) -> None:
+    """Пропущенный (GitHub так и не ответил) в снимке = как удалённый: replay повторит тот же пропуск."""
+    if _mode != "record":
+        return
+    for name in chunk:
+        if name not in got and name in last_failed:
+            _write(_dir / kind / f"{_key(name.lower())}.json.gz", None)
 
 
 def _alias_full(i: int, name: str) -> str:
@@ -251,10 +268,13 @@ def refresh(names: list[str]) -> dict[str, dict]:
             missing.append(n)
     for start in range(0, len(missing), DETAILS_CHUNK):
         log.info("обновление из Индекса: %d–%d из %d", start + 1, min(start + DETAILS_CHUNK, len(missing)), len(missing))
-        for name, repo in _batch(missing[start:start + DETAILS_CHUNK], _alias_full).items():
+        chunk = missing[start:start + DETAILS_CHUNK]
+        got = _batch(chunk, _alias_full)
+        for name, repo in got.items():
             d = _split_full(repo) if repo else None
             if _mode == "record":
                 _write(_dir / "refresh" / f"{_key(name.lower())}.json.gz", d)
             if d is not None:
                 out[name] = d
+        _record_skipped(chunk, got, "refresh")
     return out

@@ -65,12 +65,12 @@ def test_gives_up_after_max_retries(monkeypatch):
     assert len(calls) == 4 and sleeps == [5, 10, 20]
 
 
-def test_partial_errors_return_data(monkeypatch, capsys):
+def test_partial_errors_return_data(monkeypatch, caplog):
     body = json.dumps({"data": {"search": {"nodes": [{"nameWithOwner": "a/b"}]}},
                        "errors": [{"type": "FORBIDDEN", "message": "boom"}]})
     run_with(monkeypatch, [(1, body, "")])
     assert github.search("q", 5) == [{"nameWithOwner": "a/b"}]
-    assert "boom" in capsys.readouterr().err
+    assert "boom" in caplog.text
 
 
 def test_retry_on_502(monkeypatch):
@@ -89,14 +89,26 @@ def _flaky_live(bad: set[str]):
     return live
 
 
-def test_details_splits_chunk_on_502_and_skips_failing_repo(monkeypatch, capsys):
+def test_details_splits_chunk_on_502_and_skips_failing_repo(monkeypatch, caplog):
     monkeypatch.setattr(github, "_graphql_live", _flaky_live({"a/bad"}))
     out = github.details(["a/one", "a/bad", "a/two", "a/three"])
     assert set(out) == {"a/one", "a/two", "a/three"}
-    assert "a/bad" in capsys.readouterr().err
+    assert "a/bad" in caplog.text
 
 
 def test_refresh_failed_repo_is_not_reported_as_deleted(monkeypatch):
     monkeypatch.setattr(github, "_graphql_live", _flaky_live({"a/bad"}))
     out = github.refresh(["a/one", "a/bad"])
     assert "a/bad" not in out and github.last_failed == {"a/bad"}
+
+
+def test_skipped_repo_is_recorded_so_replay_repeats_the_skip(monkeypatch, tmp_path):
+    monkeypatch.setattr(github, "_graphql_live", _flaky_live({"a/bad"}))
+    github.last_failed.clear()
+    try:
+        github.configure("record", tmp_path)
+        assert set(github.details(["a/one", "a/bad"])) == {"a/one"}
+        github.configure("replay", tmp_path)
+        assert set(github.details(["a/one", "a/bad"])) == {"a/one"}
+    finally:
+        github.configure(None, None)

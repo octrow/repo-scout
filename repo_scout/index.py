@@ -77,6 +77,16 @@ class Index:
             self.db.execute("INSERT INTO verdicts VALUES(?,?,?,?,?)",
                             (repo.lower(), project, task, verdict, (now or datetime.now(UTC)).date().isoformat()))
 
+    def rows(self) -> list[dict]:
+        """Репо Индекса без векторов: key, name, meta, fetched_at, has_readme; по имени без регистра."""
+        q = "SELECT name, display_name, meta, fetched_at, readme != '' FROM repos ORDER BY display_name COLLATE NOCASE"
+        return [{"key": k, "name": n, "meta": json.loads(m), "fetched_at": f, "has_readme": bool(r)}
+                for k, n, m, f, r in self.db.execute(q)]
+
+    def readme(self, name: str) -> str | None:
+        row = self.db.execute("SELECT readme FROM repos WHERE name = ?", (name.lower(),)).fetchone()
+        return row[0] or None if row else None
+
     def seen(self, names: list[str]) -> dict[str, str]:
         """«проект: вердикт (дата)» — последний вердикт по каждому проекту, свежие первыми; ключ — имя в нижнем регистре."""
         out: dict[str, list[str]] = {}

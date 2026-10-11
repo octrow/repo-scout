@@ -1,5 +1,6 @@
 name = "linux-coding"
 source = "~/dev/linux-coding/docs/research/opensource-analogs.md"
+need = "Нужен ассистент для онлайн-собеседований и звонков, который в реальном времени слушает и распознаёт речь, находит вопросы интервьюера и подсказывает ответы через языковую модель, а оверлей не виден при демонстрации экрана. Должен работать на Linux (Ubuntu, KDE) и понимать русский и английский."
 analysis_date = "2026-10-05"
 task = "Find open-source real-time interview/meeting assistants (live speech recognition, question detection, LLM answer suggestions, screen OCR, screen-share-invisible overlay) that run on Linux (Ubuntu, KDE/Wayland or X11), ideally with Russian + English support, to use as a base or to borrow audio-capture and ASR code."
 alt_task = "Looking for open-source assistants that listen to a live job interview or call, transcribe speech in real time, spot the interviewer's questions and propose answers with a language model, with an overlay hidden from screen sharing; must work on Linux and ideally support Russian and English."

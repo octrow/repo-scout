@@ -1,5 +1,6 @@
 """`repo-scout eval`: прогон золотых наборов eval/*.toml и метрики полноты."""
 import argparse
+import contextlib
 import json
 import sys
 import tempfile
@@ -78,12 +79,13 @@ def sweep(sets: list[tuple[dict, list[dict]]]) -> str:
 
 def eval_set(path: Path, mode: str, task: str | None = None, queries: list[str] | None = None,
              index: Index | None = None, from_index: int = FROM_INDEX,
-             round2: bool = True) -> tuple[dict, list[dict]]:
+             round2: bool = True, overrides: dict | None = None,
+             snap_dir: Path | None = None) -> tuple[dict, list[dict]]:
     """Прогон набора. Индекс по умолчанию свежий временный: числа сравнимы, пользовательский Индекс не трогаем."""
-    spec = tomllib.loads(path.read_text())
+    spec = {**tomllib.loads(path.read_text()), **(overrides or {})}  # overrides: queries, must, exclude, lang, task
     exclude = compile_all("--exclude", spec.get("exclude", []))
     must = compile_all("--must", spec.get("must", []))
-    github.configure(mode, path.parent / "snapshots" / spec["name"])
+    github.configure(mode, snap_dir or path.parent / "snapshots" / spec["name"])
     github.calls.clear()
     now = github.recorded_at()  # дата снимка и при дозаписи: сравнимость с baseline
     with tempfile.TemporaryDirectory() as tmp:
@@ -146,13 +148,23 @@ def main(argv: list[str]) -> None:
     ap.add_argument("--task", metavar="TEXT", help="подменить Описание задачи (проверка устойчивости формулировок)")
     ap.add_argument("--no-round2", action="store_true", help="без второго круга (сравнение)")
     ap.add_argument("--calls", action="store_true", help="число вызовов API (поиск, детали) по наборам")
+    ap.add_argument("--llm-draft", action="store_true",
+                    help="Фаза 9: полнота Запросов агента / Черновика LLM / объединения (снапшоты eval/snapshots-llm)")
     ap.add_argument("--index-check", action="store_true", help="критерий Фазы 5: перефразировка + Индекс")
     ap.add_argument("--export-verdicts", action="store_true", help="Вердикты Индекса как [[expected]] (TOML)")
     ap.add_argument("--fake-stars", action="store_true", help="Фаза 7: precision/recall/FPR флага «всплеск★» на eval/fake-stars (сеть с --record)")
     ap.add_argument("--all-grid", action="store_true", help="с --fake-stars: вся сетка порогов")
     ap.add_argument("--from-index", type=int, default=FROM_INDEX, metavar="N", help="с --index-check")
     ap.add_argument("--project", help="с --export-verdicts: только этот проект")
+    ap.add_argument("--out", type=Path, metavar="PATH", help="отчёт в файл вместо stdout")
     a = ap.parse_args(argv)
+    if not a.out:
+        return _report(a, ap)
+    with a.out.open("w", encoding="utf-8") as f, contextlib.redirect_stdout(f):
+        _report(a, ap)
+
+
+def _report(a: argparse.Namespace, ap: argparse.ArgumentParser) -> None:
     if a.export_verdicts:
         return print(export_verdicts(Index(default_path()), a.project))
     if a.fake_stars:
@@ -163,6 +175,12 @@ def main(argv: list[str]) -> None:
             sys.exit(f"eval: {e}")
     if not a.sets:
         ap.error("нужны наборы eval/*.toml")
+    if a.llm_draft:
+        from repo_scout import eval_llm
+        try:
+            return print(eval_llm.report(a.sets, "record" if a.record else "replay"))
+        except (ValueError, GitHubError, eval_llm.LLMError) as e:
+            sys.exit(f"eval: {e}")
     try:
         if a.index_check:
             return print("\n".join(filter(None, (index_check(p, "record" if a.record else "replay", a.from_index) for p in a.sets))))

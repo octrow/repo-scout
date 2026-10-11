@@ -155,3 +155,15 @@ def test_record_and_replay_use_no_index(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["repo-scout", "q", "--task", "t"])
     cli.main()
     assert seen[:2] == [None, None] and isinstance(seen[2], Index)
+
+
+def test_rows_and_readme(tmp_path):
+    idx = Index(tmp_path / "i.db", model="m1")
+    assert idx.rows() == [] and idx.readme("o/x") is None
+    idx.upsert({**ROW, "repo": "O/Zed"}, "text", np.array([1, 0]), datetime(2026, 1, 2, tzinfo=UTC))
+    idx.upsert({**ROW, "repo": "a/Alpha"}, None, np.array([1, 0]))
+    rows = idx.rows()
+    assert [r["name"] for r in rows] == ["a/Alpha", "O/Zed"]
+    assert rows[1]["key"] == "o/zed" and rows[1]["has_readme"] and not rows[0]["has_readme"]
+    assert rows[1]["meta"]["stars"] == 3 and rows[1]["fetched_at"].startswith("2026-01-02")
+    assert idx.readme("O/ZED") == "text" and idx.readme("a/alpha") is None

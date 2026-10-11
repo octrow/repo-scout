@@ -1,5 +1,6 @@
 name = "tiktok-lazy-follower"
 source = "~/dev/tiktok-lazy-follower/INIT_DATA.md (клоны в external_examples/, письменного разбора нет)"
+need = "Хочу следить за выбранными авторами TikTok и своим списком избранного: докачивать только новые видео и превращать их в текст (субтитры или распознавание речи), чтобы раз в неделю получать дайджест. Ищу open-source загрузчики и транскрайберы."
 analysis_date = ""
 task = "Find open-source tools to track TikTok creators and the user's favorites, download new videos incrementally and transcribe them to text (Whisper / subtitles), to build a weekly digest."
 queries = ["tiktok downloader creator favorites", "tiktok video transcription whisper", "tiktok scraper user videos", "tiktok api python unofficial", "tiktok to text transcript", "douyin tiktok download api"]

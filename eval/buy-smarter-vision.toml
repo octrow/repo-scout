@@ -1,5 +1,6 @@
 name = "buy-smarter-vision"
 source = "~/dev/buy-smarter/docs/llm-vision/buy-smarter-fashion-vision-research.md"
+need = "Ищу модели и проекты для локального сравнения фото товаров (одежда, обувь, 1–6 фото одной вещи) по внешнему виду: эмбеддинги картинок, объединение нескольких ракурсов в один вектор, обучение личному вкусу по лайкам и дизлайкам. Всё должно работать локально на одной домашней видеокарте."
 analysis_date = "2026-08-24"
 task = "Find open-source local vision-embedding models and fashion-recommendation projects: image embeddings for product photos (1-6 views of one item), multi-view aggregation, learning personal visual taste from like/dislike feedback, running on a single consumer GPU."
 queries = ["fashion CLIP embeddings", "fashion image embedding SigLIP", "multi-view product image retrieval", "personalized fashion recommendation visual", "DINOv3 image embeddings", "visual taste preference learning from likes"]

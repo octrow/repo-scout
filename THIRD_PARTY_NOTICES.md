@@ -34,3 +34,9 @@ algorithm here are therefore also derived from StarGuard.
 
 `eval/fake-stars/labels.csv` contains repo names and labels selected from the StarScout data
 (https://github.com/hehao98/StarScout, Apache-2.0). The data files themselves are not redistributed.
+
+## Inter (SIL OFL 1.1)
+
+`repo_scout/gui/kit/assets/fonts/InterVariable.woff2` is the Inter Variable font (Copyright (c) 2016 The Inter Project
+Authors, https://github.com/rsms/inter), licensed under the SIL Open Font License 1.1. The license text is in
+`repo_scout/gui/kit/assets/fonts/LICENSE.txt`.

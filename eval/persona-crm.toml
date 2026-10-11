@@ -1,5 +1,6 @@
 name = "persona-crm"
 source = "~/dev/persona-crm/docs/INIT_DATA.md, ~/dev/persona-crm/CLAUDE.md, ~/dev/persona-crm/README.md"
+need = "Хочу бесплатный self-hosted инструмент, который помогает не терять связь с близкими друзьями и семьёй: отслеживает переписку в WhatsApp, Telegram и Instagram и напоминает, кому пора написать. Ещё нужна возможность читать личные сообщения Instagram."
 analysis_date = ""
 task = "Find self-hosted open-source personal CRM tools that track communication with friends and family across WhatsApp, Telegram and Instagram and remind who to contact next (usable by an ADHD user), plus libraries for reading Instagram DMs."
 queries = ["personal CRM self-hosted friends family", "personal CRM whatsapp telegram instagram", "keep in touch reminders open source", "instagram direct messages python private api", "whatsapp message history analysis local LLM", "relationship manager self-hosted open source"]

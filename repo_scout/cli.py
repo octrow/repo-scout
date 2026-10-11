@@ -8,11 +8,13 @@ import json
 import re
 import sys
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import numpy as np
 
-from repo_scout import github, semantic, stars
+from repo_scout import github, runs, semantic, stars
 from repo_scout import log as logmod
+from repo_scout.command import parse_command, search_params, to_argv  # noqa: F401  (реэкспорт)
 from repo_scout.commits import last_substantive
 from repo_scout.conditions import (
     compile_all,
@@ -35,6 +37,7 @@ OPERATORS = {"AND", "OR", "NOT"}
 MUST_STOP = "нет обязательного"
 STARS_K = 10
 FROM_INDEX = 50  # сколько ближайших из Индекса добавлять в Пул
+last_round2_topics: list[str] = []  # слаги второго круга последнего run(); для сохранения в Прогон
 
 
 def _has(tokens: list[str], name: str) -> bool:
@@ -161,7 +164,7 @@ def apply_closeness(rows: list[dict], min_closeness: float) -> None:
 
 def sort_key(r: dict) -> tuple:
     c = r.get("closeness")
-    return (-(-1.0 if c is None else c), -r["score"], r["pushed_days"])
+    return (-(-1.0 if c is None else c), -r.get("score", 0), r.get("pushed_days", 0))
 
 
 def _process(nodes: dict, live: set[str], source: str, *, now: datetime, new_days: int, lang: str | None,
@@ -210,6 +213,8 @@ def run(queries: list[str], *, months: int, new_days: int, limit: int, lang: str
         min_closeness: float = semantic.MIN_CLOSENESS, index: Index | None = None,
         from_index: int = FROM_INDEX, round2: bool = True, round2_k: int = ROUND2_K, stars_k: int = 0) -> list[dict]:
     """Все строки триажа (включая отсеянные), отсортированы по Близости, потом по баллам."""
+    global last_round2_topics
+    last_round2_topics = []
     since = (now - timedelta(days=30 * months)).date().isoformat()
     nodes: dict = {}
     _search_all(queries, months=months, since=since, lang=lang, limit=limit, into=nodes)
@@ -221,6 +226,7 @@ def run(queries: list[str], *, months: int, new_days: int, limit: int, lang: str
     if task and round2:
         extra, topics = _round2(rows, queries, nodes, k=round2_k, floor=max(min_closeness, semantic.MIN_CLOSENESS),
                                 lang=lang, months=months, since=since, limit=limit)
+        last_round2_topics = topics
         log.info("второй круг: topics %s → новых %d", ", ".join(topics) or "—", len(extra))
         rows += _process(extra, set(extra), "второй круг", known={}, **kw)
     if index:
@@ -245,6 +251,14 @@ def add_stars_flag(rows: list[dict], k: int, now: datetime) -> None:
             r["flags"].append(text)
 
 
+def draft_params(d, need: str) -> dict:
+    """Параметры поиска из Черновика LLM (остальное по умолчанию парсера)."""
+    params = search_params(_parser().parse_args(["--task", "x", "q"]))
+    params.update(task=d.task, queries=list(d.queries), must=list(d.must), exclude=list(d.exclude),
+                  lang=d.lang, need=need.strip())
+    return params
+
+
 def verdict_main(argv: list[str]) -> None:
     ap = argparse.ArgumentParser(prog="repo-scout verdict")
     ap.add_argument("repo", metavar="owner/repo")
@@ -260,19 +274,51 @@ def verdict_main(argv: list[str]) -> None:
     print(f"записано: {a.repo} — {a.verdict} ({a.project})")
 
 
+def draft_main(argv: list[str]) -> None:
+    """`repo-scout draft "<потребность>"`: Черновик LLM одной строкой `repo-scout …`."""
+    import shlex
+
+    from repo_scout import llm
+    ap = argparse.ArgumentParser(prog="repo-scout draft")
+    ap.add_argument("need", help="Потребность своими словами, на любом языке")
+    a = ap.parse_args(argv)
+    if not llm.available():
+        sys.exit(f"draft: {llm.NO_KEY}")
+    logmod.setup(quiet=True)
+    try:
+        d = llm.draft(a.need)
+    except llm.LLMError as e:
+        sys.exit(f"draft: {e}")
+    print(shlex.join(["repo-scout", *to_argv(draft_params(d, a.need))]))
+
+
 def main() -> None:
     if sys.argv[1:2] == ["eval"]:
         from repo_scout import evaluate
         return evaluate.main(sys.argv[2:])
+    if sys.argv[1:2] == ["gui"] or not sys.argv[1:]:  # без аргументов — GUI
+        from repo_scout.gui import app  # лениво: CLI не импортирует nicegui
+        return app.main(sys.argv[2:])
     if sys.argv[1:2] == ["verdict"]:
         return verdict_main(sys.argv[2:])
+    if sys.argv[1:2] == ["draft"]:
+        return draft_main(sys.argv[2:])
     a = _parser().parse_args()
     logmod.setup(quiet=a.quiet)
     _main(a)
 
 
+class _Parser(argparse.ArgumentParser):
+    raise_errors = False  # parse_command: ошибки — ValueError, без SystemExit и stderr
+
+    def error(self, message: str):
+        if self.raise_errors:
+            raise ValueError(message)
+        super().error(message)
+
+
 def _parser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = _Parser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("queries", nargs="+")
     ap.add_argument("--task", required=True, metavar="TEXT",
                     help="Описание задачи (1-3 фразы на английском): по нему считается Близость")
@@ -294,6 +340,10 @@ def _parser() -> argparse.ArgumentParser:
                     help="флаг «всплеск★» для топ-K с ≥50★ (по умолчанию %(default)s)")
     ap.add_argument("--no-stars-check", action="store_true", help="без флага «всплеск★» (REST-история звёзд)")
     ap.add_argument("--no-round2", action="store_true", help="без второго круга (`topic:` из топ-K)")
+    ap.add_argument("--project", help="проект, для которого поиск (сохраняется в Прогон)")
+    ap.add_argument("--need", metavar="TEXT", help="Потребность своими словами (только сохраняется в Прогон, поиск не использует)")
+    ap.add_argument("--out", metavar="PATH", help="путь файла Прогона (по умолчанию каталог Прогонов)")
+    ap.add_argument("--no-save", action="store_true", help="не сохранять Прогон")
     ap.add_argument("--all", action="store_true", help="показать и отсеянных стоп-правилами")
     ap.add_argument("--json", action="store_true")
     snap = ap.add_mutually_exclusive_group()
@@ -301,6 +351,17 @@ def _parser() -> argparse.ArgumentParser:
     snap.add_argument("--replay", metavar="DIR", help="читать ответы из DIR без сети")
     ap.add_argument("-q", "--quiet", action="store_true", help="ход работы только в лог-файл, в stderr — предупреждения")
     return ap
+
+
+def _save_run(a: argparse.Namespace, rows: list[dict], now: datetime) -> None:
+    if a.no_save or a.record or a.replay:
+        return
+    try:
+        path = runs.save(search_params(a), rows, last_round2_topics, now, Path(a.out) if a.out else None)
+    except OSError as e:
+        log.warning("Прогон не сохранён: %s", e)
+        return
+    log.info("Прогон сохранён: %s", path)
 
 
 def _main(a: argparse.Namespace) -> None:
@@ -327,9 +388,11 @@ def _main(a: argparse.Namespace) -> None:
     shown = [r for r in (rows if a.all else kept) if r not in by_must]
     if a.json:
         print(json.dumps({"rows": shown, "dropped_by_must": by_must}, ensure_ascii=False, indent=1))
+        _save_run(a, rows, now)
         return
     print(to_markdown(shown))
     if by_must:
         print("\nотсеяно по --must: " + ", ".join(r["repo"] for r in by_must))
     print(f"\nнайдено {len(rows)}, прошло стоп-правила {len(kept)}, отсеяно {len(rows) - len(kept)}"
           + ("" if a.all else " (--all чтобы показать)"))
+    _save_run(a, rows, now)

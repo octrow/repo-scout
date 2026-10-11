@@ -82,3 +82,11 @@ def test_round2_stops_noise_and_indexes_good(monkeypatch, tmp_path):
     assert out["b/good"]["source"] == "второй круг"
     assert idx.top("t", 10) and "b/good" in idx.top("t", 10) and "b/bad" not in idx.top("t", 10)
     assert queries
+
+
+def test_round2_topics_exposed(monkeypatch):
+    _setup(monkeypatch)
+    _run()
+    assert cli.last_round2_topics == ["asr", "x"]
+    _run(round2=False)
+    assert cli.last_round2_topics == []
