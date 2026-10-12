@@ -34,8 +34,9 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 
 [tool.hatch.build.targets.sdist]
-# frozen GitHub responses for offline eval (~30 MB); they live in git, not in the package
-exclude = ["eval/snapshots", "eval/snapshots-llm", "eval/fake-stars/snapshots"]
+# frozen GitHub responses for offline eval (~30 MB) and README images; they live in git, not in the package.
+# "/assets" is the root folder only: the GUI fonts in repo_scout/gui/kit/assets must stay
+exclude = ["eval/snapshots", "eval/snapshots-llm", "eval/fake-stars/snapshots", "/assets"]
 
 [tool.ruff]
 extend-exclude = [".agents", ".claude", "external_examples"]
