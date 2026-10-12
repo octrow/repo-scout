@@ -3,23 +3,27 @@ from nicegui import ui
 
 from .. import runs
 from . import shell
-from .i18n import t
+from .i18n import localize_table, t
 from .kit import layout, table
 from .run_view import run_page
 from .runs_logic import resolve_run
 
 COLUMNS = [
-    {"name": "date", "label": "Date", "field": "date", "align": "left", "sortable": True},
+    {"name": "date", "label": "Date", "field": "date", "align": "left", "sortable": True,
+     "classes": "rs-nowrap"},
     {"name": "task", "label": "Task", "field": "task", "align": "left"},
     {"name": "project", "label": "Project", "field": "project", "align": "left", "sortable": True},
-    {"name": "count", "label": "Kept / total", "field": "count", "align": "right"},
+    {"name": "count", "label": "Kept / total", "field": "count", "align": "right", "classes": "rs-nowrap"},
     {"name": "actions", "label": "", "field": "id", "align": "right"},
 ]
 TASK_SLOT = """<q-td :props="props">
 <a v-if="!props.row.error" :href="'/runs/' + props.row.id">{{ props.row.task }}</a>
 <span v-else class="ic-status--error">{{ props.row.task }}</span></q-td>"""
-DELETE_SLOT = """<q-td :props="props"><q-btn outline dense no-caps color="negative" label="Delete"
-@click="() => $parent.$emit('delete', props.row)" /></q-td>"""
+DELETE_SLOT = """<q-td :props="props"><q-btn flat round dense icon="delete" class="rs-delete" aria-label="Delete"
+@click.stop="() => $parent.$emit('delete', props.row)"><q-tooltip>Delete</q-tooltip></q-btn></q-td>"""
+# Delete is on every row: quiet until hovered, so the tasks stay the focus (it still asks to confirm)
+RUNS_CSS = (".rs-delete { color: var(--ic-text-muted); } .rs-delete:hover { color: var(--ic-err); }"
+            " .q-table td.rs-nowrap { white-space: nowrap; }")
 
 
 def summary_row(s: runs.Summary) -> dict:
@@ -64,14 +68,17 @@ class RunsList:
         self.table = table.empty_aware_table(columns, row_key="id", pagination={"rowsPerPage": 25},
                                              empty_text=t("No runs yet. Start one on the Search page."))
         self.table.table.add_slot("body-cell-task", TASK_SLOT)
-        self.table.table.add_slot("body-cell-actions", DELETE_SLOT.replace('label="Delete"', f'label="{t("Delete")}"'))
+        localize_table(self.table.table)
+        ui.add_css(RUNS_CSS)
+        self.table.table.add_slot("body-cell-actions", DELETE_SLOT.replace(">Delete<", f">{t('Delete')}<")
+                                  .replace('aria-label="Delete"', f'aria-label="{t("Delete")}"'))
         self.table.table.on("delete", lambda e: self.confirm_delete(e.args))
         self.refresh()
 
 
 def runs_list() -> None:
-    shell.shell("/runs", layout.PAGE_MAX_WIDTH_WIDE)
-    with layout.page_container(max_width=layout.PAGE_MAX_WIDTH_WIDE):
+    shell.shell("/runs")
+    with layout.page_container(max_width=shell.PAGE_WIDTH):
         layout.heading(t("Runs"), level=1)
         RunsList().build()
 

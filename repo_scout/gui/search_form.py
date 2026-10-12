@@ -138,16 +138,25 @@ def run_to_state(path: Path) -> dict:
     return params_to_state(runs.load(path)["params"])
 
 
+DRAFT_TASK_LIMIT = 60
+
+
+def _short(task: str | None) -> str:
+    """A task cut to one scannable line of the draft list."""
+    task = " ".join((task or "").split())
+    return task if len(task) <= DRAFT_TASK_LIMIT else task[:DRAFT_TASK_LIMIT - 1].rstrip() + "…"
+
+
 def list_drafts(eval_dir: Path = EVAL_DIR) -> list[Draft]:
     """Past Runs (newest first, corrupt skipped) and eval datasets."""
-    out = [Draft(f"{RUN_PREFIX}{s.path.stem}", f"{t('Run')}: {(s.created_at or '')[:10]} {s.task}", s.path)
+    out = [Draft(f"{RUN_PREFIX}{s.path.stem}", f"{t('Run')} · {(s.created_at or '')[:10]} · {_short(s.task)}", s.path)
            for s in runs.list_runs() if not s.error]
     for p in sorted(eval_dir.glob("*.toml")):
         try:
             tomllib.loads(p.read_text(encoding="utf-8"))
         except (OSError, tomllib.TOMLDecodeError):
             continue
-        out.append(Draft(f"{EVAL_PREFIX}{p.stem}", f"{t('Eval')}: {p.stem}", p))
+        out.append(Draft(f"{EVAL_PREFIX}{p.stem}", f"{t('Eval')} · {p.stem}", p))
     return out
 
 

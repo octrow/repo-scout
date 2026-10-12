@@ -204,9 +204,9 @@ def _buttons(form: SearchForm, started: dict[str, str]) -> None:
 
 
 def search(draft: str | None = None) -> None:
-    shell.shell("/", layout.PAGE_MAX_WIDTH_FORM)
+    shell.shell("/")
     started: dict[str, str] = {}
-    with layout.page_container():
+    with layout.page_container(max_width=shell.PAGE_WIDTH):
         layout.heading(t("Search"), level=1)
         with ui.column().classes("w-full").style("gap: var(--ic-s4)"):
             form = SearchForm()
@@ -216,8 +216,10 @@ def search(draft: str | None = None) -> None:
             with layout.section_card(recessive=True):
                 with ui.row().classes("ic-split w-full items-start justify-between no-wrap"):
                     form.command = ui.label().classes("t-mono").style("min-width: 0; overflow-wrap: anywhere")
-                    layout.button(t("Copy"), kind="quiet", icon="content_copy", on_click=lambda: (
-                        ui.clipboard.write((sf.command_text(form.state()) or "")), ui.notify(t(layout.COPIED_TEXT))))
+                    ui.button(icon="content_copy", on_click=lambda: (
+                        ui.clipboard.write((sf.command_text(form.state()) or "")), ui.notify(t(layout.COPIED_TEXT)))) \
+                        .props(f'flat round dense aria-label="{t("Copy")}"').classes("shrink-0") \
+                        .tooltip(t("Copy"))
                 _buttons(form, started)
             layout.heading(t("Runs"), level=2)
             run_monitor.attach_run_monitor(idle_text=t("No runs yet"))

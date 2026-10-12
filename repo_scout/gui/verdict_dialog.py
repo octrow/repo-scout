@@ -30,6 +30,20 @@ def open_index() -> Iterator[Index]:
         idx.db.close()
 
 
+def readme_view(repo: str) -> None:
+    """README from the Index with images resolved on GitHub, or a hint that there is none."""
+    try:
+        with open_index() as idx:
+            readme = idx.readme(repo)
+    except DB_ERRORS:
+        log.warning("README from Index could not be read: %s", repo, exc_info=True)
+        readme = None
+    if readme:
+        layout.markdown_reader(rl.absolute_images(readme, repo), max_height="60vh")
+    else:
+        ui.label(t("No README in Index: check on GitHub")).classes("t-meta")
+
+
 def _last_context(repo: str) -> tuple[str, str]:
     """Project and task of last Verdict for repo: hint for dialog without Run."""
     try:
@@ -68,12 +82,12 @@ class VerdictDialog:
         if label:
             self.note.props(f'label="{t(label)}"')
 
-    def open(self, repo: str, project: str = "", task: str = "") -> None:
+    def open(self, repo: str, project: str = "", task: str = "", *, kind: str = "watch") -> None:
         self.repo = repo
         last_project, last_task = ("", "") if (project and task) else _last_context(repo)
         self.name.set_text(repo)
         self.project.value, self.task.value = project or last_project, task or last_task
-        self.kind.value, self.note.value = "watch", ""
+        self.kind.value, self.note.value = kind, ""
         self.error.set_text("")
         self._sync_note()
         self.dialog.open()

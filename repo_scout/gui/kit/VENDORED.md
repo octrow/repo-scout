@@ -10,6 +10,7 @@ Every code modification is marked with `# repo-scout:`. General improvements sho
 ## Modifications
 
 - `run_monitor.py`: absolute `nicegui_kit` imports replaced with relative imports.
+- `theme.py`: `.md-body` keeps README images in the column (`.nicegui-markdown` width, `img` max-width, no `align` float); worth proposing upstream.
 - `__init__.py`: docstring replaced with reference to this file (marked `# repo-scout:`).
 - Everything else unchanged (`nicegui-kit` strings in constants — localStorage key and task name — left as is).
 - Files longer than 400 lines (`theme.py`) are kept as-is since this is a vendored copy.

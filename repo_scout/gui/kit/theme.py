@@ -435,6 +435,9 @@ a.ic-nav-link.ic-nav-link--here { color: var(--ic-text); border-bottom-color: va
 .md-body h4, .md-body h5, .md-body h6 { font-size: var(--ic-fs-base); line-height: 1.4; font-weight: 600; margin: 1rem 0 0.25rem; }
 .md-body > :first-child { margin-top: 0; }
 .md-body p  { margin: 0.65rem 0; }
+/* repo-scout: GitHub READMEs float logos with <img align>; keep images in the flow and inside the column */
+.md-body > .nicegui-markdown { width: 100%; min-width: 0; }  /* else a wide image sizes the flex item, and 100% is moot */
+.md-body img { max-width: 100%; height: auto; float: none; vertical-align: middle; }
 .md-body li { margin: 0.2rem 0; }
 .md-body blockquote {
   margin: 0.75rem 0; padding: 0 var(--ic-s4);

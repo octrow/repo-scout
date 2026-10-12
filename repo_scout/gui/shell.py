@@ -8,11 +8,17 @@ PAGES = {"/": "Search", "/runs": "Runs", "/index": "Index", "/eval": "Eval"}
 BRAND = "repo-scout"
 
 
-def shell(here: str, max_width: str) -> None:
+# One width for every page, header included; narrower screens just fill it
+PAGE_WIDTH = "max-w-screen-2xl"
+# Repo panels show a README: wider than Quasar's 560px dialog
+PANEL_STYLE = "width: min(64rem, 94vw); max-width: min(64rem, 94vw)"
+
+
+def shell(here: str) -> None:
     """Header: brand, navigation, theme toggle. `here` highlights current section."""
     header = ui.header().style("flex-direction: column; align-items: stretch;"
                                " gap: var(--ic-s3); padding: var(--ic-s3) 0 0")
-    with header, ui.row().classes(f"ic-split w-full {max_width} mx-auto items-center justify-between") \
+    with header, ui.row().classes(f"ic-split w-full {PAGE_WIDTH} mx-auto items-center justify-between") \
             .style("padding: 0 var(--ic-s6); flex-wrap: nowrap"):
         with ui.row().classes("items-center").style(
                 "gap: var(--ic-s4) var(--ic-s6); flex-wrap: nowrap; min-width: 0"):

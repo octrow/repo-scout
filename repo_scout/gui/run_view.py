@@ -3,29 +3,54 @@
 from nicegui import ui
 
 from .. import runs
-from ..log import log
 from . import runs_logic as rl
 from . import shell
-from .i18n import t
+from .i18n import localize_table, t
 from .kit import layout, table
-from .verdict_dialog import DB_ERRORS, VerdictDialog, notify_db_error, open_index
+from .verdict_dialog import DB_ERRORS, VerdictDialog, notify_db_error, open_index, readme_view
 
 COLUMNS = [
-    {"name": "close", "label": "Closeness", "field": "close", "align": "right", "sortable": True},
+    {"name": "repo", "label": "Repo", "field": "repo", "align": "left", "sortable": True},
+    {"name": "close", "label": "Closeness", "field": "close", "align": "right", "sortable": True,
+     "hint": "README closeness to the task, 0-1"},
     {"name": "fit", "label": "Fit", "field": "fit", "align": "right", "sortable": True},  # advanced mode only
     {"name": "source", "label": "Source", "field": "source", "align": "left", "sortable": True},
-    {"name": "score", "label": "Score", "field": "score", "align": "left"},
-    {"name": "repo", "label": "Repo", "field": "repo", "align": "left", "sortable": True},
+    {"name": "score", "label": "Score", "field": "score_n", "align": "right", "sortable": True,
+     "hint": "Score: f = freshness, p = popularity"},
     {"name": "stars", "label": "★", "field": "stars", "align": "right", "sortable": True},
     {"name": "forks", "label": "Forks", "field": "forks", "align": "right", "sortable": True},
     {"name": "commits", "label": "Commits", "field": "commits", "align": "right", "sortable": True},
-    {"name": "pushed", "label": "Pushed, d", "field": "pushed", "align": "right", "sortable": True},
+    {"name": "pushed", "label": "Pushed, d", "field": "pushed", "align": "right", "sortable": True,
+     "hint": "Days since the last push"},
     {"name": "created", "label": "Created", "field": "created", "align": "left", "sortable": True},
     {"name": "lang", "label": "Language", "field": "lang", "align": "left"},
     {"name": "flags", "label": "Flags / drop", "field": "flags", "align": "left"},
     {"name": "seen", "label": "Seen", "field": "seen", "align": "left"},
     {"name": "desc", "label": "Description", "field": "desc", "align": "left"},
 ]
+# Kit theme lets every cell wrap; here every row is one line, free text is cut with
+# an ellipsis (full text in the tooltip and the detail panel)
+TABLE_CSS = """
+.rs-run-table .q-table td { white-space: nowrap; }
+.rs-clamp { max-width: 20rem; overflow: hidden; text-overflow: ellipsis; }
+/* Repo is first and stays put when the table scrolls sideways */
+.rs-run-table .q-table tr > :first-child { position: sticky; left: 0; z-index: 1;
+  background: var(--ic-canvas); box-shadow: 1px 0 0 var(--ic-border); }
+.rs-run-table .q-table tbody tr:hover > td:first-child { background: var(--ic-surface-sunken); }
+.rs-run-table tbody tr { cursor: pointer; }
+.rs-repo { font-weight: 600; color: var(--ic-accent-700); }
+tr:hover .rs-repo { text-decoration: underline; }
+"""
+HEADER_SLOT = ('<q-th :props="props">{{ props.col.label }}'
+               '<q-tooltip v-if="props.col.hint">{{ props.col.hint }}</q-tooltip></q-th>')
+SCORE_SLOT = ('<q-td :props="props"><b>{{ props.row.score_n }}</b> '
+              '<span class="t-meta">{{ props.row.score_parts }}</span>'
+              '<q-tooltip>{{ props.row.score }}</q-tooltip></q-td>')
+FLAGS_SLOT = ('<q-td :props="props"><span v-for="f in props.row.flag_list" :key="f" '
+              'class="ic-chip ic-chip--neutral q-mr-xs">{{ f }}</span>'
+              '<span v-if="!props.row.flag_list.length">—</span></q-td>')
+CLAMP_SLOT = '<q-td :props="props"><div class="rs-clamp" :title="props.value">{{ props.value }}</div></q-td>'
+REPO_SLOT = '<q-td :props="props"><span class="rs-repo">{{ props.value }}</span></q-td>'
 METRICS = (("Closeness", "close"), ("Source", "source"), ("Score", "score"), ("★", "stars"), ("Forks", "forks"),
            ("Commits", "commits"), ("Pushed, days ago", "pushed"), ("Created", "created"), ("Language", "lang"))
 
@@ -57,8 +82,15 @@ class RunView:
         return rl.filter_rows(self.rows, text=self.flt["text"], source=self.flt["source"],
                               flag=self.flt["flag"], show_stopped=self.flt["stopped"])
 
+    def columns(self) -> list[dict]:
+        """Fit only in advanced mode, Seen only once some repo has a verdict."""
+        hidden = {name for name, key in (("fit", "fit"), ("seen", "seen")) if not any(r.get(key) for r in self.rows)}
+        return [{**c, "label": t(c["label"]), **({"hint": t(c["hint"])} if "hint" in c else {})}
+                for c in COLUMNS if c["name"] not in hidden]
+
     def refresh(self) -> None:
         shown = self.visible()
+        self.table.table.columns = self.columns()  # type: ignore[union-attr]
         self.table.set_rows([rl.table_row(r) for r in shown])  # type: ignore[union-attr]
         self.count.set_text(t("Showing {shown} of {total}").format(shown=len(shown), total=len(self.rows)))  # type: ignore[union-attr]
 
@@ -94,57 +126,58 @@ class RunView:
         row = self.by_repo[repo]
         self.panel.clear()
         cells = rl.table_row(row)
-        with self.panel, layout.section_card():
-            layout.heading(repo, level=2)
+        with self.panel, layout.section_card().style(shell.PANEL_STYLE):
+            with ui.row().classes("ic-split w-full items-start flex-nowrap"):
+                layout.heading(repo, level=2).classes("min-w-0")
+                ui.button(icon="close", on_click=self.panel.close) \
+                    .props(f'flat round dense aria-label="{t("Close")}"').classes("shrink-0")
             ui.link(t("Open on GitHub"), row.get("url", ""), new_tab=True)
             ui.label(cells["desc"]).classes("t-meta")
-            with layout.grid(min_col="10rem"):
+            with ui.row().classes("items-center gap-2"):
                 for label, key in METRICS:
-                    with ui.column().classes("ic-stack"):
-                        ui.label(t(label)).classes("t-meta")
-                        ui.label(str(cells[key]))
+                    ui.label(f"{t(label)}: {cells[key]}").classes("ic-chip ic-chip--neutral")
             ui.label(t("Flags and drop: {flags}").format(flags=cells["flags"]))
             ui.label(t("Already seen: {seen}").format(seen=cells["seen"]))
-            self._readme(repo)
+            ui.separator()
+            readme_view(repo)
             with layout.actions_row():
                 layout.button(t("Close"), kind="quiet", on_click=self.panel.close)
-                layout.button(t("Set verdict"), kind="primary", icon="rate_review",
-                              on_click=lambda: self.verdicts.open(repo, self.params.get("project") or "",
-                                                                  self.params.get("task") or ""))
+                ui.space()
+                for kind, label in rl.VERDICT_KINDS.items():
+                    layout.button(t(label), on_click=lambda k=kind: self.verdicts.open(
+                        repo, self.params.get("project") or "", self.params.get("task") or "", kind=k))
         self.panel.open()
 
-    @staticmethod
-    def _readme(repo: str) -> None:
-        try:
-            with open_index() as idx:
-                readme = idx.readme(repo)
-        except DB_ERRORS:
-            log.warning("README from Index could not be read: %s", repo, exc_info=True)
-            readme = None
-        if readme:
-            layout.markdown_reader(readme, max_height="60vh")
-        else:
-            ui.label(t("No README in Index: check on GitHub")).classes("t-meta")
-
     def build(self) -> None:
-        with ui.row().classes("ic-split w-full items-center justify-between"):
-            layout.heading(self.params.get("task") or self.stem, level=1)
-            layout.button(t("Rerun as draft"), icon="replay", on_click=lambda: ui.navigate.to(f"/?draft=run:{self.stem}"))
+        ui.add_css(TABLE_CSS)
+        with ui.row().classes("ic-split w-full items-start sm:flex-nowrap"):
+            layout.heading(self.params.get("task") or self.stem, level=1).classes("min-w-0")
+            layout.button(t("Rerun as draft"), icon="replay",
+                          on_click=lambda: ui.navigate.to(f"/?draft=run:{self.stem}")).classes("shrink-0")
         ui.label(_params_line(self.params)).classes("t-meta")
         if self.data.get("round2_topics"):
-            ui.label(t("Round 2: {topics}").format(topics=", ".join(self.data["round2_topics"]))).classes("t-meta")
+            with ui.row().classes("items-center gap-1"):
+                ui.label(t("Round 2:")).classes("t-meta")
+                for topic in self.data["round2_topics"]:
+                    ui.label(topic).classes("ic-chip ic-chip--neutral")
         self.filters()
-        has_fit = any("fit" in r for r in self.rows)
-        columns = [{**c, "label": t(c["label"])} for c in COLUMNS if c["name"] != "fit" or has_fit]
-        self.table = table.empty_aware_table(columns, row_key="repo", pagination={"rowsPerPage": 25},
+        self.table = table.empty_aware_table(self.columns(), row_key="repo", pagination={"rowsPerPage": 25},
                                              empty_text=t("No rows match these filters."))
+        self.table.table.classes("rs-run-table").props("flat dense")
+        localize_table(self.table.table)
+        self.table.table.add_slot("header-cell", HEADER_SLOT)
+        self.table.table.add_slot("body-cell-score", SCORE_SLOT)
+        self.table.table.add_slot("body-cell-repo", REPO_SLOT)
+        self.table.table.add_slot("body-cell-flags", FLAGS_SLOT)
+        for name in ("seen", "desc"):
+            self.table.table.add_slot(f"body-cell-{name}", CLAMP_SLOT)
         self.table.table.on("rowClick", lambda e: self.open_panel(e.args[1]["repo"]))
         self.refresh()
 
 
 def run_page(run_id: str) -> None:
-    shell.shell("/runs", layout.PAGE_MAX_WIDTH_WIDE)
-    with layout.page_container(max_width=layout.PAGE_MAX_WIDTH_WIDE):
+    shell.shell("/runs")
+    with layout.page_container(max_width=shell.PAGE_WIDTH):
         path = rl.resolve_run(run_id)
         try:
             data = runs.load(path) if path else None

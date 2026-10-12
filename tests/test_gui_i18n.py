@@ -69,3 +69,16 @@ async def test_runs_page_in_russian(user: User, monkeypatch) -> None:
     await user.open("/runs")
     await user.should_see("Прогоны")
     await user.should_see("Прогонов пока нет. Запустите поиск на странице Поиск.")
+
+
+def test_pagination_texts_follow_the_switch_not_startup(monkeypatch):
+    from types import SimpleNamespace
+
+    from repo_scout.gui import i18n
+    table = SimpleNamespace(props={})
+    monkeypatch.setenv("REPO_SCOUT_LANG", "ru")
+    i18n.localize_table(table)
+    assert table.props["rows-per-page-label"] == "Строк на странице:" and " из " in table.props[":pagination-label"]
+    monkeypatch.setenv("REPO_SCOUT_LANG", "en")
+    i18n.localize_table(table)
+    assert table.props["rows-per-page-label"] == "Rows per page:" and " of " in table.props[":pagination-label"]

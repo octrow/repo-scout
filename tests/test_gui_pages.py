@@ -76,7 +76,7 @@ async def test_run_page_header_filters_and_draft_link(user: User) -> None:
     path = make_run()
     await user.open(f"/runs/{path.stem}")
     await user.should_see("Find thing")
-    await user.should_see("Round 2: topic-x")
+    await user.should_see("topic-x")
     table = user.find(ui.table).elements.pop()
     assert [r["repo"] for r in table.rows] == ["a/alpha", "b/beta"]
     user.find(ui.switch).elements.pop().set_value(True)
@@ -100,10 +100,8 @@ async def test_run_panel_and_verdict_updates_seen(user: User) -> None:
     fire(user, "rowClick", {}, {"repo": "a/alpha"}, 0)
     await user.should_see("Open on GitHub")
     await user.should_see("Alpha readme")
-    user.find(content="Set verdict").click()
+    user.find(kind=ui.button, content="Drop").click()  # the verdict kind comes preselected
     await user.should_see("Save verdict")
-    sel = next(e for e in user.find(ui.select).elements if e.props.get("label") == "Verdict")
-    sel.set_value("drop")
     user.find(content="Save verdict").click()
     await user.should_see("explanation required")
     note = next(e for e in user.find(ui.input).elements if e.props.get("label") == "Drop reason")
@@ -119,7 +117,7 @@ async def test_verdict_asks_for_missing_project(user: User) -> None:
     path = make_run(project=None)
     await user.open(f"/runs/{path.stem}")
     fire(user, "rowClick", {}, {"repo": "a/alpha"}, 0)
-    user.find(content="Set verdict").click()
+    user.find(kind=ui.button, content="→ Inspect").click()
     user.find(content="Save verdict").click()
     await user.should_see("Project")
     assert Index(default_path(), model="m1").verdicts() == []

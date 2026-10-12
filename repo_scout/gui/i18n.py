@@ -94,10 +94,13 @@ RU = {
     "Open on GitHub": "Открыть на GitHub",
     "Flags and drop: {flags}": "Флаги и отсев: {flags}",
     "Already seen: {seen}": "Уже видели: {seen}",
-    "Set verdict": "Поставить вердикт",
     "No README in Index: check on GitHub": "README нет в Индексе. Посмотрите на GitHub",
     "Rerun as draft": "Повторить как черновик",
-    "Round 2: {topics}": "Второй круг: {topics}",
+    "Set verdict": "Поставить вердикт",
+    "Round 2:": "Второй круг:",
+    "README closeness to the task, 0-1": "Близость README к задаче, 0-1",
+    "Score: f = freshness, p = popularity": "Балл: f = свежесть, p = популярность",
+    "Days since the last push": "Дней с последнего пуша",
     "No rows match these filters.": "Под эти фильтры ничего не подходит.",
     "Run not found or unreadable": "Прогон не найден или не читается",
     "Back to runs": "К прогонам",
@@ -113,6 +116,8 @@ RU = {
     "Delete": "Удалить",
     "No runs yet. Start one on the Search page.": "Прогонов пока нет. Запустите поиск на странице Поиск.",
     # verdicts
+    "→ Inspect": "→ Посмотреть",
+    "→ Study": "→ Изучить",
     "Drop": "Отбросить",
     "Doubt": "Сомнение",
     "Study goal": "Цель изучения",
@@ -168,6 +173,8 @@ RU = {
     "Export": "Выгрузить",
     "No eval sets found (eval/*.toml)": "Наборы eval не найдены (eval/*.toml)",
     "Select at least one set": "Выберите хотя бы один набор",
+    "Rows per page:": "Строк на странице:",
+    "of": "из",
 }
 
 
@@ -178,6 +185,12 @@ def current() -> str:
 
 def t(text: str) -> str:
     return RU.get(text, text) if current() == "ru" else text
+
+
+def localize_table(table) -> None:
+    """Pagination texts in the current language: Quasar's own follow the language set at startup only."""
+    table.props["rows-per-page-label"] = t("Rows per page:")
+    table.props[":pagination-label"] = f"(first, last, total) => `${{first}}-${{last}} {t('of')} ${{total}}`"
 
 
 def set_lang(lang: str) -> None:

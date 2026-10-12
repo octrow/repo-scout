@@ -6,19 +6,21 @@ from nicegui import ui
 from ..index import Index
 from . import runs_logic as rl
 from . import shell
-from .i18n import t
+from .i18n import localize_table, t
 from .kit import layout, table
-from .verdict_dialog import DB_ERRORS, VerdictDialog, notify_db_error, open_index
+from .verdict_dialog import DB_ERRORS, VerdictDialog, notify_db_error, open_index, readme_view
 
 REPO_RE = re.compile(r"[A-Za-z0-9-]+/[A-Za-z0-9._-]+", re.ASCII)
 ALL_PROJECTS = "All projects"
+README_SLOT = """<q-td :props="props"><q-icon v-if="props.value" name="description" size="xs" class="t-muted"
+:aria-label="props.col.yes" /><span v-else>—</span></q-td>"""
 COLUMNS = [
     {"name": "name", "label": "Repo", "field": "name", "align": "left", "sortable": True},
     {"name": "desc", "label": "Description", "field": "desc", "align": "left"},
     {"name": "stars", "label": "★", "field": "stars", "align": "right", "sortable": True},
     {"name": "lang", "label": "Language", "field": "lang", "align": "left"},
     {"name": "date", "label": "Added", "field": "date", "align": "left", "sortable": True},
-    {"name": "readme", "label": "README", "field": "readme", "align": "left"},
+    {"name": "readme", "label": "README", "field": "readme", "align": "center"},
     {"name": "seen", "label": "Verdicts", "field": "seen", "align": "left"},
 ]
 
@@ -46,9 +48,9 @@ def index_rows(idx: Index, *, project: str = "", kind: str = "", text: str = "")
             continue
         if needle and needle not in f"{r['name']} {m.get('desc', '')} {m.get('lang', '')}".lower():
             continue
-        out.append({"key": r["key"], "name": r["name"], "desc": (m.get("desc") or "")[:rl.DESC_LIMIT],
+        out.append({"key": r["key"], "name": r["name"], "desc": rl.plain_desc(m.get("desc")),
                     "stars": m.get("stars"), "lang": m.get("lang") or "—", "date": (r["fetched_at"] or "")[:10],
-                    "readme": t("yes") if r["has_readme"] else t("no"), "seen": seen.get(r["key"], "—"),
+                    "readme": bool(r["has_readme"]), "seen": seen.get(r["key"], "—"),
                     "url": m.get("url") or f"https://github.com/{r['name']}"})
     return out
 
@@ -71,6 +73,10 @@ class IndexPage:
             notify_db_error("Failed to read Index for Index page")
             return
         self.rows = {r["key"]: r for r in rows}
+        # Verdicts column only once some shown repo has one
+        has_seen = any(r["seen"] != "—" for r in rows)
+        self.table.table.columns = [{**c, "label": t(c["label"]), "yes": t("yes")}  # type: ignore[union-attr]
+                                    for c in COLUMNS if c["name"] != "seen" or has_seen]
         self.table.set_rows(rows)  # type: ignore[union-attr]
         self.count.set_text(t("Showing {shown} of {total}").format(shown=len(rows), total=total))  # type: ignore[union-attr]
 
@@ -96,21 +102,22 @@ class IndexPage:
     def open_panel(self, key: str) -> None:
         row = self.rows[key]
         self.panel.clear()
-        with self.panel, layout.section_card():
-            layout.heading(row["name"], level=2)
+        with self.panel, layout.section_card().style(shell.PANEL_STYLE):
+            with ui.row().classes("ic-split w-full items-start flex-nowrap"):
+                layout.heading(row["name"], level=2).classes("min-w-0")
+                ui.button(icon="close", on_click=self.panel.close) \
+                    .props(f'flat round dense aria-label="{t("Close")}"').classes("shrink-0")
             ui.link(t("Open on GitHub"), row["url"], new_tab=True)
             ui.label(row["desc"]).classes("t-meta")
             ui.label(t("Verdicts: {seen}").format(seen=row["seen"]))
-            with open_index() as idx:
-                readme = idx.readme(row["name"])
-            if readme:
-                layout.markdown_reader(readme, max_height="60vh")
-            else:
-                ui.label(t("No README in Index")).classes("t-meta")
-            with layout.actions_row():
-                layout.button(t("Close"), kind="quiet", on_click=self.panel.close)
-                layout.button(t("Rename"), icon="edit", on_click=lambda: self.rename_dialog(row["name"]))
+            ui.separator()
+            readme_view(row["name"])
+            # one row: rare and destructive actions on the left, the everyday ones on the right
+            with layout.actions_row(end=False):
                 layout.button(t("Forget"), kind="danger", on_click=lambda: self.forget_dialog(row["name"]))
+                layout.button(t("Rename"), kind="quiet", icon="edit", on_click=lambda: self.rename_dialog(row["name"]))
+                ui.space()
+                layout.button(t("Close"), kind="quiet", on_click=self.panel.close)
                 layout.button(t("Set verdict"), kind="primary", icon="rate_review",
                               on_click=lambda: self.verdicts.open(row["name"]))
         self.panel.open()
@@ -169,13 +176,15 @@ class IndexPage:
         columns = [{**c, "label": t(c["label"])} for c in COLUMNS]
         self.table = table.empty_aware_table(columns, row_key="key", pagination={"rowsPerPage": 25},
                                              empty_text=t("No repos in the Index yet. Run a search to add them."))
+        self.table.table.add_slot("body-cell-readme", README_SLOT)
+        localize_table(self.table.table)
         self.table.table.on("rowClick", lambda e: self.open_panel(e.args[1]["key"]))
         self.refresh()
 
 
 def index_page() -> None:
-    shell.shell("/index", layout.PAGE_MAX_WIDTH_WIDE)
-    with layout.page_container(max_width=layout.PAGE_MAX_WIDTH_WIDE):
+    shell.shell("/index")
+    with layout.page_container(max_width=shell.PAGE_WIDTH):
         layout.heading(t("Index"), level=1)
         IndexPage().build()
 

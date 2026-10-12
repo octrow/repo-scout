@@ -98,7 +98,7 @@ class EvalPage:
                 for key, label in FLAG_LABELS.items():
                     self.opts[key] = ui.checkbox(t(label)).classes("ic-span-6")
                 self.opts["top"] = ui.number(t("Top results to show (0 = none)"), value=0, min=0, precision=0) \
-                    .props("outlined dense stack-label").classes("ic-span-6 w-full")
+                    .props("outlined dense stack-label").classes("ic-span-6").style("max-width: 26rem")
             export = self.export_dialog()
             with layout.actions_row(end=False):
                 layout.button(t("Launch eval"), kind="primary", icon="play_arrow", on_click=self.start)
@@ -134,8 +134,8 @@ class EvalPage:
 
 
 def eval_page() -> None:
-    shell.shell("/eval", layout.PAGE_MAX_WIDTH_WIDE)
-    with layout.page_container(max_width=layout.PAGE_MAX_WIDTH_WIDE):
+    shell.shell("/eval")
+    with layout.page_container(max_width=shell.PAGE_WIDTH):
         layout.heading(t("Eval"), level=1)
         EvalPage().build()
 

@@ -106,3 +106,22 @@ def test_rows_missing_keys_do_not_crash():
     assert rl.sorted_rows(sparse) and rl.filter_rows(sparse, text="a", flag="x") == []
     assert rl.filter_rows(sparse) == sparse and rl.source_options(sparse) and rl.flag_options(sparse)
     assert rl.table_row(sparse[0])["flags"] == "—"
+
+
+def test_legacy_russian_values_shown_in_english():
+    old = row("a/old", source="второй круг", flags=["новый", "всплеск★ 100% ранних"],
+              stop="шум (awesome: имя, описание, topics)")
+    r = rl.sorted_rows([old, row("b/dead", stop="мёртвый (200 дн)"), row("c/toy", stop="игрушка (3 комм, 0★)")])
+    assert r[0]["source"] == "round 2" and r[0]["flags"] == ["new", "burst★ 100% early"]
+    assert r[0]["stop"] == "noise (awesome: name, description, topics)"
+    assert [x["stop"] for x in r[1:]] == ["dead (200d)", "toy (3 commits, 0★)"]
+    assert rl.sorted_rows([row("d/ok", stop="не по теме (0.41)")])[0]["stop"] == "off-topic (0.41)"
+
+
+def test_readme_images_point_to_github_and_desc_shortcodes_render():
+    md = '![a](./img/a.png) <img src="logo.svg"> ![b](https://x.io/b.png) <img src="/c.png"> ![d](data:image/png;base64,x)'
+    out = rl.absolute_images(md, "o/r")
+    raw = "https://raw.githubusercontent.com/o/r/HEAD/"
+    assert out == (f'![a]({raw}img/a.png) <img src="{raw}logo.svg"> ![b](https://x.io/b.png) '
+                   f'<img src="{raw}c.png"> ![d](data:image/png;base64,x)')
+    assert rl.plain_desc("fast :rocket: at 10:30:00") == "fast 🚀 at 10:30:00"
