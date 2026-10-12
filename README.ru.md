@@ -88,6 +88,37 @@ repo-scout gui [--port 8790]   # Поиск, Прогоны, Индекс, Eval
 
 GUI по умолчанию на английском. Переключите на русский кнопками EN | RU в шапке; выбор сохраняется как `REPO_SCOUT_LANG` в `~/.config/repo-scout/.env`.
 
+<p align="center">
+  <img src="./assets/readme/gui/run.png" width="100%" alt="Сохранённый прогон в GUI: из 465 репозиториев для задачи про парсер Instagram оставлено 155, с близостью, источником, баллами, звёздами, форками, коммитами, флагами new и burst и фильтрами по источнику и флагу.">
+</p>
+
+<details>
+<summary>Ещё скриншоты</summary>
+
+Форма поиска, заполненная из набора eval:
+
+<img src="./assets/readme/gui/search-filled.png" width="100%" alt="Форма поиска с задачей, шестью запросами, проектом, регуляркой обязательных слов и готовой командой repo-scout.">
+
+Сохранённые прогоны:
+
+<img src="./assets/readme/gui/runs.png" width="100%" alt="Список сохранённых прогонов с датой, задачей, проектом и числом оставленных из всех.">
+
+Карточка репозитория с README и вердикт:
+
+<img src="./assets/readme/gui/repo-card.png" width="49%" alt="Карточка репозитория с метриками, флагами и README, кнопки Inspect, Study, Drop и Doubt."> <img src="./assets/readme/gui/verdict.png" width="49%" alt="Окно вердикта поверх карточки: вердикт, проект и задача.">
+
+Индекс прошлых кандидатов:
+
+<img src="./assets/readme/gui/index.png" width="100%" alt="Таблица Индекса из 1281 репозитория с описанием, звёздами, языком, датой добавления, README и вердиктами.">
+
+<img src="./assets/readme/gui/index-card.png" width="60%" alt="Карточка репозитория в Индексе с README и кнопками Forget, Rename и Set verdict.">
+
+Наборы eval:
+
+<img src="./assets/readme/gui/eval.png" width="100%" alt="Страница Eval с восемью эталонными наборами и опциями офлайн-прогона по снапшотам.">
+
+</details>
+
 Ход работы пишется в stderr и в `~/.local/state/repo-scout/run.log` (`$REPO_SCOUT_LOG`), так что его можно смотреть через `tail -f` из другого терминала. С `-q` он пишется только в файл лога.
 
 ## Базовый и продвинутый режим

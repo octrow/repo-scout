@@ -88,6 +88,37 @@ A verdict is stored in the Index and shown on later searches. It never hides a r
 
 The GUI is in English by default. Switch to Russian with EN | RU in the header; the choice is saved as `REPO_SCOUT_LANG` in `~/.config/repo-scout/.env`.
 
+<p align="center">
+  <img src="./assets/readme/gui/run.png" width="100%" alt="A saved run in the GUI: 155 of 465 repos kept for an Instagram scraper task, with closeness, source, score, stars, forks, commits, flags such as new and burst, and filters by source and flag.">
+</p>
+
+<details>
+<summary>More screenshots</summary>
+
+Search form, filled from an eval set:
+
+<img src="./assets/readme/gui/search-filled.png" width="100%" alt="Search form with task, six queries, project, a required-words regex and the generated repo-scout command.">
+
+Saved runs:
+
+<img src="./assets/readme/gui/runs.png" width="100%" alt="List of saved runs with date, task, project and kept/total counts.">
+
+Repo card with its README, and a verdict:
+
+<img src="./assets/readme/gui/repo-card.png" width="49%" alt="Repo card with metrics chips, flags and the README rendered below, plus Inspect, Study, Drop and Doubt buttons."> <img src="./assets/readme/gui/verdict.png" width="49%" alt="Verdict dialog over the repo card with the verdict, project and task fields.">
+
+Index of past candidates:
+
+<img src="./assets/readme/gui/index.png" width="100%" alt="Index table of 1281 repos with description, stars, language, date added, README and verdicts.">
+
+<img src="./assets/readme/gui/index-card.png" width="60%" alt="Index card of a repo with its README and Forget, Rename and Set verdict buttons.">
+
+Eval sets:
+
+<img src="./assets/readme/gui/eval.png" width="100%" alt="Eval page with eight golden sets and options for offline snapshot runs.">
+
+</details>
+
 Progress goes to stderr and to `~/.local/state/repo-scout/run.log` (`$REPO_SCOUT_LOG`), so you can `tail -f` it from another terminal. Use `-q` to send it only to the log file.
 
 ## Basic and advanced mode
