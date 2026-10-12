@@ -1,6 +1,6 @@
 [project]
 name = "repo-scout"
-version = "0.1.3"
+version = "0.1.4"
 description = "Find reusable GitHub projects before writing your own: search, triage, semantic closeness, no LLM"
 license = "MIT"
 requires-python = ">=3.11"
