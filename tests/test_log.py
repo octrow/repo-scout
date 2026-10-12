@@ -20,8 +20,8 @@ def test_prune_keeps_total_under_limit_and_current(tmp_path):
         p.write_bytes(b"x" * 100)
         os.utime(p, (i, i))
         files.append(p)
-    logmod.prune(tmp_path, keep=files[0], limit=250)
-    assert [p.exists() for p in files] == [True, False, False, True]
+    logmod.prune(tmp_path, keep=files[0], limit=250, now=3 + logmod.LIVE_SECONDS - 1)
+    assert [p.exists() for p in files] == [True, False, True, True]  # 3.log is fresh: maybe a live run
 
 
 def test_fatal_exit_message_goes_to_log_file():

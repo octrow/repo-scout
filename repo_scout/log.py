@@ -6,12 +6,14 @@ import functools
 import logging
 import os
 import sys
+import time
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
 log = logging.getLogger("repo_scout")
 
+LIVE_SECONDS = 3600  # a log touched within the last hour may belong to a running process
 LOG_DIR_MAX_BYTES = 1 << 30  # 1 GiB for all logs; single large run is never truncated
 
 
@@ -19,16 +21,24 @@ def log_path() -> Path:
     return Path(os.environ.get("REPO_SCOUT_LOG") or Path.home() / ".local/state/repo-scout/run.log")
 
 
-def prune(logs: Path, keep: Path, limit: int = LOG_DIR_MAX_BYTES) -> None:
-    """Delete oldest log files while total size > limit; current log (keep) is retained."""
-    files = sorted(logs.glob("*.log"), key=lambda p: p.stat().st_mtime)
-    total = sum(p.stat().st_size for p in files)
-    for p in files:
+def prune(logs: Path, keep: Path, limit: int = LOG_DIR_MAX_BYTES, now: float | None = None) -> None:
+    """Delete oldest log files while total size > limit. The current log and logs written within
+    LIVE_SECONDS (likely a parallel run) are kept; files removed by a parallel prune are skipped."""
+    now = time.time() if now is None else now
+    stats = []
+    for p in logs.glob("*.log"):
+        try:
+            st = p.stat()
+        except FileNotFoundError:
+            continue
+        stats.append((st.st_mtime, st.st_size, p))
+    total = sum(size for _, size, _ in stats)
+    for mtime, size, p in sorted(stats):
         if total <= limit:
             break
-        if p != keep:
-            total -= p.stat().st_size
+        if p != keep and now - mtime > LIVE_SECONDS:
             p.unlink(missing_ok=True)
+            total -= size
 
 
 def _link(link: Path, target: Path) -> None:
