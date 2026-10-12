@@ -80,11 +80,11 @@ def test_retry_on_502(monkeypatch):
 
 
 def _flaky_live(bad: set[str]):
-    """Пачка, где есть репо из bad, падает как 502; одиночные bad тоже."""
+    """Chunk containing repo from bad fails with 502; single bad repos also fail."""
     def live(query, variables, **_):
         names = re.findall(r'r(\d+): repository\(owner: "(\w+)", name: "(\w+)"\)', query)
         if any(f"{o}/{n}" in bad for _, o, n in names):
-            raise github.GitHubError("GitHub не ответил: gh: HTTP 502")
+            raise github.GitHubError("GitHub failed to respond: gh: HTTP 502")
         return {"data": {f"r{i}": {"m0": {"text": f"{o}/{n}"}} for i, o, n in names}}
     return live
 

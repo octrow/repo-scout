@@ -1,4 +1,4 @@
-"""Главный файл для nicegui.testing.User: регистрирует страницы без ui.run."""
+"""Main file for nicegui.testing.User: registers pages without ui.run."""
 from nicegui import ui
 
 from repo_scout.gui import app

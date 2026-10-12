@@ -1,5 +1,5 @@
-"""Собирает labels.csv из данных StarScout (Apache-2.0) и «→ Разбор» из eval/*.toml. Запуск: python3 build_labels.py
-Нужен авторизованный gh. Живость и число звёзд — батчами GraphQL; выборка с фиксированным seed."""
+"""Builds labels.csv from StarScout (Apache-2.0) data and '→ Study' from eval/*.toml. Run: python3 build_labels.py
+Requires authenticated gh. Liveness and star counts in GraphQL batches; fixed random seed."""
 import csv
 import json
 import random
@@ -24,7 +24,7 @@ def positives() -> list[str]:
 
 
 def stars_of(names: list[str]) -> dict[str, int]:
-    """{name: stargazerCount} для живых репо."""
+    """{name: stargazerCount} for live repos."""
     q = "query{" + " ".join(f'r{i}:repository(owner:{json.dumps(n.split("/")[0])},name:{json.dumps(n.split("/")[1])}){{nameWithOwner stargazerCount}}'
                             for i, n in enumerate(names)) + "}"
     out = subprocess.run(["gh", "api", "graphql", "-f", f"query={q}"], capture_output=True, text=True)
@@ -46,7 +46,9 @@ def main() -> None:
     pos = pick(positives(), WANT, set())
     rows = [(n, 1, "starscout") for n in pos]
     toml = [(e["repo"], t.name) for t in sorted((ROOT / "eval").glob("*.toml"))
-            for e in tomllib.loads(t.read_text())["expected"] if e["verdict"].startswith("→ Разбор") and NAME.fullmatch(e["repo"])]
+            for e in tomllib.loads(t.read_text())["expected"]
+            if (e["verdict"].startswith("→ Study") or e["verdict"].startswith("→ \u0420\u0430\u0437\u0431\u043e\u0440"))
+            and NAME.fullmatch(e["repo"])]
     alive = {}
     for i in range(0, len(toml), CHUNK):
         alive |= stars_of([n for n, _ in toml[i:i + CHUNK]])

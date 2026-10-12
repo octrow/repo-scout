@@ -1,4 +1,4 @@
-"""Второй круг: выбор topics, слияние в Пул, --no-round2 (без модели и сети)."""
+"""Round 2: topic selection, pool merge, --no-round2 (without model and network)."""
 import numpy as np
 
 from repo_scout import cli, github, semantic
@@ -16,7 +16,7 @@ def rows(*topic_lists):
 
 def test_pick_topics_rules():
     top = rows(["python", "asr", "whisper", "once"], ["asr", "whisper", "ai"], ["Python", "ai", "used"], ["used"])
-    assert pick_topics(top, ["x topic:used"]) == ["asr", "whisper"]  # общие, заданные и единичные убраны
+    assert pick_topics(top, ["x topic:used"]) == ["asr", "whisper"]
 
 
 def test_pick_topics_max_and_threshold():
@@ -33,7 +33,7 @@ def _setup(monkeypatch):
     def search(q, n):
         queries.append(q)
         if q.startswith("topic:"):
-            return [node("a/one"), node("b/new")]  # a/one уже в пуле
+            return [node("a/one"), node("b/new")]
         return [tnode("a/one", ["asr", "x"]), tnode("a/two", ["asr", "x"])]
 
     monkeypatch.setattr(github, "search", search)
@@ -48,7 +48,7 @@ def _run(**kw):
 def test_round2_marks_source_without_duplicates(monkeypatch):
     queries = _setup(monkeypatch)
     out = {r["repo"]: r["source"] for r in _run()}
-    assert out == {"a/one": "запрос", "a/two": "запрос", "b/new": "второй круг"}
+    assert out == {"a/one": "query", "a/two": "query", "b/new": "round two"}
     assert [q.split()[0] for q in queries] == ["q", "topic:asr", "topic:x"]
     assert "in:" not in queries[1]
 
@@ -79,7 +79,7 @@ def test_round2_stops_noise_and_indexes_good(monkeypatch, tmp_path):
     import re
     out = {r["repo"]: r for r in _run(index=idx, exclude=[re.compile("wordpress")])}
     assert out["b/bad"]["stop"] and not out["b/good"]["stop"]
-    assert out["b/good"]["source"] == "второй круг"
+    assert out["b/good"]["source"] == "round two"
     assert idx.top("t", 10) and "b/good" in idx.top("t", 10) and "b/bad" not in idx.top("t", 10)
     assert queries
 

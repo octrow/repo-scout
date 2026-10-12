@@ -1,12 +1,14 @@
-# Baseline eval (Фаза 2)
+**English** | **[Русский](BASELINE.ru.md)**
 
-Дата записи снапшотов: 2026-10-11. Конвейер: Фаза 1 (`in:name,description,topics,readme`, `mirror:false`, `pushed:>=6 мес`, лимит 50 на запрос, стоп-правила и баллы методички). Жёсткие условия (`must`/`exclude`) ещё не применяются. Описания задач в `eval/*.toml` ждут проверки пользователем, так что цифры предварительные.
+# Baseline eval (Phase 2)
 
-Команда: `repo-scout eval eval/*.toml --record` (повтор офлайн: `--replay`, вывод идентичен).
+Snapshot recording date: 2026-10-11. Pipeline: Phase 1 (`in:name,description,topics,readme`, `mirror:false`, `pushed:>=6 months`, limit 50 per query, stop rules and triage scores). Hard conditions (`must`/`exclude`) not yet applied. Task descriptions in `eval/*.toml` await user verification, so figures are preliminary.
 
-Позиции считаются среди прошедших стоп-правила, сортировка по баллам методички (Близости ещё нет). Позитив = Вердикт «→ …».
+Command: `repo-scout eval eval/*.toml --record` (offline replay: `--replay`, outputs identical results).
 
-| набор | позитивов | найдено | прошло | позиции | ложный отсев | не найдено | «отсев» прошли |
+Ranks are calculated among candidates passing stop rules, ordered by triage methodology score (Closeness not yet introduced). Positive = Verdict "→ …".
+
+| Set | Positives | Found | Passed | Ranks | False discards | Missed | Passed Discard |
 |---|---|---|---|---|---|---|---|
 | buy-smarter | 9 | 3 | 1 | 74 | 2 | 6 | 1 |
 | buy-smarter-vision | 5 | 2 | 1 | 95 | 1 | 3 | 0 |
@@ -17,20 +19,20 @@
 | repo-scout | 4 | 1 | 1 | 230 | 0 | 3 | 0 |
 | tiktok-lazy-follower | 5 | 4 | 4 | 90, 21, 152, 41 | 0 | 1 | 0 |
 
-Наблюдения:
-- Полнота низкая: из 45 позитивов в пул попали 21, прошли стоп-правила 18, не найдено 24. Все «не найдено» живые (проверено `gh api` для monica, screenpipe, open_clip, transformers, repohunt, github-hidden-gems, git-crawler: push за последние 3 мес), значит их отсекает не фильтр, а запросы и обрезка до 50 результатов на запрос в порядке best-match.
-- Позиции нужных репо в выдаче 11–230: без Близости и Шума позитивы тонут (repo-scout: DeepGit на 230 месте, три остальных не найдены). Это главный ориентир для Фаз 3–4.
-- Ложных отсевов 3 (все по правилу «мёртвый»: ozon-mcp-server 126 дн, ai-super-agent 167 дн, FashionMV 165 дн), все в наборах с клонами 2026 года; стоит сверить, были ли они живы на момент разбора.
-- «Отсев» прошли 4 репо (olx-parser, Aura-AI, xexamai, interview-copilot): стоп-правила их не ловят, нужны Шум и Жёсткие условия.
-- Пул большой (сотни репо на набор), ранжирование по свежести и звёздам размывает мелкие свежие проекты вроде repohunt (1★) и github-hidden-gems (0★): они не прошли даже в пул.
+Observations:
+- Recall is low: out of 45 positives, 21 entered the pool, 18 passed stop rules, 24 missed. All "missed" repos are alive (verified via `gh api` for monica, screenpipe, open_clip, transformers, repohunt, github-hidden-gems, git-crawler: commits within past 3 months), indicating misses stem from query formulations and the 50 results-per-query cap in best-match order rather than filters.
+- Positions of target repos range from 11 to 230: without Closeness and Noise filtering, target repos sink down (repo-scout: DeepGit at #230, others unretrieved). This is the primary target metric for Phases 3–4.
+- False discards: 3 (all flagged by "dead" rule: ozon-mcp-server 126d, ai-super-agent 167d, FashionMV 165d), all in sets with 2026 clones.
+- Repos passing despite "discard" verdict: 4 (olx-parser, Aura-AI, xexamai, interview-copilot): stop rules do not flag them, requiring Noise and Hard conditions.
+- Initial candidate pool is broad (hundreds per set), and sorting by freshness + stars buries small fresh projects such as repohunt (1★) and github-hidden-gems (0★).
 
-## Фаза 3
+## Phase 3
 
-Дата: 2026-10-11. Конвейер: Фаза 2 + Шум (≥2 сигнала из имени/описания/topics), флаг «шаблон» (от Шума не спасает), `lang`/`exclude`/`must` из наборов (регэкспы без учёта регистра), README и 20 последних коммитов у выживших, свежесть и «мёртвый» по последнему Содержательному коммиту (коммиты позже даты снимка игнорируются).
+Date: 2026-10-11. Pipeline: Phase 2 + Noise (≥2 signals across name/description/topics), "template" flag, `lang`/`exclude`/`must` from sets (case-insensitive regex), batch README and 20 recent commits for survivors, freshness and "dead" based on last Substantive Commit (commits past snapshot date ignored).
 
-Команда: `repo-scout eval eval/*.toml --record` (затем `--replay`, два прогона идентичны и совпадают с записью). Дата снимка (`meta.json`) осталась 2026-10-11. Поисковые ответы записаны заново (в GraphQL добавились `repositoryTopics` и `isTemplate`), детали README/коммитов получены позже, в тот же день. Формат снапшотов: `*.json.gz`, детали по одному файлу на репо (`details/<хэш имени>.json.gz`), поэтому смена правил не ломает воспроизведение, а `--record` дописывает только недостающее. README обрезан до 6000 знаков, у коммитов заголовок (`messageHeadline`); весь `eval/snapshots` 4,6 МБ.
+Command: `repo-scout eval eval/*.toml --record` (subsequently `--replay`, both runs match recordings identically). Snapshot date (`meta.json`) unchanged at 2026-10-11. Snapshots stored as `*.json.gz`, with repo details separated under `details/<repo_name_hash>.json.gz`, allowing incremental `--record` without invalidating existing files. README truncated to 6000 chars, commits store `messageHeadline`; complete `eval/snapshots` size is 4.6 MB.
 
-| набор | позитивов | найдено | прошло | позиции | ложный отсев | не найдено | «отсев» прошли |
+| Set | Positives | Found | Passed | Ranks | False discards | Missed | Passed Discard |
 |---|---|---|---|---|---|---|---|
 | buy-smarter | 9 | 3 | 1 | 60 | 2 | 6 | 1 |
 | buy-smarter-vision | 5 | 2 | 1 | 58 | 1 | 3 | 0 |
@@ -41,18 +43,18 @@
 | repo-scout | 4 | 1 | 1 | 191 | 0 | 3 | 0 |
 | tiktok-lazy-follower | 5 | 4 | 4 | 35, 5, 72, 13 | 0 | 1 | 0 |
 
-Дифф с baseline Фазы 2:
-- Потерь нет: позитивов в пуле 21, прошли 18, ложных отсевов 3 (те же «мёртвый»: ozon-mcp-server, ai-super-agent, FashionMV), не найдено 24, «отсев» прошли 4. Полнота та же, потому что Фаза 3 не расширяет поиск, а чистит выдачу.
-- Позиции прошедших позитивов выросли за счёт чистки пула: linux-coding 17/105/96 → 5/59/75, buy-smarter 74 → 60, buy-smarter-vision 95 → 58, tiktok 90/21/152/41 → 35/5/72/13, repo-scout DeepGit 230 → 191.
-- Шум (по ещё живым): awesome 267, tutorial 4, demo 3, homework и spam 0. Примеры: `avelino/awesome-go` (имя, описание, topics), `YouMind-OpenLab/awesome-gpt-image-2` (имя, topics), `xiaoiver/infinite-canvas-tutorial` (имя, описание, topics), `qdrant-labs/demo-ecommerce-search` (имя, описание). Флаг «шаблон» у 34 строк, «только косметика» у 47, «нет README» у 10. `--must` отсёк 52 строки (buy-smarter и tiktok), позитивов среди них нет.
-- Правки правил после ревью: из Шума убраны общие слова (generator, free, hack, learning, course/«of course», list, resources, «collection of», «a list of»; осталось «online course», «free followers», «curated list» и т.п.), иначе `openapi-generator` попадал в spam, а `deep-learning-kit` в tutorial (тесты на оба случая). Слова косметики `bump|release <версия>|typo|readme` теперь с границами слов и только для правок ≤100 строк (`pluely` остаётся живым, push по содержательному коммиту 88 дн); префиксы `docs:|chore(deps):|ci:|style:` и `Merge` безусловные.
-- «Отсев» всё ещё проходят 4 (olx-parser, Aura-AI, xexamai, interview-copilot): по имени, описанию и topics они не похожи на Шум, это отсев по смыслу, ждёт Близости (Фаза 4).
+Diff against Phase 2 baseline:
+- No regressions: positives in pool 21, passed 18, false discards 3 (same "dead": ozon-mcp-server, ai-super-agent, FashionMV), missed 24, passed discards 4. Recall is identical since Phase 3 filters noise rather than expanding search.
+- Ranks of surviving positives improved due to noise elimination: linux-coding 17/105/96 → 5/59/75, buy-smarter 74 → 60, buy-smarter-vision 95 → 58, tiktok 90/21/152/41 → 35/5/72/13, repo-scout DeepGit 230 → 191.
+- Noise filtering stats: awesome 267, tutorial 4, demo 3, homework & spam 0. Flags: "template" on 34 rows, "only cosmetics" on 47, "no README" on 10. `--must` filtered 52 rows (buy-smarter & tiktok) with zero positive losses.
+- Refined heuristics: common words removed from noise regexes (`generator`, `free`, `hack`, `learning`, `course`, `list`, `resources`, `collection of`), retaining qualified combinations (`online course`, `free followers`, `curated list`). Cosmetic commits `bump|release <v>|typo|readme` now bound by word boundaries and diff size ≤100 lines; prefixes `docs:|chore(deps):|ci:|style:` and `Merge` remain unconditional.
+- 4 discards still pass (olx-parser, Aura-AI, xexamai, interview-copilot) awaiting semantic Closeness in Phase 4.
 
-## Фаза 4
+## Phase 4
 
-Дата: 2026-10-11. Конвейер: Фаза 3 + Близость (fastembed `BAAI/bge-small-en-v1.5`, README чистится по всему тексту, вход режется до 20 000 знаков, текст кандидата `имя + описание + topics + очищенный README`, до 2000 знаков ≈ 512 токенов). Сортировка: Близость, потом баллы методички, потом дни с push. Описание задачи берётся из поля `task` набора. Новых запросов к GitHub нет: прогон полностью офлайн по снапшотам (`repo-scout eval eval/*.toml --sweep`, 2 минуты на CPU). Близость считается у строк, дошедших до деталей и не отсеянных остальными правилами (без README: имя, описание, topics).
+Date: 2026-10-11. Pipeline: Phase 3 + Closeness (fastembed `BAAI/bge-small-en-v1.5`, README cleaned across full text, input capped at 20,000 characters, candidate doc `name + description + topics + cleaned README` truncated to 2000 chars ≈ 512 tokens). Sort order: Closeness, then methodology score, then push recency. Task description taken from set `task` field. Completely offline via snapshots (`repo-scout eval eval/*.toml --sweep`, 2 min on CPU).
 
-| набор | позитивов | найдено | прошло | позиции | ложный отсев | не найдено | «отсев» прошли | мин. близость позитивов |
+| Set | Positives | Found | Passed | Ranks | False discards | Missed | Passed Discard | Min. Closeness (Positives) |
 |---|---|---|---|---|---|---|---|---|
 | buy-smarter | 9 | 3 | 1 | 31 | 2 | 6 | 1 | 0.69 |
 | buy-smarter-vision | 5 | 2 | 1 | 51 | 1 | 3 | 0 | 0.68 |
@@ -63,24 +65,24 @@
 | repo-scout | 4 | 1 | 1 | 2 | 0 | 3 | 0 | 0.80 |
 | tiktok-lazy-follower | 5 | 4 | 4 | 48, 5, 8, 18 | 0 | 1 | 0 | 0.69 |
 
-Позиции против Фазы 3 (позитивы в том же порядке):
-- linux-coding 5/59/75 → 21/17/41 (первый хуже, два других лучше);
+Ranks compared to Phase 3:
+- linux-coding 5/59/75 → 21/17/41;
 - repo-scout 191 → 2;
 - finance 9/44/11/21 → 10/7/6/58;
-- tiktok 35/5/72/13 → 48/5/8/18 (один равен, два хуже, один лучше);
+- tiktok 35/5/72/13 → 48/5/8/18;
 - persona 31/39 → 16/2; get_cool_event 8/71 → 13/3;
 - buy-smarter 60 → 31; buy-smarter-vision 58 → 51.
-Полнота не изменилась: 18 из 18 прошедших позитивов остались (порог ни одного не отсёк), ложных отсевов 3, не найдено 24. Позиции лучше у 11 из 18 позитивов (медиана 14.5). «Отсев» по смыслу (olx-parser, Aura-AI, xexamai, interview-copilot) Близость не убирает: они тематически близки, это ожидаемо.
+Recall unchanged: 18/18 surviving positives retained (zero lost to threshold), false discards 3, missed 24. Ranks improved for 11 of 18 positives (median rank: 14.5).
 
-### Префикс запроса
+### Query Prefix
 
-`query_embed` в fastembed не добавляет префикс из карточки bge-small-en-v1.5, поэтому `embed_task` ставит «Represent this sentence for searching relevant passages: » сам. Сравнение на eval (одна и та же очистка README): без префикса сумма позиций 338, медиана 16, при пороге 0.64 остаётся 632 строки; с префиксом сумма 357, медиана 14.5, остаётся 575. Максимальный порог без потери «→ Разбор» в обоих случаях 0.66. Взят вариант с префиксом: медиана лучше, выдача чище, хвост (finance: 58) хуже. Таблицы ниже для него.
+`query_embed` in fastembed does not prepend the bge-small-en model card prefix, so `embed_task` adds `"Represent this sentence for searching relevant passages: "` manually. Eval comparison (identical README cleaning): without prefix, sum of ranks is 338, median 16, 632 rows remain at 0.64; with prefix, sum of ranks is 357, median 14.5, 575 rows remain. Max threshold without loss is 0.66 in both cases. Chosen variant: with prefix for cleaner output and improved median rank.
 
-### Порог
+### Threshold Sweep
 
-Свип 0.50..0.90 (шаг 0.01), по всем наборам. Все 45 позитивов в наборах имеют вердикт «→ Разбор», поэтому «потеряно → Разбор» совпадает с «потеряно всех →». Из 18 прошедших позитивов:
+Sweep from 0.50 to 0.90 (step 0.01) across all sets. Out of 18 passing positives:
 
-| порог | потеряно → Разбор | осталось строк |
+| Threshold | Lost "→ Deep dive" | Rows Remaining |
 |---|---|---|
 | 0.50–0.66 | 0 | 1150 … 461 |
 | 0.67 | 1 | 399 |
@@ -88,51 +90,45 @@
 | 0.75 | 10 | 51 |
 | 0.80 | 18 | 2 |
 
-Максимальный порог без потери «→ Разбор» — 0.66 (мин. близость у persona-crm). Берём **0.64**: максимум минус запас 0.02, потому что 8 наборов — маленькая выборка и модель на другой формулировке сдвигает близость на сотые. Константа `MIN_CLOSENESS` в `repo_scout/semantic.py`, переопределяется `--min-closeness`. Без порога у строк, прошедших остальные правила, 1162 строки; порог 0.64 оставляет 575, то есть убирает 587 (51%) как «не по теме». Позитивов среди них нет (по построению).
+Maximum threshold without losing positives is 0.66. Configured standard threshold: **0.64** (maximum minus 0.02 safety margin). Threshold 0.64 eliminates 587 out of 1162 rows (51%) as "off topic" without losing a single positive target.
 
-### Устойчивость к формулировке
+### Phrasing Robustness
 
-Те же запросы, Описание задачи переписано двумя способами (`repo-scout eval ... --task "..." --top 10`), пересечение топ-10 с топ-10 по исходному `task`:
+Task descriptions rephrased two ways (`repo-scout eval ... --task "..." --top 10`), measuring top-10 overlap with original `task`:
 
-| набор | перефразировка 1 | перефразировка 2 |
+| Set | Rephrasing 1 | Rephrasing 2 |
 |---|---|---|
-| linux-coding | 6 из 10 | 5 из 10 |
-| repo-scout | 10 из 10 | 10 из 10 |
+| linux-coding | 6 of 10 | 5 of 10 |
+| repo-scout | 10 of 10 | 10 of 10 |
 
-repo-scout стабилен. У linux-coding топ-10 меняется на четверть-половину: пул шире и темы (ASR, оверлей, собеседования, встречи) смежные, перефразировка смещает акцент. Это приемлемо для «близкого топа» (всё равно interview/meeting-ассистенты), но поводом улучшать формулировки по нескольким вариантам в скилле. Перефразировки не сохранены в наборах, только в этом отчёте.
+## Phase 5
 
-## Фаза 5
+Date: 2026-10-11. Index (sqlite3 + BLOB vectors + numpy linear scan), Verdicts, `--from-index`, `source` and `previously seen` columns. Snapshots of Index updates recorded in `eval/snapshots/<set>/refresh/`.
 
-Дата: 2026-10-11. Индекс (sqlite3 + векторы BLOB + перебор в numpy), Вердикты, `--from-index`, колонки `источник` и `уже смотрели`. `repo-scout eval` по умолчанию берёт свежий временный Индекс на набор: пустой Индекс ничего не добавляет, числа Фазы 4 остаются сравнимыми (запись и чтение из Индекса при этом работают, но поиск по пустому ничего не тянет). Снапшоты обновлений Индекса лежат в `eval/snapshots/<набор>/refresh/`, записаны `--record`.
+Verification test (`repo-scout eval eval/linux-coding.toml eval/repo-scout.toml --index-check`): run 1 populates Index; run 2 executes against identical Index with rephrased `alt_task` and only the first 2 queries, evaluating `--from-index`:
 
-Проверка критерия «Готово» (`repo-scout eval eval/linux-coding.toml eval/repo-scout.toml --index-check`, воспроизводится офлайн): первый прогон с исходным `task` и всеми Запросами пишет Индекс; второй, в тот же Индекс, идёт с перефразированным `alt_task` (поле набора) и только первыми двумя Запросами, `--from-index 20` (таблица ниже; 30 и 50 в конце раздела).
-
-| набор | в Индексе после 1-го прогона | 2-й прогон: живая выдача | из Индекса (прошли стоп-правила) | позитивы в живой | позитивы из Индекса |
+| Set | In Index after run 1 | Run 2: Live search | From Index (passed stop rules) | Positives in live | Positives from Index |
 |---|---|---|---|---|---|
-| linux-coding | 137 | 85 | 10 (10) | 1 из 8 (natively) | 0 |
-| repo-scout | 229 | 99 | 17 (17) | 1 из 4 (DeepGit) | 0 |
+| linux-coding | 137 | 85 | 10 (10) | 1 of 8 (natively) | 0 |
+| repo-scout | 229 | 99 | 17 (17) | 1 of 4 (DeepGit) | 0 |
 
-Итог: механизм работает, 27 репо, которых нет в живой выдаче второго прогона, поднимаются из Индекса, все проходят стоп-правила. Но позитивы так не возвращаются. У linux-coding в Индексе три позитива (Natively, Specter-AI, pluely) с рангами по Близости к `alt_task` 27, 26 и 44, при `--from-index 20` в Пул они не попадают; у repo-scout DeepGit в Индексе на 2-м месте, но он и так в живой выдаче. Критерий выполнен частично: Индекс подмешивает близкие репо, а вернуть позитивы поможет `--from-index` порядка 30–50 (за это платят пакетными запросами обновления, по 10 репо на запрос). 
+Injection size testing (`--index-check --from-index N`):
 
-Размер подмешивания (`--index-check --from-index N`, тот же сценарий):
-
-| N | linux-coding: из Индекса, позитивы | repo-scout: из Индекса, позитивы | обновлений GraphQL (по 10 репо) |
+| N | linux-coding: from Index, positives | repo-scout: from Index, positives | GraphQL batch updates (10 repos/batch) |
 |---|---|---|---|
 | 20 | 10, 0 | 17, 0 | 1 + 2 |
 | 30 | 14, 1 (Specter-AI) | 26, 0 | 2 + 3 |
 | 50 | 23, 2 (Specter-AI, pluely) | 42, 0 | 3 + 5 |
 
-N=50 возвращает позитивы linux-coding, поэтому **по умолчанию `--from-index 50`**. Цена: до 5 пакетных запросов обновления на поиск (каждый ≈ 1 пункт лимита GraphQL: 10 репо с README и 20 коммитами), плюс эмбеддинг ещё до 50 строк. Natively остаётся в живой выдаче, позиции мелких проектов в Индексе зависят от Близости к формулировке. Прогон eval без Индекса (пустой временный) числа Фазы 4 не меняет.
+N=50 recovers positives for linux-coding, establishing **`--from-index 50` as default**.
 
-Правки по ревью: в Индекс пишутся только репо с непустым README; удалённые репо забываются, переименованные получают новое имя вместе с Вердиктами; `--record`/`--replay` работают без пользовательского Индекса; тесты изолированы `REPO_SCOUT_INDEX`.
+## Phase 6
 
-## Фаза 6
+Date: 2026-10-11. Round two: from top-10, topics appearing in ≥2 rows are extracted (filtering generic topics), spawning up to 5 `topic:<slug>` queries in an expansion round.
 
-Дата: 2026-10-11. Второй круг: из топ-10 (прошли стоп-правила, Близость не ниже `max(--min-closeness, 0.64)`) берутся `topics`, что встречаются минимум в 2 строках топа (ponytail: порог без калибровки), без общих (python, javascript, typescript, ai, llm, machine-learning, open-source, hacktoberfest) и уже заданных `topic:` в Запросах; до 5 Запросов `topic:<slug>` (+ `language:`), один круг. Новые кандидаты идут тем же конвейером, `источник` = «второй круг». Для чисто квалификаторных Запросов `in:` не добавляется. Снапшоты второго круга дозаписаны `--record`; два прогона `--replay` дают одинаковый вывод. `--no-round2` воспроизводит числа Фазы 4/5; `--calls` печатает вызовы API (логические: поиски и пачки по 10 репо для деталей, в replay тоже).
+Found / passed / ranks of passing positives (threshold 0.64), without round two → with round two:
 
-Найдено / прошло / позиции прошедших позитивов (порог 0.64), без второго круга → со вторым:
-
-| набор | позитивов | найдено | прошло | позиции |
+| Set | Positives | Found | Passed | Ranks |
 |---|---|---|---|---|
 | buy-smarter | 9 | 3 → 4 | 1 → 2 | 31 → 44, 27 |
 | buy-smarter-vision | 5 | 2 → 3 | 1 → 2 | 51 → 76, 88 |
@@ -142,13 +138,13 @@ N=50 возвращает позитивы linux-coding, поэтому **по �
 | persona-crm | 6 | 2 → 3 | 2 → 3 | 16, 2 → 35, 6, 3 |
 | repo-scout | 4 | 1 → 1 | 1 → 1 | 2 → 4 |
 | tiktok-lazy-follower | 5 | 4 → 4 | 4 → 4 | 48, 5, 8, 18 → 65, 5, 9, 21 |
-| **итого** | 45 | **21 → 26** | **18 → 23** | |
+| **Total** | 45 | **21 → 26** | **18 → 23** | |
 
-Только из второго круга пришли 5 позитивов: a-ulianov/OzonAPI (buy-smarter), mlfoundations/open_clip (vision), beancount/beancount (finance), PavelLizunov/suflyor (linux-coding), monicahq/monica (persona-crm). Ни один позитив не потерян, ложных отсевов столько же (3).
+Round two successfully surfaced 5 new positives: a-ulianov/OzonAPI (buy-smarter), mlfoundations/open_clip (vision), beancount/beancount (finance), PavelLizunov/suflyor (linux-coding), monicahq/monica (persona-crm). Zero positive losses; false discards remained steady at 3.
 
-Вызовы API на набор (поиск + детали, детали считаются пачками по 10), без → со вторым кругом:
+API request volume per set (searches + details, details batched by 10):
 
-| набор | поиск | детали | topics второго круга |
+| Set | Search | Details | Round 2 Topics |
 |---|---|---|---|
 | buy-smarter | 6 → 11 | 8 → 28 | ozon, ecommerce, marketplace, mcp, ai-agents |
 | buy-smarter-vision | 6 → 10 | 16 → 34 | clip, computer-vision, multimodal, streamlit |
@@ -158,40 +154,48 @@ N=50 возвращает позитивы linux-coding, поэтому **по �
 | persona-crm | 6 → 8 | 16 → 26 | self-hosted, crm |
 | repo-scout | 6 → 11 | 25 → 37 | github-api, github-search, github, github-growth, github-ranking |
 | tiktok-lazy-follower | 6 → 10 | 18 → 34 | tiktok, api, tiktok-api, youtube |
-| **итого** | 48 → 82 | 134 → 259 | |
+| **Total** | 48 → 82 | 134 → 259 | |
 
-Рост ограничен конструктивно: не больше 5 поисков и ≈ 25 пачек деталей на запуск (5 × 50 новых репо / 10). Практически +34 поиска и +125 пачек на 8 наборов (≈ +4 и +16 на набор). Позиции прошедших позитивов в целом хуже: пул вырос, и новые близкие репо встают выше (сумма позиций растёт, поэтому критерий «полнота» считается по найденным/прошедшим, а не по позициям). Мусорные topics (`api`, `youtube`, `react`, `telegram`) протаскивают широкие выдачи; Близость их отсекает, но API-вызовы тратятся.
+## Phase 7
 
-## Фаза 7
+Date: 2026-10-11. Flag `spike★ N% early`: share of first min(1000, total)★ occurring during MAD spike days (REST `stargazers/history`). Dataset `eval/fake-stars`: 100 StarScout positives (active, ≥50★) and 100 controls (27 "→ Deep dive" golden set repos, 73 from `sample_repo_ids`). Recorded 200 histories, 1707 REST calls (~8.5 per repo).
 
-Дата: 2026-10-11. Флаг `всплеск★ N% ранних`: доля первых min(1000, всего)★, пришедших в дни-всплески по MAD (история звёзд, REST `stargazers/history`). Набор `eval/fake-stars`: 100 позитивов StarScout (живые, ≥50★) и 100 негативов (27 «→ Разбор» из Золотых наборов, 73 случайных из `sample_repo_ids`). Записано 200 историй из 200, REST-вызовов 1707 (≈8,5 на репо; страницы по 30 недель до недели создания, не больше 20). `repo-scout eval --fake-stars` (офлайн; `--all-grid` — вся сетка).
+Tune split: threshold 0.7 / min 5 stars/day selected (recall ≥ 0.5, minimum FPR).
 
-Оценка честная: набор делится стратифицированно пополам (seed 0), пороги выбираются на tune (минимум FPR при recall ≥ 0.5), числа берутся с test. Чистая precision на наборе 50/50 вводит в заблуждение, поэтому главное число — FPR: среди обычных кандидатов позитивов мало, и ложные флаги доминируют.
+**Test split (threshold 0.7, min 5): TP 22, FP 7, precision 0.76, recall 0.44, FPR 0.14.** Expectation on top-10 standard candidates: ~1.4 false flags per run, with at least one in ~78% of runs if all 10 are organic.
 
-Tune (порог доли / мин. звёзд в день): 0.6/5 даёт FPR 0.06 при recall 0.62; 0.7/5 выбран (recall ≥ 0.5, минимальный FPR).
+False flags on test: viral launches (dinov3, transformers, actual, monica, nametag, meetily, ThreeOverlay).
 
-**Test (порог 0.7, мин. 5): TP 22, FP 7, precision 0.76, recall 0.44, FPR 0.14.** Ожидание на топ-10 обычных кандидатов: ≈1,4 ложного флага на прогон, хотя бы один в ≈78% прогонов (если все 10 — не накрутка).
+**Gate review** (Test FPR ≤ 0.15): passed with 0.01 margin on 50 controls. Flag enabled by default (`--stars-k 10`, `--no-stars-check` to disable) as an informative measurement rather than an absolute accusation. Cost: up to 85 REST calls per run.
 
-Ложные на test: facebookresearch/dinov3, huggingface/transformers, actualbudget/actual, monicahq/monica, mattogodoy/nametag, Zackriya-Solutions/meetily, zalo/ThreeOverlay: вирусные запуски (релиз, HN, Trending). Негативы из `sample_repo_ids` могут содержать и настоящие накрутки. Метки StarScout на январь 2025.
+Fork analysis: spikes without fork surges did not differentiate manipulated from viral repos (in fact, manipulated repos averaged higher fork ratios during spikes), so fork metrics are excluded from the flag.
 
-Окно «последние 90 дней» не включено в флаг: на этом наборе оно даёт 2 TP из 100 (накрутка StarScout приходится на старые звёзды), пороги не проверены.
+## Phase 9 — LLM Draft (2026-10-12, gate failed)
 
-**Ворота** (FPR на test ≤ 0.15): пройдены, но с запасом в 0.01 и на 50 негативах (доверительный интервал широкий), recall ниже 0.5. Флаг включён по умолчанию (`--stars-k 10`, `--no-stars-check` выключает) именно как нейтральное измерение, а не обвинение: его читают при Осмотре рядом с графиком звёзд. Стоимость: до 10 × ≈8,5 ≈ 85 REST-вызовов на прогон (квота core 5000/ч; GraphQL не тратится). Сбой REST для репо не роняет прогон (предупреждение, флаг пропущен).
+`repo-scout eval eval/*.toml --llm-draft --out eval/LLM-REPORT.md` (replay), model `free-stack` via OmniRoute, snapshots in `eval/snapshots-llm/` (details shared in `_shared/details`). Variants: agent — the set's Queries; Draft — `draft(need)` from the Need alone (no answer names), with its own task, Queries and conditions; union — both Query lists with the set's task and conditions.
 
-Форки (GraphQL `forks(first:100, orderBy: CREATED_AT)` доступен, 1 вызов) охватывают только последние 100 форков. Форков в ±3 дня от всплесков на 100 звёзд всплесков: позитивы 42,3 (n=54), негативы 21,1 (n=51): у накрученных больше, идея real-stars «всплеск без форков подозрителен» не подтвердилась. В флаг форки не входят, остались в отчёте eval.
-
-## Фаза 9 — Черновик LLM (2026-10-12, промежуточно, ворота не решены)
-
-`repo-scout eval eval/*.toml --llm-draft --record`, модель `free-stack` через OmniRoute. Запись остановлена через ~20 мин: целиком записан 1 набор из 8 (buy-smarter), buy-smarter-vision — только ответ LLM и часть деталей. Снимки: `eval/snapshots-llm/`.
-
-| набор | позитивов | агент: найдено/прошло | Черновик: найдено/прошло | объединение | токены | время Черновика, с |
+| set | positives | agent: found/kept | Draft: found/kept | union | tokens | Draft time, s |
 |---|---|---|---|---|---|---|
 | buy-smarter | 9 | 4/2 | 4/2 | 4/2 | 1125 | 13.6 |
+| buy-smarter-vision | 5 | 3/2 | 1/0 | 2/1 | 1229 | 10.1 |
+| finance-insights | 5 | 5/5 | 3/3 | 5/5 | 873 | 9.2 |
+| get_cool_event | 3 | 2/2 | 2/2 | 2/2 | 910 | 5.4 |
+| linux-coding | 8 | 6/6 | 6/5 | 5/5 | 967 | 8.9 |
+| persona-crm | 6 | 3/3 | 3/3 | 4/4 | 1028 | 8.8 |
+| repo-scout | 4 | 1/1 | 1/1 | 1/1 | 1081 | 7.7 |
+| tiktok-lazy-follower | 5 | 4/4 | 4/4 | 4/4 | 998 | 7.7 |
+| **total** | **45** | **28/25** | **24/20** | **27/24** | **8211** | **71** |
 
-- **Качество:** на buy-smarter Черновик по одной Потребности (без названий ответов) находит столько же, сколько Запросы агента, писавшего с знанием ответов; объединение ничего не добавляет. Один набор — не основание для ворот.
-- **Запросы Черновика** похожи на агентские, но модель пишет `OR` внутри строки (`kaspi parser OR scraper`) и добавляет `in:readme`. Для buy-smarter-vision Запросы осмысленные (multi-view embeddings, fashion recommendation, preference learning).
-- **Стоимость LLM:** ~1.1 тыс. токенов и ~14 с на Черновик (free-stack — бесплатно; за одним именем разные модели, ответы недетерминированы — снимки обязательны).
-- **Стоимость eval:** ~13 мин на набор. Основное время — заново записывается базовый вариант агента (~200 деталей, пачки по 10) и повторы на HTTP 502 (~35 с на каждый сбойный репо в каждом варианте). Ускорить: брать базовый вариант из существующих `eval/snapshots/<set>/` вместо повторной записи; общий кэш деталей по репо между вариантами и наборами.
-- **Найдено при записи:** репо, пропущенный из-за 502, не попадал в снимок, и replay падал → теперь пропуск пишется в снимок (`github._record_skipped`), replay повторяет его. В уже записанный buy-smarter метка дописана вручную.
+**Gate:** Draft found 24 < agent 28 → the GUI "Draft with LLM" button is hidden by default (shown with the key plus `REPO_SCOUT_GUI_DRAFT=1`); `repo-scout draft` stays. The union (27) does not beat the agent: +1 in persona-crm (`sneg55/pingcrm`), −1 in buy-smarter-vision (`mlfoundations/open_clip`) and linux-coding (`PavelLizunov/suflyor`) — a different Second round built from a different top's topics. No "my Queries + Draft" mode.
 
-Дальше: дописать запись остальных 7 наборов (лучше после ускорения выше), затем ворота: Черновик не хуже агента по сумме «найдено».
+**What the Draft loses (manual review):**
+- buy-smarter-vision: `facebookresearch/dinov3`, `mlfoundations/open_clip` — general embedding libraries; Draft Queries stay fashion-specific.
+- finance-insights: `beancount/beancount`, `beancount/fava` — the plain-text accounting ecosystem, never named by the model.
+- linux-coding: `Zackriya-Solutions/meetily` found but dropped by the Draft's Hard condition `must: interview` — the model sets overly strict conditions.
+- persona-crm: `subzeroid/instagrapi` — a building block (social API), not a CRM; the Draft found another positive instead, net equal.
+
+Conclusion: from a Need alone the model covers direct phrasings but misses adjacent ecosystems and building blocks, and sometimes drops positives with its own conditions. Useful as a hint for a human, not as a replacement for agent Queries.
+
+**Cost:** LLM — ~1k tokens and ~9 s per Draft (free-stack is free; answers are non-deterministic, so snapshots are required). Eval recording after the speed-up (shared details cache, 3 batches in parallel, 1 retry) — 5–7 min and 58–85 GraphQL points per set instead of ~13 min; replay of all 8 sets — ~5 min, 1.5 GB (embeddings in batches of 32 plus an in-process vector cache; previously 10+ GB). One repo skipped on HTTP 502 (`tkarim45/Beginner-Data-Science-Projects`, not a positive).
+
+Limitation: shared details are not tied to each set's snapshot date — when re-recording a set later, re-record its details too.

@@ -1,22 +1,22 @@
 import pytest
+from datetime import datetime
+from pathlib import Path
 
 from repo_scout import runs
 from repo_scout.gui import eval_logic as el
 from repo_scout.gui import runs_logic as rl
 from repo_scout.gui.index_page import check_repo
-from datetime import datetime
-from pathlib import Path
 
 
 def row(repo: str, **kw) -> dict:
     base = {"repo": repo, "url": f"https://github.com/{repo}", "stars": 5, "forks": 1, "commits": 3, "pushed_days": 9,
             "created": "2026-01-01", "lang": "Python", "desc": f"about {repo}", "score": 4, "fresh": 1, "pop": 2,
-            "flags": [], "stop": None, "closeness": 0.5, "source": "запрос", "seen": ""}
+            "flags": [], "stop": None, "closeness": 0.5, "source": "query", "seen": ""}
     return {**base, **kw}
 
 
-ROWS = [row("a/low", closeness=0.4), row("b/top", closeness=0.9, flags=["новый"]),
-        row("c/dead", stop="мёртвый", source="индекс", lang="Go"), row("d/none", closeness=None)]
+ROWS = [row("a/low", closeness=0.4), row("b/top", closeness=0.9, flags=["new"]),
+        row("c/dead", stop="dead", source="index", lang="Go"), row("d/none", closeness=None)]
 
 
 def test_resolve_run_only_inside_runs_dir(tmp_path):
@@ -41,22 +41,22 @@ def test_filter_rows_hides_stopped_by_default():
 
 def test_filter_rows_text_source_flag():
     assert [r["repo"] for r in rl.filter_rows(ROWS, text="TOP")] == ["b/top"]
-    assert [r["repo"] for r in rl.filter_rows(ROWS, source="индекс", show_stopped=True)] == ["c/dead"]
-    assert [r["repo"] for r in rl.filter_rows(ROWS, flag="новый")] == ["b/top"]
+    assert [r["repo"] for r in rl.filter_rows(ROWS, source="index", show_stopped=True)] == ["c/dead"]
+    assert [r["repo"] for r in rl.filter_rows(ROWS, flag="new")] == ["b/top"]
     assert [r["repo"] for r in rl.filter_rows(ROWS, text="go", show_stopped=True)] == ["c/dead"]
 
 
 def test_options_and_table_row():
-    assert rl.source_options(ROWS) == [rl.SOURCES_ALL, "запрос", "индекс"]
-    assert rl.flag_options(ROWS) == [rl.FLAGS_ALL, "новый"]
+    assert rl.source_options(ROWS) == [rl.SOURCES_ALL, "query", "index"]
+    assert rl.flag_options(ROWS) == [rl.FLAGS_ALL, "new"]
     t = rl.table_row(ROWS[2])
-    assert t["flags"] == "отсев: мёртвый" and t["seen"] == "—" and t["close"] == "0.50"
-    assert rl.table_row(ROWS[3])["close"] == "—" and rl.table_row(ROWS[1])["flags"] == "новый"
+    assert t["flags"] == "dropped: dead" and t["seen"] == "—" and t["close"] == "0.50"
+    assert rl.table_row(ROWS[3])["close"] == "—" and rl.table_row(ROWS[1])["flags"] == "new"
 
 
 @pytest.mark.parametrize(("kind", "note", "expected"), [
-    ("watch", "", "→ Осмотр"), ("dig", " порт  API ", "→ Разбор (порт API)"),
-    ("drop", "мёртвый", "отсев (мёртвый)"), ("doubt", "лицензия", "спорно (лицензия)")])
+    ("watch", "", "→ Inspect"), ("dig", " API port ", "→ Study (API port)"),
+    ("drop", "dead", "drop (dead)"), ("doubt", "license", "doubt (license)")])
 def test_compose_verdict(kind, note, expected):
     from repo_scout.index import validate_verdict
     text = rl.compose_verdict(kind, note)
@@ -65,7 +65,7 @@ def test_compose_verdict(kind, note, expected):
 
 
 def test_compose_verdict_needs_note():
-    with pytest.raises(ValueError, match="пояснение"):
+    with pytest.raises(ValueError, match="explanation"):
         rl.compose_verdict("drop", "  ")
 
 

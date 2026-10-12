@@ -1,92 +1,93 @@
-# Триаж чужих git-репозиториев
+**English** | [Русский](repo-triage.ru.md)
 
-Как быстро решить, стоит ли тратить время на чужой репо (аналог, конкурент, донор кода), не изучая код всерьёз.
-Цель — вердикт «куда тратить время» + что можно позаимствовать. Лицензию не учитываем: делаем для себя.
+# Triage Guide for External Git Repositories
 
-**Это ориентиры, а не правила в камне.** Спорное — спрашиваем пользователя.
+How to quickly decide whether an external repo (analog, competitor, code donor) is worth your time without in-depth code reading.
+Goal: a verdict on where to invest attention and what to borrow. License is not considered: this is internal research.
 
-Проектные оси баллов (платформа, стек, фичи) живут в проекте: `<проект>/docs/repo-triage.md`.
-Пример: `linux-coding/docs/repo-triage.md`, результаты — `linux-coding/docs/opensource-analogs.md`.
+**These are guidelines, not rigid rules.** When in doubt, clarify with the user.
 
-## Шаги
+Project-specific scoring axes (platform, stack, features) live in the project directory: `<project>/docs/repo-triage.md`.
 
-| Шаг | Что смотрим | Итог |
+## Steps
+
+| Step | What to Check | Output |
 |---|---|---|
-| **1. Отсев** | Близость к Описанию задачи, затем Жёсткие условия, Шум, описание + stars / forks / commits / last update. README — если без него не решить (зона 6–7 баллов или неизвестна платформа/стек). | Близость + баллы → проход на Шаг 2 при ≥ порога |
-| **2. Осмотр** | Страницы GitHub без клонирования: README, языки в сайдбаре, Releases, Contributors/Insights, последние 10–20 коммитов, открытые issues и ответы на них. | Вердикт + **цель Разбора** |
-| **3. Разбор** | Клон в `<проект>/external_examples/` (в `.gitignore`). | Что берём / годится ли как база |
+| **1. Triage** | Closeness to Task description, Hard conditions, Noise, description + stars / forks / commits / last update. README — if decision requires it. | Closeness + score → pass to Step 2 if ≥ threshold |
+| **2. Inspect** | GitHub web pages without cloning: README, sidebar languages, Releases, Contributors/Insights, last 10–20 commits, open issues and replies. | Verdict + **Study goal** |
+| **3. Study** | Clone into `<project>/external_examples/` (in `.gitignore`). | What to borrow / suitability as a base |
 
-## Шаг 1 — Отсев
+## Step 1 — Triage
 
-### Близость
+### Closeness
 
-Семантическое сходство кандидата (имя, описание, topics, README) с Описанием задачи (английский, 1–3 фразы; `--task`). Не балл: порог и **первый ключ сортировки**, баллы — второй, дни с push — третий. Порог по умолчанию 0.64 (`--min-closeness`): ниже — стоп «не по теме (0.xx)». Подобран на eval как максимум, при котором ни один «→ Разбор» не отсеян, минус запас 0.02.
+Semantic similarity of candidate (name, description, topics, README) to Task description (English, 1–3 sentences; `--task`). Not a score: threshold and **primary sort key**; score is secondary, days since push is tertiary. Default threshold is 0.64 (`--min-closeness`): below is dropped as `off-topic (0.xx)`. Calibrated on eval benchmarks as the maximum threshold retaining all `→ Study` positives, minus a 0.02 safety margin.
 
-### Стоп-правила (любое → отсев, баллы не считаем)
+### Stop Rules (any triggers immediate drop, skipping scores)
 
-- **Не по теме:** Близость ниже порога.
-- **Жёсткие условия** (`--lang`, `--must`, `--exclude`): неверный язык, запрещённое слово в имени/описании/topics/README, нет обязательной группы слов (README нет — не отсев, а флаг).
-- **Шум:** awesome-лист, tutorial, demo, homework, spam/promo — только при ≥2 независимых сигналах (имя, описание, topics). Шаблон — не Шум, а флаг.
-- **Мёртвый:** нет обновлений > 4 мес при < 500 коммитов; нет обновлений > 6 мес — при любом числе коммитов.
-  Свежесть и «мёртвый» считаются по последнему **содержательному** коммиту (не бот, не косметика docs/deps/ci/bump/typo; коммиты AI-агентов обычные).
-  Почему жёстко: большинство проектов сейчас пишут модели, и код даже трёхмесячной давности заметно хуже нынешнего.
-- **Игрушка:** < ~50 коммитов и нет звёзд (если только коммиты не гигантские).
-- **Закрытый / locked:** отсев, если кода, который можно скопировать, нет. Если код есть (старая открытая версия и т.п.) — оцениваем как обычно.
+- **Off-topic:** Closeness below threshold.
+- **Hard conditions** (`--lang`, `--must`, `--exclude`): wrong language, forbidden word in name/description/topics/README, missing required word regexes (missing README flags instead of dropping).
+- **Noise:** awesome list, tutorial, demo, homework, spam/promo — only upon ≥2 independent signals (name, description, topics). Template is flagged, not dropped.
+- **Dead:** no updates > 4 months with < 500 commits; no updates > 6 months with any commit count.
+  Freshness and dead checks rely on the last **substantive** commit (not a service bot, not cosmetic docs/deps/ci/bump/typo; AI-agent commits are judged by content).
+  Rationale: modern projects evolve rapidly with AI assistance, making older unmaintained code significantly less viable.
+- **Toy:** < ~50 commits and 0 stars (unless individual commits are massive).
+- **Closed / locked:** dropped if no copyable source code exists. If historical code is accessible, evaluate normally.
 
-Что **не** отсеивает:
-- Звёзды (их мало — это не повод выкидывать).
-- Позиционирование («note taker», «meeting summary»): судим по тому, что внутри — захват аудио, ASR и т.д. часто почти то, что нужно.
-- Форк: ценен, если специализирован (например, донастройка под Linux). Без своей ценности — смотрим оригинал.
-- Много коммитов: норма, зависит от человека и агента.
+What does **not** drop:
+- Low star counts (few stars is no reason to discard).
+- Narrow product positioning ("note taker", "meeting summary"): evaluate internal mechanisms — audio capture, ASR, etc.
+- Fork: valuable if specialized (e.g. customized for Linux). If not differentiated, evaluate upstream.
+- High commit volume: normal variation.
 
-### Флаги (не отсеивают, помечаем)
+### Flags (informative, do not drop)
 
-- **stars≫commits** — перекос (тысячи звёзд на десятки коммитов): хайп/накрутка без развития.
-- **всплеск★ N% ранних** — измерение: доля первых ~1000★, пришедших в дни-всплески (по истории звёзд: окно 28 дней, день выше медианы + 3·1,4826·MAD, ≥5★ в день). Считается для топ-K после Близости с ≥50★, баллы не меняет. **Значит:** звёзды приходили пачками. Причина может быть покупка **или** вирусный запуск (HN, Trending, релиз, пост), по истории их не отличить: поэтому флаг — повод посмотреть график звёзд при Осмотре, а не вердикт. Качество на eval (test): recall ≈0,44, доля ложных флагов среди органических репо (FPR) ≈0,14, то есть на топ-10 в среднем ≈1,4 флага на органике. Окно «последние 90 дней» не проверено и в флаг не входит. Ограничения: история по неделям с разбивкой по дням, списки звездочётов для чужих репо недоступны (сигналов по аккаунтам нет); <30★ и история старше ~11 лет (обрезана) — без значения.
-- **форк** — указать оригинал.
-- **только косметика** — среди последних 20 коммитов нет содержательного.
-- **шаблон**, **нет README**, **новый**.
+- **stars≫commits** — imbalance (thousands of stars for dozens of commits): hype/purchased stars without engineering substance.
+- **burst★ N% early** — measurement: share of the first ~1000★ arriving during spike days (via star history: 28-day window, day above median + 3·1.4826·MAD, ≥5★/day). Computed for top-K candidates after closeness with ≥50★. **Meaning:** stars arrived in bursts. Could be star-farming **or** organic viral launch (Hacker News, Trending, post); cannot be distinguished from history alone. Treat as an indicator to inspect the star chart during Inspect, not a verdict. Eval performance (test): recall ≈0.44, false positive rate (FPR) on organic repos ≈0.14 (~1.4 false flags per top 10 organic repos).
+- **fork** — notes upstream repository.
+- **cosmetic only** — none of the last 20 commits are substantive.
+- **template**, **no README**, **new**.
 
-### Общие оси баллов
+### Common Scoring Axes
 
-| Ось | Баллы |
+| Axis | Points |
 |---|---|
-| **Свежесть** (last update) | ≤ 7 дней **+4**; ≤ 14 дней **+3**; ≤ 1 мес **+2**; ≤ 3 мес **+1** |
-| **Популярность** (stars) | ≥ 100 **+1**; ≥ 1k **+2**; ≥ 10k **+3**; ≥ 50k **+4**; ≥ 100k **+5** |
+| **Freshness** (last update) | ≤ 7 days **+4**; ≤ 14 days **+3**; ≤ 1 month **+2**; ≤ 3 months **+1** |
+| **Popularity** (stars) | ≥ 100 **+1**; ≥ 1k **+2**; ≥ 10k **+3**; ≥ 50k **+4**; ≥ 100k **+5** |
 
-Плюс проектные оси. **Неизвестное = 0.** Порог задаёт проект.
+Plus project-specific axes. **Unknown = 0.**
 
-## Шаг 2 — Осмотр
+## Step 2 — Inspect
 
-**Бюджет токенов:** скриншоты пропускаем; README — первые ~15 KB (≈300 строк), дальше только оглавление и нужные разделы.
-Для отсева по README хватает grep по ключевым словам (платформы, стек, фичи) вместо чтения целиком.
+**Token budget:** skip images/screenshots; read first ~15 KB of README (≈300 lines), then only table of contents and target sections.
+For README screening, grep for keywords (platforms, stack, features) rather than full reading.
 
-**Поддержка платформы — не только по README.** Если README молчит про нужную платформу, ищем по issues/PR (`gh search issues --repo X linux`): бывают открытые PR с поддержкой, обсуждения ограничений от мейнтейнера, отчёты о сборке. Пример: Natively — README без Linux, но есть PR #327 с Linux-захватом и X11-оверлеем.
+**Platform support beyond README:** If README omits your target platform, search issues/PRs (`gh search issues --repo X linux`): look for open PRs, maintainer discussions, or build logs.
 
-**Стоп:**
-- Ни один компонент нашего конвейера нельзя взять.
-- Последние коммиты — косметика (README, бамп версий), реальной работы нет.
-- Нет ни Releases, ни внятной установки, и видно, что не запустится.
+**Stop:**
+- None of our pipeline components can be borrowed.
+- Last commits are purely cosmetic (README edits, version bumps) with no real progress.
+- No releases or clear setup instructions, and evident runtime failure.
 
-**Плюсы (повод идти в Разбор):**
-- Есть конкретный интересный модуль (по README/структуре).
-- Issues/PR про нашу платформу или наши проблемы — особенно с решениями.
-- Больше одного активного контрибьютора, на issues отвечают.
+**Positives (reasons to proceed to Study):**
+- Specific module of interest is present.
+- Issues/PRs addressing our platform or exact challenges with solutions.
+- Multiple active contributors responsive to issues.
 
-**Итог:** вердикт + цель Разбора («как они прячут окно от screen share»). Цель уточняем у пользователя; без цели Разбор не начинаем.
+**Output:** verdict + Study goal ("how the window hides from screen share"). Confirm goal with user before starting Study.
 
-## Шаг 3 — Разбор
+## Step 3 — Study
 
-`git clone --depth 1 <url> <проект>/external_examples/<repo>` — и читаем код под цель из Шага 2.
-Итог: что копируем/адаптируем, или «годится как база».
+`git clone --depth 1 <url> <project>/external_examples/<repo>` — inspect code under the specific goal from Step 2.
+Output: what to copy/adapt, or suitability as architectural foundation.
 
-## Формат результата
+## Result Format
 
-Подробные данные Шагов 2–3 (метрики, факты, пути к файлам, сравнение с нашим кодом, что берём/не берём, грабли) — **обязательно сохранять** в `<проект>/docs/analogs/<repo>.md`: иначе анализ теряется вместе с сессией.
-В списке аналогов — только строка-сводка со ссылкой на этот файл:
+Detailed findings from Steps 2–3 (metrics, facts, file paths, comparison, pitfalls) should be preserved in `<project>/docs/analogs/<repo>.md`.
+Summary row in analog list:
 
 ```
-триаж: шаг 1 · близ 0.81 · баллы 10 (плат 3, стек 1, фичи 2, свеж 4, поп 0) · флаги: новый · вердикт: → Осмотр
+triage: step 1 · close 0.81 · score 10 (platform 3, stack 1, features 2, fresh 4, pop 0) · flags: new · verdict: → Inspect
 ```
 
-Вердикты: `→ Осмотр`, `→ Разбор (<цель>)`, `отсев (<причина>)`, `спорно (<что уточнить>)`.
+Verdicts: `→ Inspect`, `→ Study (<goal>)`, `drop (<reason>)`, `doubt (<what to clarify>)`.

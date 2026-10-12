@@ -1,4 +1,4 @@
-"""Индекс, Вердикты, источник строк и экспорт (без модели и сети)."""
+"""Index, Verdicts, row source, and export (without model and network)."""
 from datetime import UTC, datetime
 
 import numpy as np
@@ -22,7 +22,7 @@ def test_roundtrip_and_top(tmp_path, fake_embed):
     idx = Index(tmp_path / "sub" / "i.db", model="m1")
     idx.upsert(ROW, "readme", np.array([0, 1]))
     idx.upsert({**ROW, "repo": "o/best"}, None, np.array([1, 0]))
-    idx.upsert({**ROW, "repo": "O/NAME"}, "again", np.array([0.5, 0.5]))  # upsert по имени без регистра
+    idx.upsert({**ROW, "repo": "O/NAME"}, "again", np.array([0.5, 0.5]))
     assert idx.top("task", 5) == ["o/best", "O/NAME"]
     assert idx.top("task", 1) == ["o/best"]
     assert Index(tmp_path / "empty.db").top("t", 3) == []
@@ -40,13 +40,13 @@ def test_model_change_recomputes_from_stored_text(tmp_path, fake_embed):
 
 
 def test_verdict_validation():
-    validate_verdict("a/b", "→ Разбор (цель)", "p", "t")
-    validate_verdict("a/b.c_d", "отсев (шум)", "p", "t")
+    validate_verdict("a/b", "→ Study (goal)", "p", "t")
+    validate_verdict("a/b.c_d", "drop (noise)", "p", "t")
     for repo, verdict, project, task, msg in [
-        ("a/b", "ок", "p", "t", "вердикт"), ("a/b", "→ Разбор", "p", "t", "вердикт"),
-        ("a/b", "отсев (x)\nещё", "p", "t", "вердикт"), ("ab", "→ Осмотр", "p", "t", "owner/repo"),
-        ("a/..", "→ Осмотр", "p", "t", "owner/repo"), ("a/b c", "→ Осмотр", "p", "t", "owner/repo"),
-        ("a/b", "→ Осмотр", "", "t", "проект"), ("a/b", "→ Осмотр", "p", "x\ny", "задача"),
+        ("a/b", "ok", "p", "t", "verdict"), ("a/b", "→ Study", "p", "t", "verdict"),
+        ("a/b", "drop (x)\nmore", "p", "t", "verdict"), ("ab", "→ Inspect", "p", "t", "owner/repo"),
+        ("a/..", "→ Inspect", "p", "t", "owner/repo"), ("a/b c", "→ Inspect", "p", "t", "owner/repo"),
+        ("a/b", "→ Inspect", "", "t", "project"), ("a/b", "→ Inspect", "p", "x\ny", "task"),
     ]:
         with pytest.raises(ValueError, match=msg):
             validate_verdict(repo, verdict, project, task)
@@ -55,7 +55,7 @@ def test_verdict_validation():
 def test_forget_and_rename(tmp_path):
     idx = Index(tmp_path / "i.db")
     idx.upsert(ROW, "r", np.array([1, 0]))
-    idx.add_verdict("o/name", "→ Осмотр", "p", "t")
+    idx.add_verdict("o/name", "→ Inspect", "p", "t")
     idx.rename("O/Name", "new/name")
     assert idx.db.execute("SELECT COUNT(*) FROM repos").fetchone() == (0,)
     assert "new/name" in idx.seen(["new/name"])
@@ -66,27 +66,27 @@ def test_forget_and_rename(tmp_path):
 
 def test_export_collapses_whitespace(tmp_path):
     idx = Index(tmp_path / "i.db")
-    idx.add_verdict("a/b", "→ Осмотр", "p  q", "t\t\u2028x")
-    assert evaluate.export_verdicts(idx, None).count("\n") == 4 and "# проект: p q" in evaluate.export_verdicts(idx, None)
+    idx.add_verdict("a/b", "→ Inspect", "p  q", "t\t\u2028x")
+    assert evaluate.export_verdicts(idx, None).count("\n") == 4 and "# project: p q" in evaluate.export_verdicts(idx, None)
 
 
 def test_seen_latest_per_project_and_export(tmp_path):
     idx = Index(tmp_path / "i.db")
     d = lambda day: datetime(2026, 10, day, tzinfo=UTC)
-    idx.add_verdict("A/b", "→ Осмотр", "p1", "t1", d(1))
-    idx.add_verdict("a/b", "отсев (шум)", "p1", "t1", d(2))
-    idx.add_verdict("a/b", "→ Разбор (x)", "p2", "t2", d(3))
-    assert idx.seen(["a/B", "z/z"]) == {"a/b": "p2: → Разбор (x) (2026-10-03); p1: отсев (шум) (2026-10-02)"}
+    idx.add_verdict("A/b", "→ Inspect", "p1", "t1", d(1))
+    idx.add_verdict("a/b", "drop (noise)", "p1", "t1", d(2))
+    idx.add_verdict("a/b", "→ Study (x)", "p2", "t2", d(3))
+    assert idx.seen(["a/B", "z/z"]) == {"a/b": "p2: → Study (x) (2026-10-03); p1: drop (noise) (2026-10-02)"}
     out = evaluate.export_verdicts(idx, None)
-    assert '# проект: p1\n[[expected]]\nrepo = "a/b"\nverdict = "→ Осмотр"' in out and "# проект: p2" in out
+    assert '# project: p1\n[[expected]]\nrepo = "a/b"\nverdict = "→ Inspect"' in out and "# project: p2" in out
     assert "p2" not in evaluate.export_verdicts(idx, "p1")
 
 
 def test_run_writes_index_pulls_from_index_and_marks_seen(tmp_path, fake_embed, monkeypatch):
     idx = Index(tmp_path / "i.db")
     idx.upsert({**ROW, "repo": "old/repo"}, "match", np.array([1, 0]))
-    idx.upsert({**ROW, "repo": "a/live"}, "match", np.array([0, 1]))  # уже в живой выдаче: не тянем
-    idx.add_verdict("old/repo", "→ Осмотр", "proj", "t", NOW)
+    idx.upsert({**ROW, "repo": "a/live"}, "match", np.array([0, 1]))
+    idx.add_verdict("old/repo", "→ Inspect", "proj", "t", NOW)
     fetched = []
     monkeypatch.setattr(github, "search", lambda q, n: [node("a/live")])
     monkeypatch.setattr(github, "details", lambda names: {n: {"readme": "match", "commits": []} for n in names})
@@ -95,13 +95,13 @@ def test_run_writes_index_pulls_from_index_and_marks_seen(tmp_path, fake_embed, 
     rows = {r["repo"]: r for r in cli.run(["q"], months=6, new_days=60, limit=5, lang=None, now=NOW, task="t",
                                           index=idx, from_index=5)}
     assert fetched == ["old/repo"]
-    assert rows["old/repo"]["source"] == "индекс" and rows["a/live"]["source"] == "запрос"
-    assert "proj: → Осмотр" in rows["old/repo"]["seen"] and rows["a/live"]["seen"] == ""
+    assert rows["old/repo"]["source"] == "index" and rows["a/live"]["source"] == "query"
+    assert "proj: → Inspect" in rows["old/repo"]["seen"] and rows["a/live"]["seen"] == ""
     assert idx.db.execute("SELECT readme FROM repos WHERE name='a/live'").fetchone() == ("match",)
     md = cli.to_markdown(list(rows.values()))
-    assert "источник" in md and "уже смотрели" in md and "proj: → Осмотр" in md
+    assert "source" in md and "seen" in md and "proj: → Inspect" in md
     cli.run(["q"], months=6, new_days=60, limit=5, lang=None, now=NOW, task="t", index=idx, from_index=0)
-    assert fetched == ["old/repo"]  # from_index=0 выключает
+    assert fetched == ["old/repo"]
 
 
 def test_refresh_splits_node_and_details(monkeypatch):
@@ -124,11 +124,11 @@ def test_gone_and_renamed_index_rows(tmp_path, fake_embed, monkeypatch):
     idx = Index(tmp_path / "i.db")
     for n in ("gone/repo", "old/name"):
         idx.upsert({**ROW, "repo": n}, "match", np.array([1, 0]))
-    idx.add_verdict("old/name", "→ Осмотр", "p", "t")
+    idx.add_verdict("old/name", "→ Inspect", "p", "t")
     _pipeline(monkeypatch, idx, lambda names: {"old/name": {"node": node("new/name"),
                                                            "details": {"readme": "match", "commits": []}}})
     names = {r[0] for r in idx.db.execute("SELECT name FROM repos")}
-    assert names == {"a/live", "new/name"}  # gone забыт, old/name переименован и записан заново
+    assert names == {"a/live", "new/name"}
     assert "new/name" in idx.seen(["new/name"])
 
 

@@ -13,14 +13,14 @@ def test_lang():
     assert lang_stop({"lang": "Go"}, "go") is None
     assert lang_stop({"lang": ""}, "go") is None
     assert lang_stop({"lang": "Rust"}, None) is None
-    assert lang_stop({"lang": "Rust"}, "go") == "не тот язык (Rust)"
+    assert lang_stop({"lang": "Rust"}, "go") == "wrong language (Rust)"
 
 
 def test_exclude_and_must():
-    assert exclude_stop("a WordPress plugin", compile_all("--exclude", ["wordpress"])) == "запрещено: WordPress"
+    assert exclude_stop("a WordPress plugin", compile_all("--exclude", ["wordpress"])) == "forbidden: WordPress"
     assert exclude_stop("clean", compile_all("--exclude", ["wordpress"])) is None
     assert must_stop("kaspi and ozon", compile_all("--must", ["kaspi", "OZON"])) is None
-    assert must_stop("kaspi", compile_all("--must", ["kaspi", "ozon"])) == "нет обязательного: ozon"
+    assert must_stop("kaspi", compile_all("--must", ["kaspi", "ozon"])) == "missing required: ozon"
 
 
 def test_bad_regex_is_value_error_with_flag_name():
@@ -60,24 +60,24 @@ def test_pipeline_must_exclude_readme_and_cosmetic(monkeypatch):
     }
     rows = run_pipeline(monkeypatch, details, must=compile_all("--must", ["kaspi"]), exclude=compile_all("--exclude", ["wordpress"]))
     assert rows["a/ok"]["stop"] is None
-    assert rows["a/nomust"]["stop"] == "нет обязательного: kaspi"
-    assert rows["a/banned"]["stop"] == "запрещено: wordpress"
-    assert rows["a/noreadme"]["stop"] is None and "нет README" in rows["a/noreadme"]["flags"]
-    assert "только косметика" in rows["a/cosmetic"]["flags"]
-    assert rows["a/cosmetic"]["stop"].startswith("мёртвый")
-    assert rows["a/stale"]["stop"].startswith("мёртвый")
+    assert rows["a/nomust"]["stop"] == "missing required: kaspi"
+    assert rows["a/banned"]["stop"] == "forbidden: wordpress"
+    assert rows["a/noreadme"]["stop"] is None and "no README" in rows["a/noreadme"]["flags"]
+    assert "cosmetic only" in rows["a/cosmetic"]["flags"]
+    assert rows["a/cosmetic"]["stop"].startswith("dead")
+    assert rows["a/stale"]["stop"].startswith("dead")
 
 
 def test_pipeline_missing_details_flag(monkeypatch):
     rows = run_pipeline(monkeypatch, {"a/gone": None}, must=compile_all("--must", ["x"]))
-    assert rows["a/gone"]["stop"] is None and "нет деталей" in rows["a/gone"]["flags"]
+    assert rows["a/gone"]["stop"] is None and "no details" in rows["a/gone"]["flags"]
 
 
 def test_json_output_has_dropped_by_must(monkeypatch, capsys):
     import json
     import sys
     rows = [{"repo": "a/ok", "stop": None, "score": 1, "pushed_days": 1},
-            {"repo": "a/no", "stop": "нет обязательного: x", "score": 1, "pushed_days": 1}]
+            {"repo": "a/no", "stop": "missing required: x", "score": 1, "pushed_days": 1}]
     monkeypatch.setattr(cli, "run", lambda *a, **k: rows)
     monkeypatch.setattr(sys, "argv", ["repo-scout", "q", "--task", "t", "--json"])
     cli.main()
@@ -90,5 +90,5 @@ def test_pipeline_noise_and_lang_skip_details(monkeypatch):
     monkeypatch.setattr(github, "search", lambda q, n: [node("a/awesome-x"), node("a/real")])
     monkeypatch.setattr(github, "details", lambda names: seen.extend(names) or {})
     rows = cli.run(["q"], months=6, new_days=60, limit=5, lang="rust", now=NOW)
-    assert {r["repo"]: r["stop"] for r in rows}["a/real"] == "не тот язык (Go)"
+    assert {r["repo"]: r["stop"] for r in rows}["a/real"] == "wrong language (Go)"
     assert seen == []

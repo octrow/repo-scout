@@ -1,4 +1,4 @@
-"""Страница «Eval» (`/eval`): наборы eval/*.toml, запуск подпроцессом, отчёт из `--out`."""
+"""Eval page (`/eval`): eval/*.toml datasets, subprocess execution, report from `--out`."""
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -15,9 +15,9 @@ from .verdict_dialog import open_index
 
 POLL_PERIOD = 1.0
 REPORTS_DIR = "eval-reports"
-FLAG_LABELS = {"detail": "Список репо по наборам", "sweep": "Пороги Близости 0.50–0.90", "no_round2": "Без второго круга",
-               "calls": "Число вызовов API", "index_check": "Проверка Индекса (Фаза 5)",
-               "fake_stars": "Флаг «всплеск звёзд» (eval/fake-stars)", "all_grid": "С ним: вся сетка порогов"}
+FLAG_LABELS = {"detail": "List repos by dataset", "sweep": "Closeness thresholds 0.50–0.90", "no_round2": "Skip round 2",
+               "calls": "API call counts", "index_check": "Index check (Phase 5)",
+               "fake_stars": "Flag 'burst★' (eval/fake-stars)", "all_grid": "With it: full threshold grid"}
 
 
 def report_path(now: datetime) -> Path:
@@ -28,8 +28,8 @@ def _projects() -> list[str]:
     try:
         with open_index() as idx:
             return list(dict.fromkeys(v[0] for v in idx.verdicts()))
-    except (sqlite3.Error, OSError):  # без Индекса выбор проекта просто пуст
-        log.warning("Проекты из Индекса недоступны", exc_info=True)
+    except (sqlite3.Error, OSError):  # without Index project list is simply empty
+        log.warning("Index projects unavailable", exc_info=True)
         return []
 
 
@@ -50,12 +50,12 @@ class EvalPage:
 
     def submit(self, argv: list[str], out: Path, label: str) -> None:
         out.parent.mkdir(parents=True, exist_ok=True)
-        run = run_pool.submit(argv, label=label, meta={"out": str(out)})
-        if run is None:
-            ui.notify("Очередь запусков переполнена: дождитесь завершения", type="warning")
+        run_item = run_pool.submit(argv, label=label, meta={"out": str(out)})
+        if run_item is None:
+            ui.notify("Execution queue is full: wait for completion", type="warning")
             return
-        self.pending[run.run_id] = out
-        ui.notify("Eval запущен", type="positive")
+        self.pending[run_item.run_id] = out
+        ui.notify("Eval started", type="positive")
 
     def start(self) -> None:
         o = self.options()
@@ -67,7 +67,7 @@ class EvalPage:
         self.submit(el.eval_argv(o, out), out, f"eval: {names}")
 
     def watch(self) -> None:
-        """ui.* только в таймере страницы: из on_line вызывать нельзя."""
+        """ui.* only in page timer: must not call from on_line."""
         for run_id, out in list(self.pending.items()):
             state = run_pool.RUNS.get(run_id)
             if state is None or state.status in run_pool.PENDING_STATUSES:
@@ -76,10 +76,10 @@ class EvalPage:
             self.report.clear()
             with self.report:
                 if state.status == run_pool.DONE and out.is_file():
-                    layout.heading("Отчёт", level=2)
+                    layout.heading("Report", level=2)
                     layout.markdown_reader(out.read_text(encoding="utf-8"))
                 elif state.status == run_pool.FAILED:
-                    layout.failed("Eval завершился с ошибкой: подробности в логе запуска выше")
+                    layout.failed("Eval failed with error: see execution log above for details")
 
     def cards(self) -> None:
         with layout.grid(min_col="18rem"):
@@ -87,46 +87,46 @@ class EvalPage:
                 with layout.section_card(recessive=True):
                     ui.checkbox(s.name, on_change=lambda e, p=s.path: self.picked.add(p) if e.value else self.picked.discard(p))
                     ui.label(s.task[:160]).classes("t-meta")
-                    ui.label(f"Ожидаемых: {s.n_expected} · снимок: {s.snapshot}").classes("t-meta")
+                    ui.label(f"Expected: {s.n_expected} · snapshot: {s.snapshot}").classes("t-meta")
 
     def controls(self) -> None:
         with layout.section_card():
-            self.opts["mode"] = ui.toggle({"replay": "Снапшоты (без сети)", "record": "Записать снапшоты (сеть)"}, value="replay")
+            self.opts["mode"] = ui.toggle({"replay": "Snapshots (offline)", "record": "Record snapshots (network)"}, value="replay")
             with layout.grid():
                 for key, label in FLAG_LABELS.items():
                     self.opts[key] = ui.checkbox(label).classes("ic-span-6")
-                self.opts["top"] = ui.number("Вывести топ-N выдачи (0 — не выводить)", value=0, min=0, precision=0) \
+                self.opts["top"] = ui.number("Show top-N results (0 — do not show)", value=0, min=0, precision=0) \
                     .props("outlined dense stack-label").classes("ic-span-6 w-full")
             export = self.export_dialog()
             with layout.actions_row(end=False):
-                layout.button("Запустить eval", kind="primary", icon="play_arrow", on_click=self.start)
-                layout.button("Экспортировать вердикты", icon="download", on_click=export.open)
+                layout.button("Launch eval", kind="primary", icon="play_arrow", on_click=self.start)
+                layout.button("Export verdicts", icon="download", on_click=export.open)
 
     def export_dialog(self) -> ui.dialog:
         with ui.dialog() as dialog, layout.section_card():
-            layout.heading("Экспорт вердиктов", level=2)
-            ui.label("Вердикты Индекса как блоки [[expected]] для наборов.").classes("t-meta")
-            project = ui.select(_projects(), label="Проект", clearable=True) \
-                .props('outlined dense stack-label hint="Пусто: все проекты"').classes("w-full")
+            layout.heading("Export verdicts", level=2)
+            ui.label("Index verdicts as [[expected]] blocks for datasets.").classes("t-meta")
+            project = ui.select(_projects(), label="Project", clearable=True) \
+                .props('outlined dense stack-label hint="Empty: all projects"').classes("w-full")
 
             def go() -> None:
                 out = report_path(datetime.now())
-                self.submit(el.export_argv(project.value, out), out, "eval: экспорт вердиктов")
+                self.submit(el.export_argv(project.value, out), out, "eval: export verdicts")
                 dialog.close()
 
             with layout.actions_row():
-                layout.button("Отмена", kind="quiet", on_click=dialog.close)
-                layout.button("Экспортировать", kind="primary", on_click=go)
+                layout.button("Cancel", kind="quiet", on_click=dialog.close)
+                layout.button("Export", kind="primary", on_click=go)
         return dialog
 
     def build(self) -> None:
         if not self.sets:
-            layout.empty("Наборы eval/*.toml не найдены")
+            layout.empty("eval/*.toml datasets not found")
         else:
             self.cards()
         self.controls()
-        layout.heading("Запуски", level=2)
-        run_monitor.attach_run_monitor(idle_text="Запусков пока не было")
+        layout.heading("Runs", level=2)
+        run_monitor.attach_run_monitor(idle_text="No runs yet")
         self.report = ui.column().classes("w-full ic-stack")
         ui.timer(POLL_PERIOD, self.watch)
 

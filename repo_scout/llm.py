@@ -1,8 +1,8 @@
-"""Черновик LLM: по Потребности модель предлагает Описание задачи, Запросы и Жёсткие условия.
+"""LLM draft: model suggests Task description, Queries, and Hard conditions from user's Need.
 
-Только stdlib. Модель вызывается до поиска и не влияет на выдачу; без ключа `available()` = False.
-Ответ модели недоверенный: JSON, типы, лимиты, `validate_query`, `compile_all`.
-Ключ нигде не печатается и не попадает в сообщения: ошибки называют только имена переменных.
+Standard library only. Called before search and does not affect ranking; without key `available()` = False.
+Model output is untrusted: JSON validation, type checks, bounds, `validate_query`, `compile_all`.
+The key is never printed or included in messages: errors mention variable names only.
 """
 import hashlib
 import http.client
@@ -22,10 +22,10 @@ from repo_scout.log import log
 ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 KEY_VAR, MODEL_VAR, URL_VAR = "OMNIROUTE_API_KEY", "OMNIROUTE_MODEL", "OMNIROUTE_BASE_URL"
 DEFAULT_MODEL, DEFAULT_URL = "free-stack", "http://127.0.0.1:20128/v1"
-TIMEOUT_S = 90  # free-stack отвечает ~8 с, но маршрутизируется по разным моделям
+TIMEOUT_S = 90  # free-stack responds in ~8s, but routes across different models
 MAX_QUERIES, MAX_QUERY_CHARS, MAX_TASK_CHARS, MAX_REGEXES = 10, 256, 600, 10
 MAX_NEED_CHARS = 2_000
-NO_KEY = f"нет ключа LLM: задайте {KEY_VAR} (и при необходимости {MODEL_VAR}, {URL_VAR}) в окружении или в .env"
+NO_KEY = f"missing LLM key: set {KEY_VAR} (and optionally {MODEL_VAR}, {URL_VAR}) in environment or .env"
 
 SYSTEM_PROMPT = """You turn a user's need (any language) into a draft for a GitHub repository search.
 Reply with ONE JSON object and nothing else:
@@ -38,15 +38,25 @@ Rules:
 - must / exclude: optional Python regexes (case-insensitive) searched in README, topics and description:
   must = words every result needs, exclude = words that rule a result out. Empty lists if unsure."""
 
-last_stats: dict = {}  # токены и секунды последнего draft() (из снапшота при replay)
+last_stats: dict = {}  # tokens and seconds of last draft() (from snapshot in replay)
 
 
 class LLMError(Exception):
     pass
 
 
+def _why(e: Exception) -> str:
+    """Reason without response body or headers: timeout != connection refused."""
+    reason = getattr(e, "reason", e)
+    if isinstance(reason, TimeoutError):
+        return f"no response within {TIMEOUT_S}s"
+    if isinstance(reason, ConnectionRefusedError):
+        return "connection refused — server not running?"
+    return f"no connection ({type(reason).__name__})"
+
+
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    """Редирект = ошибка: заголовок Authorization не должен уйти на чужой адрес."""
+    """Redirects are treated as errors to prevent Authorization leakage."""
 
     def redirect_request(self, *args, **kwargs):
         return None
@@ -65,7 +75,7 @@ class Draft:
 
 
 def _env_file() -> dict[str, str]:
-    """KEY=VALUE из .env (комментарии и пустые строки игнорируются, кавычки снимаются)."""
+    """Parse KEY=VALUE from .env (comments and blank lines ignored, quotes stripped)."""
     try:
         lines = ENV_FILE.read_text(encoding="utf-8").splitlines()
     except OSError:
@@ -84,7 +94,7 @@ def _env_file() -> dict[str, str]:
 
 
 def _setting(name: str, default: str = "") -> str:
-    """Реальное окружение главнее .env."""
+    """Real environment takes precedence over .env."""
     return (os.environ.get(name) or _env_file().get(name) or default).strip()
 
 
@@ -92,12 +102,20 @@ def available() -> bool:
     return bool(_setting(KEY_VAR))
 
 
+GUI_VAR = "REPO_SCOUT_GUI_DRAFT"  # eval gate failed (Draft found 24 vs agent 28, eval/BASELINE.md Phase 9): opt-in
+
+
+def gui_enabled() -> bool:
+    """GUI button only on explicit opt-in; `repo-scout draft` needs just the key."""
+    return available() and _setting(GUI_VAR) in ("1", "true", "yes")
+
+
 def model() -> str:
     return _setting(MODEL_VAR, DEFAULT_MODEL)
 
 
 def _post(messages: list[dict]) -> dict:
-    """POST {base}/chat/completions; в ошибках только статус, без ключа и тела запроса."""
+    """POST {base}/chat/completions; errors show status only, no key or payload."""
     key = _setting(KEY_VAR)
     if not key:
         raise LLMError(NO_KEY)
@@ -108,22 +126,22 @@ def _post(messages: list[dict]) -> dict:
         with _OPENER.open(req, timeout=TIMEOUT_S) as resp:
             data = json.load(resp)
     except urllib.error.HTTPError as e:
-        raise LLMError(f"LLM ответила ошибкой HTTP {e.code}; проверьте {KEY_VAR} и {MODEL_VAR}") from None
-    except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException):
-        raise LLMError(f"LLM недоступна ({_setting(URL_VAR, DEFAULT_URL)}): нет ответа за {TIMEOUT_S} с") from None
+        raise LLMError(f"LLM returned HTTP error {e.code}; check {KEY_VAR} and {MODEL_VAR}") from None
+    except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException) as e:
+        raise LLMError(f"LLM unavailable ({_setting(URL_VAR, DEFAULT_URL)}): {_why(e)}") from None
     except ValueError:
-        raise LLMError("LLM вернула не JSON") from None
+        raise LLMError("LLM response was not JSON") from None
     if not isinstance(data, dict):
-        raise LLMError("LLM вернула ответ неожиданной формы")
+        raise LLMError("LLM returned unexpected response format")
     return data
 
 
 def _tokens(response: dict) -> int:
-    """total_tokens из usage; кривой usage не роняет Черновик."""
+    """Extract total_tokens from usage; malformed usage does not fail draft."""
     try:
         return int((response.get("usage") or {}).get("total_tokens") or 0)
     except (AttributeError, TypeError, ValueError, OverflowError):
-        log.warning("Черновик LLM: usage неожиданной формы, токены считаем нулём")
+        log.warning("LLM draft: unexpected usage format, treating tokens as 0")
         return 0
 
 
@@ -136,14 +154,13 @@ def _snapshot_path(messages: list[dict]) -> Path | None:
 
 
 def _chat(messages: list[dict], pending: list | None = None) -> str:
-    """Текст ответа модели. В record новые ответы не пишутся сразу, а ставятся в `pending`:
-    их сохранит draft() только после успешной проверки."""
+    """Model response text. In record mode, responses are queued in `pending` and written after validation."""
     mode, _ = github.snapshot()
     path = _snapshot_path(messages)
     if path and path.exists():
         rec = github._read(path)
     elif mode == "replay":
-        raise LLMError(f"нет снапшота ответа LLM {path.name} (--record)")
+        raise LLMError(f"missing LLM response snapshot {path.name} (--record)")
     else:
         started = time.monotonic()
         rec = {"response": _post(messages), "seconds": round(time.monotonic() - started, 2)}
@@ -157,14 +174,14 @@ def _chat(messages: list[dict], pending: list | None = None) -> str:
         text = response["choices"][0]["message"]["content"] or ""
         tokens = _tokens(response)
     except (KeyError, IndexError, TypeError, ValueError, AttributeError):
-        raise LLMError("LLM вернула ответ неожиданной формы") from None
+        raise LLMError("LLM returned unexpected response format") from None
     last_stats["tokens"] = last_stats.get("tokens", 0) + tokens
     last_stats["seconds"] = round(last_stats.get("seconds", 0) + seconds, 2)
     return text
 
 
 def _json_object(text: str) -> dict:
-    """JSON из текста, в том числе из блока ```json или с лишней болтовнёй вокруг."""
+    """Extract JSON object from text, including markdown fences or surrounding chatter."""
     fenced = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
     for chunk in ([fenced.group(1)] if fenced else []) + [text, text[text.find("{"):text.rfind("}") + 1]]:
         try:
@@ -173,18 +190,18 @@ def _json_object(text: str) -> dict:
             continue
         if isinstance(data, dict):
             return data
-    raise ValueError("ответ не содержит JSON-объект")
+    raise ValueError("response does not contain a JSON object")
 
 
 def _strings(data: dict, key: str, limit: int, chars: int) -> tuple[str, ...]:
     value = data.get(key) or []
     if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
-        raise ValueError(f"поле {key} должно быть списком строк")
+        raise ValueError(f"field {key} must be a list of strings")
     items = tuple(dict.fromkeys(v.strip() for v in value if v.strip()))
     if len(items) > limit:
-        raise ValueError(f"поле {key}: {len(items)} элементов, максимум {limit}")
+        raise ValueError(f"field {key}: {len(items)} items, maximum {limit}")
     if long := next((v for v in items if len(v) > chars), None):
-        raise ValueError(f"поле {key}: элемент длиннее {chars} символов: {long[:40]!r}")
+        raise ValueError(f"field {key}: item longer than {chars} characters: {long[:40]!r}")
     return items
 
 
@@ -196,12 +213,12 @@ def _lang(value) -> str | None:
     if value is None:
         return None
     if not isinstance(value, str):
-        raise ValueError("поле lang должно быть строкой или null")
+        raise ValueError("field lang must be a string or null")
     value = value.strip()
     if value.lower() in NO_LANG:
         return None
     if not LANG_RE.fullmatch(value):
-        raise ValueError(f"поле lang должно быть одним названием языка, получено {value[:40]!r}")
+        raise ValueError(f"field lang must be a single language name, got {value[:40]!r}")
     return value
 
 
@@ -210,9 +227,9 @@ def _quantified(pattern: str, i: int) -> bool:
 
 
 def reject_nested_quantifiers(field: str, patterns: tuple[str, ...]) -> None:
-    """Группа с квантификатором внутри и квантификатором снаружи, например `(\\w+\\s?)+`: ReDoS."""
+    """Reject patterns with nested quantifiers (e.g. `(\\w+\\s?)+`) to avoid ReDoS."""
     for pat in patterns:
-        stack, in_class, i = [False], False, 0  # stack: есть ли квантификатор внутри открытой группы
+        stack, in_class, i = [False], False, 0  # stack: track quantifier inside open group
         while i < len(pat):
             c = pat[i]
             if c == "\\":
@@ -226,7 +243,7 @@ def reject_nested_quantifiers(field: str, patterns: tuple[str, ...]) -> None:
             elif c == ")" and len(stack) > 1:
                 inner = stack.pop()
                 if inner and _quantified(pat, i + 1):
-                    raise ValueError(f"поле {field}: вложенные квантификаторы в {pat[:40]!r} (риск ReDoS)")
+                    raise ValueError(f"field {field}: nested quantifiers in {pat[:40]!r} (ReDoS risk)")
                 stack[-1] = stack[-1] or inner or _quantified(pat, i + 1)
             elif c in "+*{":
                 stack[-1] = True
@@ -234,18 +251,18 @@ def reject_nested_quantifiers(field: str, patterns: tuple[str, ...]) -> None:
 
 
 def parse_draft(text: str) -> Draft:
-    """Проверенный Черновик из ответа модели; нарушение — ValueError с причиной."""
-    from repo_scout.cli import validate_query  # поздний импорт: cli вызывает llm лениво
+    """Validate draft from model response; raises ValueError on violation."""
+    from repo_scout.cli import validate_query  # lazy import: cli calls llm lazily
 
     data = _json_object(text)
     task = data.get("task")
     if not isinstance(task, str) or not task.strip():
-        raise ValueError("поле task должно быть непустой строкой")
+        raise ValueError("field task must be a non-empty string")
     if len(task.strip()) > MAX_TASK_CHARS:
-        raise ValueError(f"поле task длиннее {MAX_TASK_CHARS} символов")
+        raise ValueError(f"field task longer than {MAX_TASK_CHARS} characters")
     queries = _strings(data, "queries", MAX_QUERIES, MAX_QUERY_CHARS)
     if not queries:
-        raise ValueError("поле queries пусто")
+        raise ValueError("field queries is empty")
     for q in queries:
         validate_query(q)
     must, exclude = (_strings(data, k, MAX_REGEXES, MAX_QUERY_CHARS) for k in ("must", "exclude"))
@@ -255,14 +272,14 @@ def parse_draft(text: str) -> Draft:
 
 
 def draft(need: str) -> Draft:
-    """Черновик по Потребности. Невалидный ответ: один повтор с текстом ошибки, потом LLMError."""
+    """Generate draft from need. Retries once with error explanation before raising LLMError."""
     need = need.strip()
     if not need:
-        raise LLMError("опишите, что ищем")
+        raise LLMError("describe what you are looking for")
     last_stats.clear()
     messages = [{"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": f"Need:\n{need[:MAX_NEED_CHARS]}"}]
-    pending: list = []  # снапшоты record: пишем только после успешной проверки
+    pending: list = []  # queued snapshots: written only after successful validation
     for attempt in (1, 2):
         reply = _chat(messages, pending)
         try:
@@ -271,9 +288,9 @@ def draft(need: str) -> Draft:
                 github._write(path, rec)
             return result
         except ValueError as e:
-            log.info("Черновик LLM: ответ не прошёл проверку (попытка %d): %s", attempt, e)
+            log.info("LLM draft: response validation failed (attempt %d): %s", attempt, e)
             if attempt == 2:
-                raise LLMError(f"LLM дважды вернула непригодный ответ: {e}") from e
+                raise LLMError(f"LLM returned invalid response twice: {e}") from e
             messages += [{"role": "assistant", "content": reply},
                          {"role": "user", "content": f"Invalid: {e}. Reply with the corrected JSON object only."}]
     raise AssertionError("unreachable")

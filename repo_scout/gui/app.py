@@ -1,4 +1,4 @@
-"""GUI repo-scout на NiceGUI: `repo-scout` без аргументов или `repo-scout gui [--port 8790]`."""
+"""NiceGUI interface for repo-scout: `repo-scout` without arguments or `repo-scout gui [--port 8790]`."""
 import argparse
 import os
 import sys
@@ -38,9 +38,9 @@ def main(argv: list[str] | None = None) -> None:
     theme.apply_theme()
     register_pages()
     app.on_shutdown(_stop)
-    # reload=False: страницы регистрируются в этом процессе, поэтому literal-guard NiceGUI
-    # (`__name__ in {"__main__", "__mp_main__"}`) не нужен: main() вызывается из консольной команды
-    ui.run(host=portmod.HOST, port=port, reload=False, language="ru", show=False, title="repo-scout")
+    # reload=False: pages are registered in this process, so NiceGUI literal-guard
+    # (`__name__ in {"__main__", "__mp_main__"}`) is not needed: main() is called from CLI command
+    ui.run(host=portmod.HOST, port=port, reload=False, language="en", show=False, title="repo-scout")
 
 
 if __name__ in {"__main__", "__mp_main__"}:  # python -m repo_scout.gui.app

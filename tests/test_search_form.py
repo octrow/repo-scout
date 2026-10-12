@@ -40,7 +40,7 @@ def test_out_path_in_runs_dir() -> None:
 
 
 def test_form_errors() -> None:
-    assert sf.form_errors(sf.default_state()) == ["Опишите задачу", "Добавьте хотя бы один запрос"]
+    assert sf.form_errors(sf.default_state()) == ["Task description is required", "Add at least one query"]
     assert sf.form_errors(_state(must="(")) and "--must" in sf.form_errors(_state(must="("))[0]
     assert sf.form_errors(_state()) == []
 
@@ -52,7 +52,7 @@ def test_check_queries_reports_operator_overflow() -> None:
 
 def test_agent_prompt_has_task_and_one_line_rule() -> None:
     p = sf.agent_prompt("  my task ")
-    assert "my task" in p and "ОДНОЙ строкой" in p and "stars:" in p
+    assert "my task" in p and "ONE line" in p and "stars:" in p
 
 
 def test_drafts_from_runs_and_eval(tmp_path: Path) -> None:

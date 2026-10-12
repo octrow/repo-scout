@@ -12,16 +12,16 @@ def test_one_signal_passes():
 
 def test_two_signals_stop_with_sources():
     stop = noise_stop(node("o/awesome-llm", "A curated list of tools", ["tools"]))
-    assert stop == "шум (awesome: имя, описание)"
+    assert stop == "noise (awesome: name, description)"
 
 
 def test_topics_count_as_signal():
-    assert noise_stop(node("o/my-demo", "x", ["demo"])) == "шум (demo: имя, topics)"
+    assert noise_stop(node("o/my-demo", "x", ["demo"])) == "noise (demo: name, topics)"
 
 
 def test_homework_and_spam():
-    assert noise_stop(node("o/os-homework", "university assignment")).startswith("шум (homework")
-    assert noise_stop(node("o/keygen-pro", "guaranteed passive income")).startswith("шум (spam")
+    assert noise_stop(node("o/os-homework", "university assignment")).startswith("noise (homework")
+    assert noise_stop(node("o/keygen-pro", "guaranteed passive income")).startswith("noise (spam")
 
 
 def test_poc_is_a_word_not_substring():
@@ -30,7 +30,7 @@ def test_poc_is_a_word_not_substring():
 
 def test_template_is_flag_and_still_noise_if_noisy():
     n = node("o/awesome-boilerplates", "A curated list of boilerplates", ["awesome-list"])
-    assert is_template(n) and noise_stop(n).startswith("шум (awesome")
+    assert is_template(n) and noise_stop(n).startswith("noise (awesome")
     assert is_template(node(template=True))
     assert not is_template(node("o/tool", "does things"))
     assert noise_stop(node("o/starter-app", "a starter kit")) is None

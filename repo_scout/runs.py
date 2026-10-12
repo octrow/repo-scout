@@ -1,4 +1,4 @@
-"""Прогоны: один запуск поиска целиком (параметры, второй круг, все строки), JSON-файл на Прогон."""
+"""Runs: a complete single search run (parameters, round two, all rows), saved as a JSON file."""
 import json
 import os
 import re
@@ -19,7 +19,7 @@ class Summary:
     project: str | None = None
     n_total: int = 0
     n_kept: int = 0
-    error: str | None = None  # у битого файла — причина, остальные поля пустые
+    error: str | None = None  # corrupt file stores error reason, other fields remain empty
 
 
 def runs_dir() -> Path:
@@ -39,7 +39,7 @@ def free_path(base: Path) -> Path:
 
 
 def save(params: dict, rows: list[dict], round2_topics: list[str], now: datetime, path: Path | None = None) -> Path:
-    """Пишет Прогон (все строки, включая отсеянные). `path` задан — пишет туда, иначе в каталог Прогонов."""
+    """Save a Run (all rows, including dropped). Writes to `path` if specified, else runs directory."""
     if path is None:
         name = f"{now.strftime('%Y%m%d-%H%M%S')}-{slug(params.get('task') or '')}.json"
         path = free_path(runs_dir() / name)
@@ -54,28 +54,28 @@ def load(path: Path) -> dict:
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
-        raise ValueError(f"{path}: битый JSON: {e}") from e
+        raise ValueError(f"{path}: corrupt JSON: {e}") from e
     if not isinstance(data, dict) or data.get("version") != VERSION:
-        raise ValueError(f"{path}: неподдерживаемая версия Прогона")
+        raise ValueError(f"{path}: unsupported Run version")
     if missing := [k for k in REQUIRED if k not in data]:
-        raise ValueError(f"{path}: нет ключей {', '.join(missing)}")
+        raise ValueError(f"{path}: missing keys {', '.join(missing)}")
     topics = data["round2_topics"]
     if not (isinstance(data["params"], dict) and isinstance(data["rows"], list)
             and all(isinstance(r, dict) for r in data["rows"])
             and isinstance(topics, list) and all(isinstance(t, str) for t in topics)):
-        raise ValueError(f"{path}: неверная структура Прогона")
+        raise ValueError(f"{path}: invalid Run structure")
     return data
 
 
 def list_runs() -> list[Summary]:
-    """Сводки Прогонов, новые первыми; битый файл — запись с `error`, без исключения."""
+    """Run summaries, newest first; corrupt files recorded with `error` without raising."""
     if not runs_dir().is_dir():
         return []
     out = []
     for p in sorted(runs_dir().glob("*.json"), reverse=True):
         try:
             d = load(p)
-        except (ValueError, OSError) as e:  # ValueError включает JSONDecodeError
+        except (ValueError, OSError) as e:
             out.append(Summary(p, error=str(e)))
             continue
         params = d["params"]

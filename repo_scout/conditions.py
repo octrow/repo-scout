@@ -1,4 +1,4 @@
-"""Жёсткие условия: язык, запрещённые и обязательные слова. Нарушение возвращает причину стопа."""
+"""Hard conditions: language, forbidden and required words. Violations return a stop reason."""
 import re
 
 MATCH_SHOWN = 40
@@ -6,7 +6,7 @@ MATCH_SHOWN = 40
 
 def lang_stop(row: dict, lang: str | None) -> str | None:
     if lang and row["lang"] and row["lang"].lower() != lang.lower():
-        return f"не тот язык ({row['lang']})"
+        return f"wrong language ({row['lang']})"
     return None
 
 
@@ -15,7 +15,7 @@ def meta_text(row: dict) -> str:
 
 
 def compile_all(flag: str, patterns: list[str]) -> list[re.Pattern]:
-    """Скомпилировать регэкспы (без учёта регистра) до сетевых вызовов; ошибка -> ValueError."""
+    """Compile regexes (case-insensitive) before network calls; errors raise ValueError."""
     out = []
     for p in patterns:
         try:
@@ -28,13 +28,13 @@ def compile_all(flag: str, patterns: list[str]) -> list[re.Pattern]:
 def exclude_stop(text: str, patterns: list[re.Pattern]) -> str | None:
     for p in patterns:
         if m := p.search(text):
-            return f"запрещено: {m.group(0)[:MATCH_SHOWN]}"
+            return f"forbidden: {m.group(0)[:MATCH_SHOWN]}"
     return None
 
 
 def must_stop(text: str, groups: list[re.Pattern]) -> str | None:
-    """Все группы должны найтись в тексте."""
+    """All groups must be present in the text."""
     for g in groups:
         if not g.search(text):
-            return f"нет обязательного: {g.pattern}"
+            return f"missing required: {g.pattern}"
     return None

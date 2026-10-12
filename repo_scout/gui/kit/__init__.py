@@ -1,1 +1,1 @@
-"""Копия nicegui-kit, см. VENDORED.md."""  # repo-scout: докстринг заменён
+"""Vendored copy of nicegui-kit, see VENDORED.md."""

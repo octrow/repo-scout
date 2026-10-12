@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from nicegui import ui
 
-DEFAULT_EMPTY_TEXT = "ничего не найдено."
+DEFAULT_EMPTY_TEXT = "nothing found."
 
 
 @dataclass

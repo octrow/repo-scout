@@ -1,4 +1,4 @@
-"""Прогон из CLI, parse_command / to_argv, python -m repo_scout."""
+"""Run from CLI, parse_command / to_argv, python -m repo_scout."""
 import shlex
 import subprocess
 import sys
@@ -8,9 +8,9 @@ import pytest
 from repo_scout import cli, runs
 
 ROW = {"repo": "a/b", "stop": None, "url": "u", "score": 1, "fresh": 1, "pop": 0, "stars": 1, "forks": 0,
-       "commits": 1, "pushed_days": 1, "created": "2020", "lang": "Py", "desc": "d", "source": "запрос",
+       "commits": 1, "pushed_days": 1, "created": "2020", "lang": "Py", "desc": "d", "source": "query",
        "flags": [], "closeness": 0.9}
-DROPPED = {**ROW, "repo": "c/d", "stop": "мёртвый"}
+DROPPED = {**ROW, "repo": "c/d", "stop": "dead"}
 
 
 def _argv(*extra):

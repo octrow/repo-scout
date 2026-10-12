@@ -1,7 +1,7 @@
-"""Шаг 1 из docs/repo-triage.md: найти репо на GitHub, применить стоп-правила, посчитать баллы.
+"""Step 1 from docs/repo-triage.md: search GitHub repos, apply stop rules, compute scores.
 
 Usage: repo-scout --task "<English task description>" "query one" "query two" [--min-closeness 0.6] [--months 6] [--new-days 60] [--limit 50] [--lang X] [--exclude RE] [--must RE] [--no-round2] [--round2-k 10] [--stars-k 10] [--no-stars-check] [--all] [--json]
-Each query is GitHub search syntax (language:python, topic:x ...). Needs an authenticated `gh`.
+Each query uses GitHub search syntax (language:python, topic:x ...). Requires an authenticated `gh`.
 """
 import argparse
 import json
@@ -14,7 +14,7 @@ import numpy as np
 
 from repo_scout import github, runs, semantic, stars
 from repo_scout import log as logmod
-from repo_scout.command import parse_command, search_params, to_argv  # noqa: F401  (реэкспорт)
+from repo_scout.command import parse_command, search_params, to_argv  # noqa: F401  (re-export)
 from repo_scout.commits import last_substantive
 from repo_scout.conditions import (
     compile_all,
@@ -34,10 +34,10 @@ MAX_TEXT_CHARS, MAX_OPERATORS = 256, 5
 TOKEN = re.compile(r'-?[\w-]+:"[^"]*"|"[^"]*"|\S+')
 QUALIFIER = re.compile(r"-?[A-Za-z-]+:(?!//).+")
 OPERATORS = {"AND", "OR", "NOT"}
-MUST_STOP = "нет обязательного"
+MUST_STOP = "missing required"
 STARS_K = 10
-FROM_INDEX = 50  # сколько ближайших из Индекса добавлять в Пул
-last_round2_topics: list[str] = []  # слаги второго круга последнего run(); для сохранения в Прогон
+FROM_INDEX = 50  # number of closest repos from Index to add to pool
+last_round2_topics: list[str] = []  # round two slugs from last run(); saved to Run
 
 
 def _has(tokens: list[str], name: str) -> bool:
@@ -47,7 +47,7 @@ def _has(tokens: list[str], name: str) -> bool:
 def build_query(q: str, *, months: int, since: str, lang: str | None) -> str:
     tokens = TOKEN.findall(q)
     parts = [q]
-    if not _has(tokens, "in") and not all(QUALIFIER.fullmatch(t) for t in tokens):  # `in:` относится к тексту
+    if not _has(tokens, "in") and not all(QUALIFIER.fullmatch(t) for t in tokens):
         parts.append("in:name,description,topics,readme")
     if not _has(tokens, "mirror"):
         parts.append("mirror:false")
@@ -62,10 +62,10 @@ def validate_query(q: str) -> None:
     tokens = TOKEN.findall(q)
     text = " ".join(t for t in tokens if not QUALIFIER.fullmatch(t))
     if len(text) > MAX_TEXT_CHARS:
-        raise ValueError(f"запрос {q!r}: текст без квалификаторов {len(text)} символов, лимит GitHub {MAX_TEXT_CHARS}")
+        raise ValueError(f"query {q!r}: text without qualifiers is {len(text)} chars, GitHub limit is {MAX_TEXT_CHARS}")
     ops = sum(t in OPERATORS for t in tokens)
     if ops > MAX_OPERATORS:
-        raise ValueError(f"запрос {q!r}: {ops} операторов AND/OR/NOT, лимит GitHub {MAX_OPERATORS}")
+        raise ValueError(f"query {q!r}: {ops} AND/OR/NOT operators, GitHub limit is {MAX_OPERATORS}")
 
 
 def _fmt_close(r: dict) -> str:
@@ -73,9 +73,9 @@ def _fmt_close(r: dict) -> str:
 
 
 def to_markdown(rows: list[dict]) -> str:
-    head = "| близ | источник | баллы | repo | ★ | forks | комм | push, дн | создан | язык | флаги / отсев | уже смотрели | описание |\n" + "|---" * 13 + "|"
+    head = "| close | source | score | repo | ★ | forks | commits | pushed, d | created | lang | flags / stop | seen | desc |\n" + "|---" * 13 + "|"
     lines = [
-        f"| {_fmt_close(r)} | {r['source']} | {r['score']} (свеж {r['fresh']}, поп {r['pop']}) | [{r['repo']}]({r['url']}) | {r['stars']} | {r['forks']} "
+        f"| {_fmt_close(r)} | {r['source']} | {r['score']} (fresh {r['fresh']}, pop {r['pop']}) | [{r['repo']}]({r['url']}) | {r['stars']} | {r['forks']} "
         f"| {r['commits']} | {r['pushed_days']} | {r['created']} | {r['lang']} "
         f"| {verdict(r)} | {r.get('seen') or '—'} "
         f"| {r['desc'][:120]} |"
@@ -90,11 +90,11 @@ def _stop(row: dict, reason: str | None) -> None:
 
 
 def _screen_meta(rows: list[dict], nodes: dict, lang: str | None, exclude: list[re.Pattern]) -> None:
-    """Шум, шаблон, язык и запрещённые слова по метаданным."""
+    """Noise, template, language, and forbidden words based on metadata."""
     for row in filter(lambda r: not r["stop"], rows):
         node = nodes[row["repo"]]
         if is_template(node):
-            row["flags"].append("шаблон")
+            row["flags"].append("template")
         _stop(row, noise_stop(node))
         _stop(row, lang_stop(row, lang))
         _stop(row, exclude_stop(meta_text(row), exclude))
@@ -103,7 +103,7 @@ def _screen_meta(rows: list[dict], nodes: dict, lang: str | None, exclude: list[
 def _screen_details(rows: list[dict], nodes: dict, now: datetime, new_days: int,
                     exclude: list[re.Pattern], must: list[re.Pattern],
                     known: dict[str, dict]) -> dict[str, str | None]:
-    """README и коммиты выживших: пересчёт свежести, запрещённые и обязательные слова. Возвращает README."""
+    """README and commits for survivors: freshness recheck, forbidden and required words. Returns READMEs."""
     readmes: dict[str, str | None] = {}
     alive = [r for r in rows if not r["stop"]]
     names = [r["repo"] for r in alive]
@@ -112,17 +112,17 @@ def _screen_details(rows: list[dict], nodes: dict, now: datetime, new_days: int,
     for row in alive:
         d = info.get(row["repo"])
         if d is None:
-            row["flags"].append("нет деталей")
+            row["flags"].append("no details")
             continue
         if found := last_substantive(d["commits"], now):
             date, cosmetic_only = found
             new = triage(nodes[row["repo"]], now, new_days, last_push=date)
             row.update({k: new[k] for k in ("pushed_days", "fresh", "score", "stop")})
             if cosmetic_only:
-                row["flags"].append("только косметика")
+                row["flags"].append("cosmetic only")
         readme = readmes[row["repo"]] = d["readme"]
         if readme is None:
-            row["flags"].append("нет README")
+            row["flags"].append("no README")
         _stop(row, exclude_stop(readme or "", exclude))
         if readme is not None:
             _stop(row, must_stop(" ".join([readme, meta_text(row)]), must))
@@ -130,11 +130,11 @@ def _screen_details(rows: list[dict], nodes: dict, now: datetime, new_days: int,
 
 
 def add_closeness(rows: list[dict], readmes: dict[str, str | None], task: str) -> dict[str, np.ndarray]:
-    """Близость строкам, не отсеянным к этому моменту (нет README: имя, описание, topics). Возвращает векторы."""
+    """Compute closeness for non-dropped rows (name, desc, topics if no README). Returns vectors."""
     todo = [r for r in rows if not r["stop"]]
     if not todo:
         return {}
-    log.info("Близость: эмбеддинг %d кандидатов", len(todo))
+    log.info("closeness: embedding %d candidates", len(todo))
     docs = semantic.embed_docs([semantic.candidate_text(r, readmes.get(r["repo"])) for r in todo])
     for r, c in zip(todo, semantic.closeness(semantic.embed_task(task), docs)):
         r["closeness"] = float(c)
@@ -142,13 +142,13 @@ def add_closeness(rows: list[dict], readmes: dict[str, str | None], task: str) -
 
 
 def _from_index(index: Index, task: str, nodes: dict, n: int) -> dict[str, dict]:
-    """Топ-n из Индекса, которых нет в живой выдаче: свежие метаданные и детали одним пакетным запросом."""
+    """Top-n from Index not in live results: fresh metadata and details via a single batch request."""
     live = {k.lower() for k in nodes}
     wanted = [m for m in index.top(task, n) if m.lower() not in live]
     fresh = github.refresh(wanted)
     for name in wanted:
         if name not in fresh and name not in github.last_failed:
-            index.forget(name)  # удалено на GitHub
+            index.forget(name)  # deleted on GitHub
         elif (new := fresh[name]["node"]["nameWithOwner"]).lower() != name.lower():
             index.rename(name, new)
     for d in fresh.values():
@@ -159,7 +159,7 @@ def _from_index(index: Index, task: str, nodes: dict, n: int) -> dict[str, dict]
 def apply_closeness(rows: list[dict], min_closeness: float) -> None:
     for r in rows:
         if r.get("closeness") is not None and r["closeness"] < min_closeness:
-            _stop(r, f"не по теме ({r['closeness']:.2f})")
+            _stop(r, f"off-topic ({r['closeness']:.2f})")
 
 
 def sort_key(r: dict) -> tuple:
@@ -170,11 +170,11 @@ def sort_key(r: dict) -> tuple:
 def _process(nodes: dict, live: set[str], source: str, *, now: datetime, new_days: int, lang: str | None,
              exclude: list[re.Pattern], must: list[re.Pattern], task: str | None, min_closeness: float,
              index: Index | None, known: dict[str, dict]) -> list[dict]:
-    """Конвейер для набора узлов: триаж, шум, условия, детали, Близость, порог, запись в Индекс."""
-    log.info("конвейер (%s): %d кандидатов", source, len(nodes))
+    """Pipeline for a set of nodes: triage, noise, conditions, details, closeness, threshold, index upsert."""
+    log.info("pipeline (%s): %d candidates", source, len(nodes))
     rows = [triage(n, now, new_days) for n in nodes.values()]
     for r in rows:
-        r["source"] = source if r["repo"] in live else "индекс"
+        r["source"] = source if r["repo"] in live else "index"
     _screen_meta(rows, nodes, lang, exclude)
     readmes = _screen_details(rows, nodes, now, new_days, exclude, must, known)
     if task:
@@ -194,12 +194,12 @@ def _search_all(queries: list[str], *, months: int, since: str, lang: str | None
         found = github.search(full, min(limit, 100))
         for r in found:
             into.setdefault(r["nameWithOwner"], r)
-        log.info("поиск %d/%d: %s → %d (пул %d)", i, len(queries), q, len(found), len(into))
+        log.info("search %d/%d: %s → %d (pool %d)", i, len(queries), q, len(found), len(into))
 
 
 def _round2(rows: list[dict], queries: list[str], pool: dict, *, k: int, floor: float, lang: str | None,
             months: int, since: str, limit: int) -> tuple[dict, list[str]]:
-    """Новые узлы по `topic:`-Запросам из топ-k прошедших строк (Близость не ниже floor)."""
+    """New nodes via `topic:` queries from top-k surviving rows (closeness not below floor)."""
     top = sorted((r for r in rows if not r["stop"] and (r.get("closeness") or 0) >= floor), key=sort_key)[:k]
     topics = pick_topics(top, queries)
     found: dict = {}
@@ -212,7 +212,7 @@ def run(queries: list[str], *, months: int, new_days: int, limit: int, lang: str
         exclude: list[re.Pattern] = (), must: list[re.Pattern] = (), task: str | None = None,
         min_closeness: float = semantic.MIN_CLOSENESS, index: Index | None = None,
         from_index: int = FROM_INDEX, round2: bool = True, round2_k: int = ROUND2_K, stars_k: int = 0) -> list[dict]:
-    """Все строки триажа (включая отсеянные), отсортированы по Близости, потом по баллам."""
+    """All triage rows (including dropped), sorted by closeness, then score."""
     global last_round2_topics
     last_round2_topics = []
     since = (now - timedelta(days=30 * months)).date().isoformat()
@@ -222,13 +222,13 @@ def run(queries: list[str], *, months: int, new_days: int, limit: int, lang: str
     known = _from_index(index, task, nodes, from_index) if index and task and from_index else {}
     kw = {"now": now, "new_days": new_days, "lang": lang, "exclude": list(exclude), "must": list(must),
           "task": task, "min_closeness": min_closeness, "index": index}
-    rows = _process(nodes, live, "запрос", known=known, **kw)
+    rows = _process(nodes, live, "query", known=known, **kw)
     if task and round2:
         extra, topics = _round2(rows, queries, nodes, k=round2_k, floor=max(min_closeness, semantic.MIN_CLOSENESS),
                                 lang=lang, months=months, since=since, limit=limit)
         last_round2_topics = topics
-        log.info("второй круг: topics %s → новых %d", ", ".join(topics) or "—", len(extra))
-        rows += _process(extra, set(extra), "второй круг", known={}, **kw)
+        log.info("round two: topics %s → %d new", ", ".join(topics) or "—", len(extra))
+        rows += _process(extra, set(extra), "round two", known={}, **kw)
     if index:
         seen = index.seen([r["repo"] for r in rows])
         for r in rows:
@@ -239,20 +239,20 @@ def run(queries: list[str], *, months: int, new_days: int, limit: int, lang: str
 
 
 def add_stars_flag(rows: list[dict], k: int, now: datetime) -> None:
-    """Флаг «всплеск★» топ-k выжившим строкам с ≥50★ (после Близости; баллы не меняет)."""
+    """'burst★' flag for top-k surviving rows with >=50★ (after closeness; does not alter score)."""
     top = [r for r in rows if not r["stop"] and r["stars"] >= stars.MIN_STARS][:k]
     for r in top:
         try:
             text = stars.flag(stars.history(r["repo"], now))
-        except GitHubError as e:  # флаг вторичен: сбой не должен ронять прогон
-            log.warning("предупреждение: флаг «всплеск★» для %s пропущен: %s", r["repo"], e)
+        except GitHubError as e:
+            log.warning("warning: 'burst★' flag for %s skipped: %s", r["repo"], e)
             continue
         if text:
             r["flags"].append(text)
 
 
 def draft_params(d, need: str) -> dict:
-    """Параметры поиска из Черновика LLM (остальное по умолчанию парсера)."""
+    """Search parameters from LLM draft (remaining values default to parser defaults)."""
     params = search_params(_parser().parse_args(["--task", "x", "q"]))
     params.update(task=d.task, queries=list(d.queries), must=list(d.must), exclude=list(d.exclude),
                   lang=d.lang, need=need.strip())
@@ -262,25 +262,25 @@ def draft_params(d, need: str) -> dict:
 def verdict_main(argv: list[str]) -> None:
     ap = argparse.ArgumentParser(prog="repo-scout verdict")
     ap.add_argument("repo", metavar="owner/repo")
-    ap.add_argument("verdict", help="«→ Осмотр», «→ Разбор (цель)», «отсев (причина)», «спорно (что уточнить)»")
+    ap.add_argument("verdict", help="'→ Inspect', '→ Study (goal)', 'drop (reason)', 'doubt (details)'")
     ap.add_argument("--project", required=True)
-    ap.add_argument("--task", required=True, help="кратко, о какой задаче проекта")
+    ap.add_argument("--task", required=True, help="short project task description")
     a = ap.parse_args(argv)
     try:
         validate_verdict(a.repo, a.verdict, a.project, a.task)
     except ValueError as e:
         sys.exit(f"verdict: {e}")
     Index(default_path()).add_verdict(a.repo, a.verdict, a.project, a.task)
-    print(f"записано: {a.repo} — {a.verdict} ({a.project})")
+    print(f"recorded: {a.repo} — {a.verdict} ({a.project})")
 
 
 def draft_main(argv: list[str]) -> None:
-    """`repo-scout draft "<потребность>"`: Черновик LLM одной строкой `repo-scout …`."""
+    """`repo-scout draft "<need>"`: LLM draft output as a single runnable `repo-scout …` command."""
     import shlex
 
     from repo_scout import llm
     ap = argparse.ArgumentParser(prog="repo-scout draft")
-    ap.add_argument("need", help="Потребность своими словами, на любом языке")
+    ap.add_argument("need", help="User need in natural language (any language)")
     a = ap.parse_args(argv)
     if not llm.available():
         sys.exit(f"draft: {llm.NO_KEY}")
@@ -292,12 +292,13 @@ def draft_main(argv: list[str]) -> None:
     print(shlex.join(["repo-scout", *to_argv(draft_params(d, a.need))]))
 
 
+@logmod.logged_exit
 def main() -> None:
     if sys.argv[1:2] == ["eval"]:
         from repo_scout import evaluate
         return evaluate.main(sys.argv[2:])
-    if sys.argv[1:2] == ["gui"] or not sys.argv[1:]:  # без аргументов — GUI
-        from repo_scout.gui import app  # лениво: CLI не импортирует nicegui
+    if sys.argv[1:2] == ["gui"] or not sys.argv[1:]:
+        from repo_scout.gui import app
         return app.main(sys.argv[2:])
     if sys.argv[1:2] == ["verdict"]:
         return verdict_main(sys.argv[2:])
@@ -309,7 +310,7 @@ def main() -> None:
 
 
 class _Parser(argparse.ArgumentParser):
-    raise_errors = False  # parse_command: ошибки — ValueError, без SystemExit и stderr
+    raise_errors = False  # parse_command: errors raise ValueError without SystemExit or stderr
 
     def error(self, message: str):
         if self.raise_errors:
@@ -321,35 +322,35 @@ def _parser() -> argparse.ArgumentParser:
     ap = _Parser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("queries", nargs="+")
     ap.add_argument("--task", required=True, metavar="TEXT",
-                    help="Описание задачи (1-3 фразы на английском): по нему считается Близость")
+                    help="Task description (1-3 sentences in English): used to compute closeness")
     ap.add_argument("--min-closeness", type=float, default=semantic.MIN_CLOSENESS, metavar="FLOAT",
-                    help="ниже порога Близости: стоп «не по теме» (по умолчанию %(default)s)")
-    ap.add_argument("--months", type=int, default=6, help="только репо с push за N месяцев (0 = без фильтра)")
-    ap.add_argument("--new-days", type=int, default=60, help="флаг «новый» для репо младше N дней")
-    ap.add_argument("--limit", type=int, default=50, help="результатов на запрос (макс 100)")
-    ap.add_argument("--lang", help="добавить language:<X> к каждому запросу")
+                    help="closeness threshold: rows below are stopped as 'off-topic' (default %(default)s)")
+    ap.add_argument("--months", type=int, default=6, help="only repos with push within N months (0 = no filter)")
+    ap.add_argument("--new-days", type=int, default=60, help="'new' flag for repos younger than N days")
+    ap.add_argument("--limit", type=int, default=50, help="results per query (max 100)")
+    ap.add_argument("--lang", help="add language:<X> to each query")
     ap.add_argument("--exclude", action="append", default=[], metavar="REGEX",
-                    help="отсев, если REGEX найден в имени, описании, topics или README (можно повторять)")
+                    help="drop if REGEX found in name, description, topics, or README (repeatable)")
     ap.add_argument("--must", action="append", default=[], metavar="REGEX",
-                    help="группа обязательных слов в README, topics, описании; нужны все группы (можно повторять)")
+                    help="required word group in README, topics, or description; all groups must match (repeatable)")
     ap.add_argument("--from-index", type=int, default=FROM_INDEX, metavar="N",
-                    help="добавить в Пул N ближайших из Индекса (0 = выключить, по умолчанию %(default)s)")
+                    help="add N closest repos from Index to pool (0 = disable, default %(default)s)")
     ap.add_argument("--round2-k", type=int, default=ROUND2_K, metavar="K",
-                    help="второй круг берёт topics из топ-K (по умолчанию %(default)s)")
+                    help="round two uses topics from top-K (default %(default)s)")
     ap.add_argument("--stars-k", type=int, default=STARS_K, metavar="K",
-                    help="флаг «всплеск★» для топ-K с ≥50★ (по умолчанию %(default)s)")
-    ap.add_argument("--no-stars-check", action="store_true", help="без флага «всплеск★» (REST-история звёзд)")
-    ap.add_argument("--no-round2", action="store_true", help="без второго круга (`topic:` из топ-K)")
-    ap.add_argument("--project", help="проект, для которого поиск (сохраняется в Прогон)")
-    ap.add_argument("--need", metavar="TEXT", help="Потребность своими словами (только сохраняется в Прогон, поиск не использует)")
-    ap.add_argument("--out", metavar="PATH", help="путь файла Прогона (по умолчанию каталог Прогонов)")
-    ap.add_argument("--no-save", action="store_true", help="не сохранять Прогон")
-    ap.add_argument("--all", action="store_true", help="показать и отсеянных стоп-правилами")
+                    help="'burst★' flag for top-K with >=50★ (default %(default)s)")
+    ap.add_argument("--no-stars-check", action="store_true", help="disable 'burst★' flag check (REST star history)")
+    ap.add_argument("--no-round2", action="store_true", help="disable round two (`topic:` from top-K)")
+    ap.add_argument("--project", help="project name for search (saved to Run)")
+    ap.add_argument("--need", metavar="TEXT", help="original need in user's words (saved to Run, not used in search)")
+    ap.add_argument("--out", metavar="PATH", help="Run output file path (default: runs directory)")
+    ap.add_argument("--no-save", action="store_true", help="do not save Run")
+    ap.add_argument("--all", action="store_true", help="show dropped rows as well")
     ap.add_argument("--json", action="store_true")
     snap = ap.add_mutually_exclusive_group()
-    snap.add_argument("--record", metavar="DIR", help="писать ответы GitHub в DIR")
-    snap.add_argument("--replay", metavar="DIR", help="читать ответы из DIR без сети")
-    ap.add_argument("-q", "--quiet", action="store_true", help="ход работы только в лог-файл, в stderr — предупреждения")
+    snap.add_argument("--record", metavar="DIR", help="record GitHub responses to DIR")
+    snap.add_argument("--replay", metavar="DIR", help="replay responses from DIR without network")
+    ap.add_argument("-q", "--quiet", action="store_true", help="log progress to file only, stderr gets warnings only")
     return ap
 
 
@@ -359,9 +360,9 @@ def _save_run(a: argparse.Namespace, rows: list[dict], now: datetime) -> None:
     try:
         path = runs.save(search_params(a), rows, last_round2_topics, now, Path(a.out) if a.out else None)
     except OSError as e:
-        log.warning("Прогон не сохранён: %s", e)
+        log.warning("Run not saved: %s", e)
         return
-    log.info("Прогон сохранён: %s", path)
+    log.info("Run saved: %s", path)
 
 
 def _main(a: argparse.Namespace) -> None:
@@ -379,12 +380,10 @@ def _main(a: argparse.Namespace) -> None:
         sys.exit(2)
     except GitHubError as e:
         sys.exit(f"GitHub: {e}")
-    if github.last_rate_limit and not a.replay:
-        rl = github.last_rate_limit
-        log.info("rate limit: осталось %s, сброс %s", rl["remaining"], rl["resetAt"])
+    github.log_usage()
 
     kept = [r for r in rows if not r["stop"]]
-    by_must = [r for r in rows if (r["stop"] or "").startswith(MUST_STOP)]
+    by_must = [r for r in rows if (r["stop"] or "").startswith((MUST_STOP, "\u043d\u0435\u0442 \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u043e\u0433\u043e"))]
     shown = [r for r in (rows if a.all else kept) if r not in by_must]
     if a.json:
         print(json.dumps({"rows": shown, "dropped_by_must": by_must}, ensure_ascii=False, indent=1))
@@ -392,7 +391,7 @@ def _main(a: argparse.Namespace) -> None:
         return
     print(to_markdown(shown))
     if by_must:
-        print("\nотсеяно по --must: " + ", ".join(r["repo"] for r in by_must))
-    print(f"\nнайдено {len(rows)}, прошло стоп-правила {len(kept)}, отсеяно {len(rows) - len(kept)}"
-          + ("" if a.all else " (--all чтобы показать)"))
+        print("\ndropped by --must: " + ", ".join(r["repo"] for r in by_must))
+    print(f"\nfound {len(rows)}, passed stop rules {len(kept)}, dropped {len(rows) - len(kept)}"
+          + ("" if a.all else " (--all to show)"))
     _save_run(a, rows, now)

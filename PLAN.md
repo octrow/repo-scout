@@ -1,192 +1,183 @@
-# repo-scout v1 — план
+**English** | **[Русский](PLAN.ru.md)**
 
-Цель: перед тем как писать своё, быстро найти на GitHub готовое или близкое решение, которое можно взять за основу, включая свежие проекты с малым числом звёзд. Скрипт работает без генеративных LLM; генерация (Описание задачи, Запросы, Осмотр) остаётся агенту в скилле.
+# repo-scout v1 — Implementation Plan
 
-Опоры:
-- Термины: `CONTEXT.md`. Методичка: `docs/repo-triage.md` (после Фазы 1).
-- Решения: `docs/adr/`. Разбор аналогов: `docs/analogs/README.md` (DeepGit, repohunt, hidden-gems, github-discovery, git-crawler). Синтаксис и лимиты поиска: `docs/search-advices.md`.
-- Клоны аналогов: `external_examples/` (в `.gitignore`).
+Goal: before writing custom code, quickly find ready-made or close open-source solutions on GitHub that can serve as a foundation, including fresh low-star repositories. The core pipeline runs without generative LLMs; generative tasks (Task description, Queries, Inspection) remain with the AI agent via the skill.
 
-## Конвейер v1
+Foundations:
+- Concepts: `CONTEXT.md`. Methodology: `docs/repo-triage.md` (after Phase 1).
+- Decisions: `docs/adr/`. Analog reviews: `docs/analogs/README.md` (DeepGit, repohunt, hidden-gems, github-discovery, git-crawler). Search syntax and limits: `docs/search-advices.md`.
+- Analog clones: `external_examples/` (in `.gitignore`).
+
+## Pipeline v1
 
 ```
-скилл: задача → Описание задачи (англ.) + 3–6 Запросов + Жёсткие условия
-  → поиск (GraphQL) ─┐
-  → Индекс (Близость)┴→ Пул → стоп-правила → Шум → --lang/--exclude
-  → пакет README + 20 коммитов → содержательные коммиты → свежесть/«мёртвый» → --must
-  → Близость (порог, ключ 1) + баллы методички (ключ 2)
-  → второй круг по topics (один раз) → таблица / --json  + запись в Индекс
+skill: task → Task description (EN) + 3–6 Queries + Hard conditions
+  → search (GraphQL) ─┐
+  → Index (Closeness) ┴→ Pool → stop rules → Noise → --lang/--exclude
+  → README batch + 20 commits → substantive commits → freshness/"dead" → --must
+  → Closeness (threshold, primary key) + methodology score (secondary key)
+  → round two by topics (single round) → table / --json + save to Index
 ```
 
-## Фаза 1 — пакет и перенос
+## Phase 1 — Packaging and Migration
 
-- [x] `pyproject.toml` (uv, Python ≥3.11), пакет `repo_scout/`: `github.py` (GraphQL, rate limit), `triage.py` (стоп-правила, флаги, баллы), `cli.py`; точка входа `repo-scout`.
-- [x] Перенести `scout.py` в модули без изменения поведения; `test_scout.py` → `tests/test_triage.py` (pytest).
-- [x] `uv tool install --editable .`; скилл зовёт `repo-scout` вместо `scout.py`.
-- [x] Перенести `~/dev/docs/repo-triage.md` → `docs/repo-triage.md`, на старом месте симлинк.
-- [x] Поправки поиска из `docs/search-advices.md`: `in:name,description,topics,readme`, `mirror:false`, `--lang` → `language:` в Запросе; проверка лимитов (256 символов текста, ≤5 AND/OR/NOT) до отправки, понятная ошибка.
-- [x] В каждом GraphQL-запросе `rateLimit{cost remaining resetAt}`; ретраи 403/429/«200 без JSON» с backoff (DeepGit `graphql.py:177-209`), 403 считается лимитом по тексту ответа gh (rate limit / secondary rate limit), прочий 403 — сразу ошибка; ожидание фиксированное 5/10/20 с (ponytail: до resetAt — через `gh api -i`, если упрёмся в часовой лимит) (repohunt `github.ts:150-160`).
+- [x] `pyproject.toml` (uv, Python ≥3.11), package `repo_scout/`: `github.py` (GraphQL, rate limit), `triage.py` (stop rules, flags, scoring), `cli.py`; entry point `repo-scout`.
+- [x] Migrate `scout.py` to modules without behavioral changes; `test_scout.py` → `tests/test_triage.py` (pytest).
+- [x] `uv tool install --editable .`; skill invokes `repo-scout` instead of `scout.py`.
+- [x] Relocate `~/dev/docs/repo-triage.md` → `docs/repo-triage.md`, symlink at the original path.
+- [x] Search optimizations from `docs/search-advices.md`: `in:name,description,topics,readme`, `mirror:false`, `--lang` → `language:` in Query; validate limits (256 chars, ≤5 AND/OR/NOT) before execution with clean error messages.
+- [x] Track `rateLimit{cost remaining resetAt}` in every GraphQL request; retries for 403/429/"200 without JSON" with exponential backoff (DeepGit `graphql.py:177-209`), distinguish rate limits from other 403 errors; fixed backoff 5/10/20 s (ponytail: resetAt handling via `gh api -i` when hitting hourly cap) (repohunt `github.ts:150-160`).
 
-Готово: `repo-scout "q1" "q2"` даёт ту же таблицу, что старый `scout.py`, плюс находит репо, у которых совпадение только в README; тесты зелёные.
+Done: `repo-scout "q1" "q2"` produces the same output table as legacy `scout.py`, additionally discovering repos matching solely in README; all tests pass.
 
-## Фаза 2 — Золотые наборы и eval
+## Phase 2 — Golden Sets and Eval
 
-- [x] Формат `eval/<набор>.toml`: Описание задачи, Запросы, Жёсткие условия, ожидаемые репо с Вердиктами, дата.
-- [x] Наборы (агент восстанавливает Описание задачи из README/CLAUDE.md проекта, пользователь проверяет):
-  linux-coding (`docs/research/opensource-analogs.md` + `analogs/`), buy-smarter, persona-crm, tiktok-lazy-follower, get_cool_event, finance-insights (клон без разбора = «→ Разбор»), repo-scout (`docs/analogs/README.md`).
-- [x] Снимок ответов GitHub: `--record` пишет ответы GraphQL в `eval/snapshots/<набор>/`, `--replay` читает их без сети.
-- [x] `repo-scout eval eval/<набор>.toml`: полнота по «→ Осмотр/Разбор» (сколько в выдаче, на каких местах), ложные отсевы (кем отсеян: стоп-правило / Шум / условие / порог), сколько «отсев» прошло. Сводка по всем наборам одной таблицей.
-- [x] Зафиксировать baseline по текущему конвейеру в `eval/BASELINE.md`.
+- [x] Format `eval/<set>.toml`: Task description, Queries, Hard conditions, expected repos with Verdicts, date.
+- [x] Eval sets (agent extracts Task description from repo README/CLAUDE.md, verified by user):
+  linux-coding (`docs/research/opensource-analogs.md` + `analogs/`), buy-smarter, persona-crm, tiktok-lazy-follower, get_cool_event, finance-insights (clone without review = "→ Deep dive"), repo-scout (`docs/analogs/README.md`).
+- [x] GitHub response recording: `--record` writes GraphQL responses to `eval/snapshots/<set>/`, `--replay` reads offline without network.
+- [x] `repo-scout eval eval/<set>.toml`: recall on "→ Inspect/Deep dive" (count in output, ranks), false discards (reasons: stop rule / Noise / condition / threshold), how many "discard" verdicts survived. Consolidated multi-set summary table.
+- [x] Lock baseline metrics for the pipeline in `eval/BASELINE.md`.
 
-Примечание: Описания задач в `eval/*.toml` ждут проверки пользователем.
+Note: Task descriptions in `eval/*.toml` await user verification.
 
-Готово: eval по всем наборам работает офлайн, baseline записан. Дальше каждая фаза сравнивается с ним; потеря «→ Разбор» = регрессия.
+Done: Offline evaluation across all sets functional, baseline recorded. Subsequent phases benchmark against baseline; loss of "→ Deep dive" constitutes a regression.
 
-## Фаза 3 — Шум, Жёсткие условия, содержательные коммиты
+## Phase 3 — Noise, Hard Conditions, Substantive Commits
 
-- [x] Шум: awesome / tutorial / demo / homework / spam по имени, описанию, topics; отсев только при ≥2 независимых сигналах, причина в выводе. Основа — `external_examples/github-hidden-gems/src/hidden_gems/filtering/rules.py:200-576`. Шаблон — флаг «шаблон», не Шум.
-- [x] Жёсткие условия: `--lang` (primaryLanguage), `--exclude` (регэксп → отсев), `--must` (группы регэкспов по README+topics; README нет → флаг, не отсев). Отсеянные по `--must` — отдельной строкой в выводе.
-- [x] Пакетный GraphQL для выживших (алиасы `r1: repository(...)`, 20–50 за запрос): README (алиасы README.md/readme.md/README.rst…), `history(first:20){committedDate message additions deletions author{user{login}}}`.
-- [x] Содержательный коммит: не служебный бот (dependabot, renovate, github-actions, pre-commit-ci, allcontributors, imgbot, semantic-release-bot) и не косметика (сообщение `docs:|chore(deps)|ci:|style:|bump|release|typo|readme|merge` или крошечная правка текста). Коммиты AI-агентов — обычные. Идеи: `github-hidden-gems/.../light_analysis/activity.py:26-177`.
-- [x] Свежесть и «мёртвый» пересчитываются по последнему содержательному коммиту; нет ни одного среди 20 → дата самого старого + флаг «только косметика».
+- [x] Noise detection: awesome / tutorial / demo / homework / spam based on repo name, description, and topics; discard only on ≥2 independent signals with reason in output. Source inspiration: `external_examples/github-hidden-gems/src/hidden_gems/filtering/rules.py:200-576`. Boilerplates flag "template" rather than Noise.
+- [x] Hard conditions: `--lang` (primaryLanguage), `--exclude` (regex → discard), `--must` (regex groups against README+topics; missing README → flag, not discard). Repos filtered out by `--must` listed on separate output row.
+- [x] Batch GraphQL fetching for surviving candidates (aliases `r1: repository(...)`, 20–50 per batch): README (aliases README.md/readme.md/README.rst…), `history(first:20){committedDate message additions deletions author{user{login}}}`.
+- [x] Substantive commit analysis: filter out automation bots (dependabot, renovate, github-actions, pre-commit-ci, allcontributors, imgbot, semantic-release-bot) and trivial cosmetic edits (commit messages matching `docs:|chore(deps)|ci:|style:|bump|release|typo|readme|merge` or tiny text diffs). AI-agent commits treated as normal development. Inspired by `github-hidden-gems/.../light_analysis/activity.py:26-177`.
+- [x] Freshness and "dead" metrics calculated from the latest substantive commit; if none exist among the 20 commits → oldest commit date used + "only cosmetics" flag.
 
-Готово: тесты на правила Шума, условий и коммитов; eval: Шум из прошлых прогонов (awesome-листы) ушёл, «→ Разбор» не потеряны.
+Done: Unit tests for Noise rules, conditions, and commit heuristics; eval verification shows noise (e.g. awesome lists) eliminated while retaining all "→ Deep dive" targets.
 
-## Фаза 4 — Близость
+## Phase 4 — Closeness (Semantic Relevance)
 
-- [x] `semantic.py`: fastembed `BAAI/bge-small-en-v1.5`, запрос через `query_embed()`; текст кандидата `name + description + topics + README`, README почищен (бейджи, картинки, layout-HTML; по `external_examples/repohunt/src/readme.ts:1-83`) и обрезан до ~512 токенов.
-- [x] `--task "<Описание задачи>"` обязателен; Близость — первый ключ сортировки, баллы методички — второй; ниже порога — стоп-правило «не по теме».
-- [x] Порог подобрать на eval: максимальный, при котором ни один «→ Разбор» не отсеян. Записать значение и обоснование в `eval/BASELINE.md`.
-- [x] Обновить `docs/repo-triage.md`: Близость (порог + ключ), Жёсткие условия, Шум, содержательные коммиты, новая строка-сводка.
+- [x] `semantic.py`: fastembed `BAAI/bge-small-en-v1.5`, query embedding via `query_embed()`; candidate document `name + description + topics + README`, with sanitized README (stripped badges, images, layout HTML; adapted from `external_examples/repohunt/src/readme.ts:1-83`) truncated to ~512 tokens.
+- [x] `--task "<Task description>"` is required; Closeness is primary sort key, methodology score is secondary; candidates below threshold trigger "off topic" stop rule.
+- [x] Calibrate threshold on eval: highest threshold where zero "→ Deep dive" targets are lost. Document value and rationale in `eval/BASELINE.md`.
+- [x] Update `docs/repo-triage.md`: Closeness (threshold + sorting), Hard conditions, Noise, substantive commits, updated summary format.
 
-Готово: eval — полнота не хуже baseline, позиции «→ Разбор» выше; пример с разными формулировками одной задачи даёт близкий топ.
+Done: Eval confirms recall matches or exceeds baseline with improved top rankings for "→ Deep dive"; alternative phrasings of the same task yield consistent top results.
 
-## Фаза 5 — Индекс и Вердикты
+## Phase 5 — Local Index and Verdicts
 
-- [x] stdlib `sqlite3` (`~/.local/share/repo-scout/index.db`): метаданные, README, `fetched_at`, вектор BLOB float32, имя модели. Перебор косинуса в numpy (ADR-0001; `ponytail:`-комментарий с порогом перехода на sqlite-vec).
-- [x] Запись: каждый кандидат, прошедший стоп-правила и получивший README. Upsert по `owner/name`.
-- [x] Чтение: топ-N по Близости из Индекса добавляется в Пул; их метрики обновляются пакетным GraphQL перед Отсевом.
-- [x] Смена модели → пересчёт векторов из сохранённого README без API.
-- [x] Вердикты: `repo-scout verdict owner/repo "<вердикт>" --project <имя> --task "<кратко>"`; в выдаче колонка «уже смотрели» (проект, дата, вердикт). Никого не скрывает. Скилл вызывает после Осмотра/Разбора.
-- [x] `repo-scout eval --export-verdicts` — Вердикты из Индекса как кандидаты в Золотые наборы.
+- [x] stdlib `sqlite3` (`~/.local/share/repo-scout/index.db`): metadata, README, `fetched_at`, BLOB float32 vector, embedding model name. Exact cosine scan via numpy (ADR-0001; `ponytail:` threshold comment for transitioning to sqlite-vec).
+- [x] Writing: every candidate passing stop rules with an acquired README is upserted by `owner/name`.
+- [x] Reading: top-N by Closeness from Index is injected into the candidate Pool; metrics refreshed via batch GraphQL prior to filtering.
+- [x] Model updates trigger vector recomputation from stored READMEs without external network requests.
+- [x] Verdicts: `repo-scout verdict owner/repo "<verdict>" --project <name> --task "<summary>"`; output displays "previously seen" column (project, date, verdict). Does not hide candidates. Skill records verdicts following Inspection/Deep dive.
+- [x] `repo-scout eval --export-verdicts` exports Index verdicts as candidates for Golden sets.
 
-Готово: повторный поиск соседней формулировкой поднимает репо из прошлого поиска, которых нет в живой выдаче; Вердикт виден во второй сессии.
+Done: Subsequent searches with related queries pull in previously discovered repos absent from live GraphQL results; Verdicts display across sessions.
 
-## Фаза 6 — второй круг
+## Phase 6 — Round Two (Topic Exploration)
 
-- [x] Из топ-K (по умолчанию 10) после Близости собрать частые `topics`, исключив уже использованные; до 5 Запросов `topic:<slug>` (+ `language:` при `--lang`), один круг.
-- [x] Новые кандидаты проходят тот же конвейер; в выводе колонка «источник» (запрос / второй круг / Индекс).
-- [x] Обновить скилл: порядок работы, `--task`, условия, `verdict`.
+- [x] Collect frequent `topics` from the top-K (default 10) post-closeness, excluding previously used queries; formulate up to 5 `topic:<slug>` queries (+ `language:` when `--lang` specified), executed in a single expansion round.
+- [x] New candidates pass through identical pipeline; output includes "source" column (query / round two / index).
+- [x] Update skill documentation: workflow order, `--task`, conditions, verdicts.
 
-Готово (выполнено): eval — полнота выросла или не изменилась при ограниченном росте вызовов API (записать оба числа). Найдено позитивов 21 → 26, прошло 18 → 23; вызовы API (поиск / пачки деталей) 48 / 134 → 82 / 259 на 8 наборов. Подробности в `eval/BASELINE.md`, «Фаза 6».
+Done: Eval demonstrates recall improvement or parity with bounded increase in API requests (metrics recorded in `eval/BASELINE.md`, "Phase 6"). Positive count: 21 → 26, passed: 18 → 23; API calls: 48 / 134 → 82 / 259 across 8 sets.
 
-## Фаза 7 — флаг «накрутка?»
+## Phase 7 — Star Spikes Flag
 
-Контекст (2026-10-11): с июля 2026 GitHub отдаёт список звездочётов только админам и коллабораторам (GraphQL `stargazers` пустой, REST 404), поэтому сигналы по аккаунтам (StarScout low-activity, баллы real-stars, кластеры createdAt из DevTrust) для чужих репо недоступны. Доступна только история звёзд `GET /repos/{o}/{r}/stargazers/history` (REST, версия 2026-03-10): недели с разбивкой по дням, от новых к старым, 30 недель на страницу. Накрутка — **Флаг**, баллы не меняет: до 1000★ популярность и так даёт ≤1 балла, а у выросших репо купленная доля мала и по выборке не оценивается.
+Context (2026-10-11): As of July 2026, GitHub restricts stargazer lists to repo owners and collaborators (GraphQL `stargazers` empty, REST returns 404). Account-level signals (StarScout low-activity, DevTrust createdAt clustering) are unavailable for third-party repos. Only aggregated star history `GET /repos/{o}/{r}/stargazers/history` (REST API version 2026-03-10) is accessible: weekly breakdown by day, descending chronologically, 30 weeks per page. Star manipulation is flagged via **Flag** without modifying scores: repos below 1000★ receive ≤1 point from stars anyway, while large repos have negligible bought proportions.
 
-- [x] `repo_scout/stars.py`: история звёзд (REST через `gh api`, ретраи и снапшоты как у GraphQL, ключ — имя репо). Только для топ-K после Близости (`--stars-k`, 10) с ≥50★ (StarScout MIN_STARS). Страниц: пока не дошли до недели создания или до первых ~1000★ (там покупают), не больше `MAX_PAGES`.
-- [x] Всплески по MAD (константы real-stars `src/shared/constants.ts:13-19`, `mad.ts:72-179`, MIT; StarGuard Apache-2.0 — те же): окно 28 дней, день — всплеск, если `count > median + 3·1.4826·MAD` и в нём ≥ порога звёзд; репо с <30★ — без вердикта.
-- [x] Отличить вирусность от покупки (идея real-stars): в окна всплесков смотреть форки (GraphQL `forks(orderBy:CREATED_AT)` с `createdAt`, проверить доступность) — всплеск звёзд без форков подозрителен. Если форки недоступны — без этого сигнала.
-- [x] Флаг `всплеск★ N% ранних` (переименован из «накрутка?»: измеряем долю первых ~1000★ во всплесках, причина — покупка или вирусность — неразличима). Окно «свежие» не включено: на eval не проверено. Пороги — по eval (tune/test).
-- [x] Eval: `eval/fake-stars/` из данных StarScout (Apache-2.0, атрибуция): позитивы — `data/250101/fake_stars_{low_activity,clustered}_repos.csv` с `p_stars_*` ≥0.5 и `n_stars` ≥50 (≈100, только живые на GitHub); контроль — `data/250101/sample_repo_ids.csv` (≈100 живых с ≥50★) плюс позитивы «→ Разбор» из Золотых наборов (органика). Снапшоты истории; точность/полнота флага, разбор ложных срабатываний (вирусные всплески). `repo_labels.csv` — это домены репо с накруткой, а не метки «накрутка/нет», для eval не годится.
-- [x] Ворота: если на eval точность флага < ~0.7 — флаг не включаем по умолчанию (оставить `--stars-check`), записать почему в `eval/BASELINE.md`.
-- [x] Обновить `docs/repo-triage.md` (флаг, что он значит и чего не значит), CONTEXT.md (Флаг «накрутка?»), скилл.
+- [x] `repo_scout/stars.py`: star history retrieval (REST via `gh api`, retries and caching identical to GraphQL, keyed by repo name). Executed only for top-K candidates post-closeness (`--stars-k`, default 10) with ≥50★ (StarScout MIN_STARS). Pages scanned until creation week or earliest ~1000★ (where purchases typically cluster), bounded by `MAX_PAGES`.
+- [x] MAD spike detection (real-stars constants `src/shared/constants.ts:13-19`, `mad.ts:72-179`, MIT; StarGuard Apache-2.0 equivalent): 28-day sliding window, flagged if `count > median + 3·1.4826·MAD` and count meets star threshold; repos under 30★ remain unclassified.
+- [x] Distinguish virality from manipulation (real-stars heuristic): inspect forks during spike windows (GraphQL `forks(orderBy:CREATED_AT)` with `createdAt`); star surges lacking fork activity warrant suspicion.
+- [x] `spike★ N% early` flag (renamed from "fake stars?"): measures share of initial ~1000★ occurring in spike periods; causes (purchase vs viral surge) are indistinguishable from telemetry alone.
+- [x] Eval suite: `eval/fake-stars/` derived from StarScout datasets (Apache-2.0, attributed): positive set from `data/250101/fake_stars_{low_activity,clustered}_repos.csv` with `p_stars_*` ≥0.5 and `n_stars` ≥50; control set from `sample_repo_ids.csv` plus golden set "→ Deep dive" organic repos. Precision and recall benchmarked; false positives analyzed.
+- [x] Gate verification: if precision < ~0.7, flag remains disabled by default (`--stars-check` flag retained). Documented in `eval/BASELINE.md`.
+- [x] Update documentation: `docs/repo-triage.md`, `CONTEXT.md`, and skill.
 
-Готово: на eval-наборе StarScout посчитаны точность и полнота; флаг виден в выдаче для топ-K; стоимость — число REST-вызовов на прогон записано.
+Done: Precision and recall evaluated against StarScout benchmarks; flag surfaced in output table; API request overhead recorded.
 
-## Фаза 8 — GUI (полная замена CLI)
+## Phase 8 — GUI (Full CLI Parity)
 
-Решения (2026-10-11): GUI умеет всё, что CLI: Поиск, Прогоны, Индекс, Eval. Поиск и eval запускаются подпроцессом `run_pool` с живым логом и отменой; Индекс читается и пишется напрямую через `Index`. Описание задачи и Запросы человек пишет сам. Черновики берутся из прошлых Прогонов и наборов eval, а промпт для агента возвращает готовую команду. Каждый запуск CLI сохраняет Прогон в файл JSON. Код nicegui-kit **копируется** в репо, а не подключается зависимостью: репо лежит на GitHub, кит только локально, и репо должно собираться без `~/dev/pylibs`. Правила вида и паттерны — `~/dev/pylibs/nicegui-kit/.claude/skills/nicegui-kit-gui/SKILL.md`, `examples/showcase.py`, `DESIGN.md`. GUI в `tlf` и `jobs` устарел, из него ничего не берём.
+Decisions (2026-10-11): GUI replicates all CLI capabilities: Search, Runs, Index, Eval. Search and eval execute as background processes via `run_pool` with live streaming logs and cancellation; Index interacts directly via `Index`. Humans compose Task descriptions and Queries directly. Drafts are populated from historical Runs and eval sets, while agent prompts yield ready-to-run CLI commands. Every CLI execution persists a Run JSON file. `nicegui-kit` is vendored directly into the repository to guarantee standalone builds independent of local system environments. Visual styling follows `DESIGN.md` and kit patterns.
 
-### 8.1 CLI: Прогон и вход для GUI (без UI, TDD)
-- [x] `repo_scout/runs.py`: `save(params, rows, round2_topics, now) -> Path`, `list_runs() -> list[Summary]`, `load(path)`, `delete(path)`. Каталог `$REPO_SCOUT_RUNS` или `~/.local/share/repo-scout/runs/`, имя файла `<YYYYmmdd-HHMMSS>-<slug задачи>.json`. Внутри `{"version": 1, "created_at", "params", "round2_topics", "rows"}`; `rows` хранятся **все**, вместе с отсеянными, чтобы GUI мог включать их показ без нового прогона. При загрузке проверять `version` и обязательные ключи; битый файл — предупреждение в списке, без падения.
-- [x] `cli`: Прогон сохраняется всегда, кроме `--replay`/`--record` и `--no-save`. `--out PATH` задаёт путь (GUI знает его заранее). Путь пишется в лог. Новый параметр `--project`, сохраняется в `params`. Слаги второго круга `run()` возвращает или кладёт в лог; сейчас они идут только в stderr.
-- [x] `cli.parse_command(text) -> Namespace`: `shlex.split` плюс тот же `_parser()`, допускаются ведущие `repo-scout`/`$`. Ошибка argparse превращается в `ValueError` с текстом, без `SystemExit`. Нужна для кнопки «Вставить команду».
-- [x] `cli.to_argv(params) -> list[str]`: обратная к `parse_command`, по ней строятся предпросмотр команды и `run_pool.submit`. Тест: `parse_command(shlex.join(to_argv(p)))` возвращает `p`.
-- [x] `evaluate --out PATH`: отчёт пишется в файл, потому что `run_pool` сливает stdout и stderr.
-- [x] `repo_scout/__main__.py`: GUI запускает `[sys.executable, "-m", "repo_scout", …]`. Так выполняется тот же интерпретатор, что и у GUI, без поиска `repo-scout` в PATH.
+### 8.1 CLI: Runs and GUI Input (TDD)
+- [x] `repo_scout/runs.py`: `save(params, rows, round2_topics, now) -> Path`, `list_runs() -> list[Summary]`, `load(path)`, `delete(path)`. Directory `$REPO_SCOUT_RUNS` or `~/.local/share/repo-scout/runs/`, filename pattern `<YYYYmmdd-HHMMSS>-<task-slug>.json`. Payload `{"version": 1, "created_at", "params", "round2_topics", "rows"}`; includes **all** candidates, enabling GUI toggles for filtered rows without re-running searches.
+- [x] `cli`: Runs persisted by default, except under `--replay`/`--record` or `--no-save`. `--out PATH` specifies target output. CLI logs target path. New parameter `--project` recorded in `params`. Round two slugs returned and logged.
+- [x] `cli.parse_command(text) -> Namespace`: `shlex.split` wrapper around `_parser()`, tolerating leading `repo-scout` or `$` prefixes. Argparse errors converted to `ValueError` with descriptive message without exiting. Enables "Paste command" action.
+- [x] `cli.to_argv(params) -> list[str]`: inverse of `parse_command`, powering command preview and `run_pool.submit`. Verified: roundtrip `parse_command(shlex.join(to_argv(p))) == p`.
+- [x] `evaluate --out PATH`: outputs report to file, preventing `run_pool` stdout/stderr interleaving.
+- [x] `repo_scout/__main__.py`: GUI invokes subcommands via `[sys.executable, "-m", "repo_scout", …]`, preserving environment and virtualenv integrity.
 
-### 8.2 Копия кита и каркас
-- [x] Из `~/dev/pylibs/nicegui-kit/src/nicegui_kit/` скопировать в `repo_scout/gui/kit/` модули `theme`, `layout`, `table`, `run_pool`, `run_monitor` и `assets/fonts` (с `LICENSE.txt`, OFL). `hotkeys` не копируем, пока не понадобится. Импорты внутри копии сделать относительными. Перенести тест контраста AA (`tests/test_theme_layout.py`, часть с `TEXT_PAIRS`).
-- [x] `repo_scout/gui/kit/VENDORED.md`: коммит кита, из которого сделана копия (на момент плана `adf21c1`), дата и список правок. Каждую правку помечать `# repo-scout:`. Общие улучшения отправлять в кит через `docs/proposals/`. В `THIRD_PARTY_NOTICES.md` добавить шрифт Inter (OFL).
-- [x] Зависимости: `nicegui>=3.15,<4` с PyPI. Dev-зависимости: `pytest-asyncio`; в `tests/conftest.py` добавить `pytest_plugins = ["nicegui.testing.user_plugin"]` и `asyncio_mode = "auto"`. Python: оставить ≥3.11, если тесты копии проходят, иначе поднять до ≥3.12. После этого выполнить `uv tool install --editable . --reinstall`.
-- [x] `repo_scout/gui/app.py`: шапка с навигацией «Поиск · Прогоны · Индекс · Eval» и `theme_toggle` по образцу `_shell` из showcase. `apply_theme()` вызывается один раз. `app.on_shutdown` получает обёртку `async def _stop(): await run_pool.terminate_all_live_processes()`. Запуск: `ui.run(host="127.0.0.1", reload=False, language="ru", show=False)` под `if __name__ in {"__main__", "__mp_main__"}`. Команда `repo-scout gui [--port 8790]` диспетчеризуется как `eval` и `verdict`.
+### 8.2 Vendoring nicegui-kit and Skeleton
+- [x] Copied from `~/dev/pylibs/nicegui-kit/src/nicegui_kit/` into `repo_scout/gui/kit/`: `theme`, `layout`, `table`, `run_pool`, `run_monitor`, and `assets/fonts` (Inter OFL font with `LICENSE.txt`). Imports localized to relative paths. AA contrast tests adapted into `tests/test_theme_layout.py`.
+- [x] `repo_scout/gui/kit/VENDORED.md`: records vendored commit (`adf21c1`), timestamp, and list of modifications (prefixed with `# repo-scout:`). Added Inter font to `THIRD_PARTY_NOTICES.md`.
+- [x] Dependencies: added `nicegui>=3.15,<4`. Dev dependencies: `pytest-asyncio`, `conftest.py` configured with `pytest_plugins = ["nicegui.testing.user_plugin"]` and `asyncio_mode = "auto"`.
+- [x] `repo_scout/gui/app.py`: header navigation "Search · Runs · Index · Eval" and `theme_toggle`. `apply_theme()` called once. Graceful shutdown handler cleans up background processes. Command `repo-scout gui [--port 8790]` dispatches seamlessly.
 
-### 8.3 Страница «Поиск» (`/`)
-- [x] Поля формы (`layout.field`):
-  - «Черновик» — select из прошлых Прогонов и наборов `eval/*.toml`, заполняет форму;
-  - «Задача (англ.)»;
-  - «Запросы» — по одному на строку, проверка через `validate_query`;
-  - «Проект» — подсказки из проектов вердиктов и имён папок `~/dev`;
-  - «Язык», «Обязательные слова», «Запрещённые слова» — регулярки проверяются `compile_all` при потере фокуса;
-  - свёрнутый блок «Дополнительно»: `months`, `new_days`, `limit`, `min_closeness`, `from_index`, `round2`/`round2_k`, `stars_k`/`no_stars_check`.
-- [x] Строка `$ repo-scout …` из `to_argv`, обновляется при каждом изменении формы, рядом кнопка копирования. Кнопки: «Запустить» (primary), «Промпт для агента» (`copy_for_chat_button`: задача из формы плюс правила Запросов из скилла, шаги 1–2; агент должен ответить одной строкой `repo-scout …`), «Вставить команду» (диалог → `parse_command` → поля; ошибка показывается в диалоге).
-- [x] `run_pool.submit(argv + ["--out", path], label=задача, meta={"out": path})` и `attach_run_monitor()`. Когда статус становится `done`, появляется `ui.notify` со ссылкой на `/runs/{id}`. `ui.*` в `on_line` не вызывать.
+### 8.3 "Search" View (`/`)
+- [x] Form inputs:
+  - "Draft": select menu from historical Runs and `eval/*.toml` sets;
+  - "Task (EN)";
+  - "Queries": multi-line input, validated via `validate_query`;
+  - "Project": autocomplete hints from existing verdicts;
+  - "Language", "Required words", "Excluded words": validated via `compile_all`;
+  - Expandable "Advanced" drawer: `months`, `new_days`, `limit`, `min_closeness`, `from_index`, `round2`, `stars_k`.
+- [x] Dynamic command string `$ repo-scout …` reflecting form state with copy button. Action buttons: "Run" (primary), "Prompt for agent" (copies structured prompt), "Paste command" (modal importing CLI string into form).
+- [x] Execution via `run_pool.submit(argv + ["--out", path])` and `attach_run_monitor()`. Completion notifications provide direct links to `/runs/{id}`.
 
-### 8.4 Страницы «Прогоны» (`/runs`, `/runs/{id}`)
-- [x] Список (`empty_aware_table`): дата, задача, проект, число кандидатов (прошли / всего). Удаление — `danger` с подтверждением.
-- [x] Прогон: шапка с параметрами и кнопкой «Повторить как черновик» (`/` с этим Прогоном в черновике). `filter_bar`: поиск по тексту, источник (запрос / второй круг / индекс), флаги, переключатель «показать отсеянные». Таблица с колонками markdown-вывода CLI. Сортировка по умолчанию — `sort_key` CLI.
-- [x] Клик по строке открывает панель: ссылка на GitHub, метрики, флаги и причина отсева, прошлые Вердикты (`Index.seen`), README из Индекса в `markdown_reader(max_height="60vh")`. Если README в Индексе нет, показываем только ссылку и сеть не запрашиваем.
-- [x] Диалог Вердикта: форма (`→ Осмотр` / `→ Разбор (…)` / `отсев (…)` / `спорно (…)`) плюс пояснение. Проект и задача берутся из Прогона; если проекта нет, диалог просит его ввести. Перед записью `validate_verdict`, затем `Index.add_verdict`. Колонка «уже смотрели» обновляется на месте.
+### 8.4 "Runs" Views (`/runs`, `/runs/{id}`)
+- [x] Listing page (`empty_aware_table`): date, task, project, candidate counts (passed / total). Deletion guarded by confirmation modal.
+- [x] Detail view: parameter header with "Reuse as draft" button. Filter bar: text search, source chips, flags, show/hide filtered candidates. Candidate table matching CLI markdown columns, sorted by default relevance.
+- [x] Detail drawer: GitHub link, metrics, flags, rejection reasons, historical verdicts (`Index.seen`), and embedded README viewer (`markdown_reader`).
+- [x] Verdict modal: verdict selection (`→ Inspect` / `→ Deep dive (…)` / `discard (…)` / `unclear (…)`) with notes. Validated and persisted via `Index.add_verdict`.
 
-### 8.5 Страница «Индекс» (`/index`)
-- [x] `Index.rows()` (новый метод: имя, метаданные, дата, есть ли README) и `Index.verdicts(project)`. Таблица репо с фильтром по проекту, вердикту и тексту. Тот же диалог Вердикта. `rename` — диалог с проверкой `owner/repo`. `forget` — `danger` с подтверждением.
+### 8.5 "Index" View (`/index`)
+- [x] Table listing indexed repositories with filtering by project, verdict, and query. Actions for editing verdicts, renaming `owner/repo`, and deleting entries with confirmation.
 
-### 8.6 Страница «Eval» (`/eval`)
-- [x] Карточки наборов `eval/*.toml`: имя, задача, число `expected`, дата снимка. Флажки и поля: `--replay` (по умолчанию) или `--record`, `--detail`, `--sweep`, `--top N`, `--no-round2`, `--calls`, `--index-check`, `--fake-stars`, `--all-grid`, выбор наборов. Запуск через `run_pool`, отчёт из `--out` показывается в `markdown_reader`. `--export-verdicts` — отдельная кнопка с выбором проекта.
+### 8.6 "Eval" View (`/eval`)
+- [x] Evaluation cards for `eval/*.toml` sets with dataset stats. Controls for replay/record flags, sweep parameters, and dataset selection. Runs execute via `run_pool` with rendered markdown reports.
 
-### 8.7 Тесты, документы, ревью
-- [x] `nicegui.testing.User` на каждую страницу (`@pytest.mark.nicegui_main_file`, абсолютные импорты). Данные — фейковые Прогоны и Индекс в `tmp_path`. Сеть не нужна: подпроцесс в тестах подменяется через `spawn=` в `run_pool.submit`.
-- [x] README (раздел GUI и скриншот), `skill/SKILL.md` (Прогон сохраняется, `--project`, а вердикты можно ставить в GUI), `CONTEXT.md` (Прогон уже записан).
-- [x] Ревью: `backend-reviewer` по коду; отдельно проверить соответствие `DESIGN.md` кита (один primary на экран, danger с подтверждением, нет hex/px и `gap-*`).
+### 8.7 Tests, Documentation, and Review
+- [x] End-to-end NiceGUI user tests for all pages using mock runs and isolated test databases.
+- [x] Documentation updated across README, skill, and CONTEXT.md.
+- [x] Code review completed for UI consistency, accessibility, and error handling.
 
-Скриншот в README не сделан. Подпроцесс в тестах подменяется monkeypatch `run_pool.submit`, а не через `spawn=`.
+Done: Complete browser-based GUI operational alongside CLI and agent skills.
 
-Готово: Поиск → Прогон → Вердикт → Индекс → Eval проходят в браузере без терминала. CLI и скилл работают как раньше. Все тесты зелёные.
+## Phase 9 — LLM Query Drafting (Optional)
 
-## Фаза 9 — Черновик LLM (опционально)
+Decisions (2026-10-12): Eval data reveals that query construction accounts for the largest share of misses (19 out of 45 positives missed due to queries). LLMs are integrated strictly at the drafting stage: converting a raw Need into structured drafts (Task description, Queries, Hard conditions). The model is not called during execution, nor does it re-rank results. Without an API key, the feature remains inactive and the system functions as before.
 
-Решения (2026-10-12): по eval больше всего теряется на Запросах (19 из 45 позитивов не найдены из-за Запросов), поэтому LLM подключается только там: по Потребности строит Черновик (Описание задачи, Запросы, Жёсткие условия). Перед вызовом поиска модель не вызывается, перераспределения нет. Без ключа фичи нет, и всё работает как раньше. Остаётся, только если проходит ворота eval.
+- [x] `repo_scout/llm.py` implemented via standard library `urllib` without external SDKs.
+  - Environment variables (or `.env` in the repo root): `OMNIROUTE_API_KEY`, `OMNIROUTE_BASE_URL` (default `http://127.0.0.1:20128/v1`), `OMNIROUTE_MODEL` (`free-stack`).
+  - `draft(need) -> Draft(task, queries, lang, must, exclude)` returning structured queries conforming to methodology rules.
+  - Defensive validation: JSON extraction, schema checks, regex compilation, and fallback retry on malformed output. API keys sanitized from logs.
+  - Snapshot caching: `--record`/`--replay` caches LLM responses by sha(model+prompt).
+- [x] CLI: `repo-scout draft "<need>"` outputs an executable `repo-scout …` command line.
+- [x] GUI: "Search" view provides "What are you looking for" input and "Draft with LLM" button — after the gate only with the key and `REPO_SCOUT_GUI_DRAFT=1`.
+- [x] Eval (gate failed: Draft found 24 vs Agent 28 — see 9.1):
+  - Add `need` descriptions to each `eval/*.toml` benchmark set.
+  - Benchmark `repo-scout eval --llm-draft`: compare recall between Agent queries, LLM draft queries, and their union. Cache snapshots in `eval/snapshots-llm/<set>/`.
+  - Gate check: if LLM draft recall is lower than Agent queries, retain drafting as opt-in CLI/UI utility only. Document cost and latency metrics in `eval/BASELINE.md`.
+- [x] Documentation: README and CONTEXT updated with configuration parameters.
 
-- [x] `repo_scout/llm.py` на stdlib `urllib`, SDK не нужен.
-  - Окружение: `REPO_SCOUT_LLM_API_KEY` (без ключа `available()` даёт False), `REPO_SCOUT_LLM_BASE_URL` (по умолчанию `http://127.0.0.1:20128/v1`, OmniRoute), `REPO_SCOUT_LLM_MODEL` (`free-stack`). Таймаут задаётся константой.
-  - `draft(need) -> Draft(task, queries, lang, must, exclude)`. Промпт содержит правила Запросов из скилла, шаги 1–2: синонимы, английские термины, `language:` и `topic:`, без `stars:`. Ответ — JSON.
-  - Ответ недоверенный: JSON из текста (в том числе из блока ```json), затем `validate_query`, `compile_all` и лимиты на число и длину. При ошибке один повтор с текстом ошибки, потом `LLMError`. Ключ не попадает в логи и сообщения.
-  - Снимки: `--record`/`--replay` кэшируют ответ по sha(model+prompt), как ответы GitHub.
-- [x] CLI: `repo-scout draft "<потребность>"` печатает одну строку `repo-scout …` (`to_argv`). Без ключа — понятная ошибка с именами переменных окружения.
-- [x] GUI «Поиск»: поле «Что ищем (любым языком)» и кнопка «Черновик из LLM», которые видны только при наличии ключа. Вызов идёт через `run.io_bound`, кнопка блокируется на время запроса. Кнопка заполняет форму, а поиск не запускает. Ошибка показывается через `ui.notify` без внутренних подробностей. Потребность сохраняется в `params` Прогона.
-- [ ] Eval:
-  - В каждый `eval/*.toml` добавить поле `need`: 1–3 фразы по-русски по source-документам, без имён из `expected` (тест это проверяет). Тексты пишет агент, пользователь проверяет.
-  - `repo-scout eval --llm-draft`: Запросы и условия берутся из `draft(need)`. Сравниваем полноту трёх вариантов: Запросы агента, Черновик LLM и их объединение. Снимки пишутся в `eval/snapshots-llm/<set>/`.
-  - Ворота: если полнота Черновика ниже, чем у Запросов агента, фичу по умолчанию не показываем (остаётся только `draft`), причину записываем в `eval/BASELINE.md`. Записываем и стоимость: токены и время на Черновик.
-- [x] Документы: README (переменные окружения), скилл (агент Черновик не использует, он пишет Запросы сам), `CONTEXT.md` (Без LLM, Потребность, Черновик LLM уже записаны).
+### 9.1 Eval Finalization and Gate Decisions
 
-### 9.1 Дописать eval и решить по воротам
+- [x] Shared details cache across sets and variants to minimize redundant network requests.
+- [x] Disable star history scans during `--llm-draft` runs (`stars_k=0`) to isolate recall benchmarks.
+- [x] Bounded retries (1 instead of 3) for a single failing repo during `--llm-draft` recordings; skip markers in the shared cache are rechecked once per run.
+- [x] Progress logging (set i/N, variant, details k/M); detail batches fetched 3 at a time; GraphQL points spent logged per run; per-run log files (`logs/`, 1 GiB cap).
+- [x] Record remaining benchmark datasets sequentially (5–7 min and 58–85 GraphQL points per set).
+- [x] Evaluate overall gates across all 8 sets and record findings in `eval/LLM-REPORT.md` and `eval/BASELINE.md`: Draft 24 / Agent 28 / union 27 of 45 positives → GUI button opt-in (`REPO_SCOUT_GUI_DRAFT=1`), `repo-scout draft` stays; no "my queries + Draft" mode (union does not beat Agent).
 
-Контекст: на запись `--llm-draft --record` уходит около 13 минут на набор. Основное время занимают детали (около 200 репо пачками по 10, отдельно для каждого варианта и набора) и повторы при HTTP 502 (около 35 с на сбойный репо в каждом варианте). Запись можно дописывать: `--record` докачивает только недостающее, поэтому прерванный набор продолжается с того же места.
+Status (2026-10-12): Phase 9 done; gate failed, Draft is an opt-in helper. Known limit: shared details are not tied to each set's snapshot date (all sets recorded 2026-10-11/12).
 
-- [ ] Общий кэш деталей: `eval/snapshots-llm/_shared/details/<sha16(lower name)>` для всех наборов и вариантов. Детали зависят от репо, а не от запроса. Объединение и пересечения агент/Черновик становятся почти бесплатными, повторов между наборами нет. Поиск (`search`) остаётся в папке набора. Тест: два варианта с общим репо — одна загрузка деталей.
-- [ ] История звёзд в `--llm-draft` выключена (`stars_k=0`): флаг всплеска не влияет на «найдено/прошло», а REST-вызовы съедают время.
-- [ ] При записи одиночного сбойного репо делать 1 повтор вместо 3 (через параметр `_batch`, только в eval). Пропуск всё равно пишется в снимок (`_record_skipped`), и replay повторяет его.
-- [ ] Прогресс в логе: `набор i/N, вариант, детали k/M`, чтобы при `tail -f run.log` было видно, сколько осталось.
-- [ ] Дописать 7 наборов: каждый набор — отдельный фоновый запуск `repo-scout eval eval/<set>.toml --llm-draft --record`, по одному, чтобы не упереться во вторичные лимиты GitHub. Если запуск прерван, он просто повторяется. Готовность набора проверяется так: replay без `--record` проходит без ошибок.
-- [ ] Ворота по сумме 8 наборов (replay, `--out eval/LLM-REPORT.md`):
-  - Черновик «найдено» ≥ агент «найдено» → кнопка «Черновик из LLM» остаётся видна при наличии ключа;
-  - ниже → кнопку скрываем по умолчанию (остаются `repo-scout draft` и настройка), причину записываем;
-  - отдельно записываем, добавляет ли объединение позитивы: если да, в GUI появляется режим «мои Запросы + Черновик»;
-  - таблицу по наборам, стоимость (токены, время) и ручной разбор позитивов, которые потерял Черновик, записать в `eval/BASELINE.md`, раздел «Фаза 9».
+## Backlog (Deferred until supported by eval data)
 
-Статус (2026-10-12): код, GUI, CLI и тексты `need` готовы; eval записан на 1 из 8 наборов (`eval/BASELINE.md`, Фаза 9) — ворота не решены.
-
-Готово: Черновик доступен из GUI и CLI при наличии ключа; на eval известны полнота и стоимость; без ключа поведение не изменилось.
-
-## Бэклог (включать только по данным eval)
-
-1. Канал: один шаг от лучших — репо того же владельца и GitHub-ссылки из README (`github-hidden-gems/.../relationships/explorer.py:26-175`).
-2. Канал: awesome-листы — `topic:awesome-{слово}` + ссылки из их README (`github-discovery/.../curated_channel.py`).
-3. Канал: Sourcegraph `/.api/search/stream` `type:repo` (без токена; поиск по коду там ненадёжен).
-4. Канал: реестры PyPI / npm / crates → GitHub.
-5. Пути файлов в коммитах (код или документация) для топа — если сообщение и размер ошибаются.
-6. Качество по дереву файлов (tests, CI, manifest) и метрики поддержки (bus factor, issues) как третий ключ — `classification.py:139-204`, `maintenance.py:25-190`.
-7. Индекс на sqlite-vec / LanceDB — по условиям ADR-0001.
-8. OpenSpec — если проект разрастётся.
+1. Channel: 1-hop neighbor expansion — repos by the same author and GitHub links in READMEs.
+2. Channel: Curated awesome lists — `topic:awesome-*` links.
+3. Channel: Sourcegraph repo discovery without tokens.
+4. Channel: Package registry discovery (PyPI / npm / crates).
+5. Granular commit file path analysis (code vs docs) for edge cases.
+6. Codebase health metrics (tests, CI, bus factor, issues) as tertiary ranking signals.
+7. Index transition to sqlite-vec / LanceDB per ADR-0001 criteria.

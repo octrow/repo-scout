@@ -60,7 +60,7 @@ def test_triage_recomputes_from_last_push():
     node = repo(pushed=1, commits=100)
     assert triage(node, NOW, 60)["stop"] is None
     row = triage(node, NOW, 60, last_push=datetime(2026, 1, 1, tzinfo=UTC).isoformat())
-    assert row["stop"].startswith("мёртвый") and row["pushed_days"] > 180
+    assert row["stop"].startswith("dead") and row["pushed_days"] > 180
 
 
 def test_big_commit_mentioning_readme_is_substantive():

@@ -1,11 +1,11 @@
-"""Шум (awesome / tutorial / demo / homework / spam) и флаг «шаблон». Слова: github-hidden-gems filtering/rules.py."""
+"""Noise (awesome / tutorial / demo / homework / spam) and 'template' flag. Words from github-hidden-gems filtering/rules.py."""
 import re
 
 from repo_scout.triage import topics_of
 
 MIN_SIGNALS = 2
 
-# вид -> (слова в имени, фразы в описании, topics)
+# kind -> (words in name, phrases in description, topics)
 KINDS: dict[str, tuple[set, tuple, set]] = {
     "awesome": ({"awesome"}, ("awesome list", "curated list", "a curated", "curated collection"),
                 {"awesome", "awesome-list", "curated-list"}),
@@ -35,9 +35,9 @@ def _signals(node: dict, words: set, phrases: tuple, topics: set) -> list[str]:
     desc = (node.get("description") or "").lower()
     found = []
     if any(t in words or t.rstrip("s") in words for t in tokens):
-        found.append("имя")
+        found.append("name")
     if any(re.search(rf"\b{re.escape(p)}s?\b", desc) for p in phrases):
-        found.append("описание")
+        found.append("description")
     if topics & {t.lower() for t in topics_of(node)}:
         found.append("topics")
     return found
@@ -48,7 +48,7 @@ def is_template(node: dict) -> bool:
 
 
 def noise_stop(node: dict) -> str | None:
-    """«шум (вид: источники)» при ≥2 независимых сигналов. Шаблон только флаг, от шума не спасает."""
+    """'noise (kind: sources)' when >=2 independent signals match. Template is only a flag and doesn't prevent noise."""
     best = max(((kind, _signals(node, *spec)) for kind, spec in KINDS.items()), key=lambda x: len(x[1]))
     kind, found = best
-    return f"шум ({kind}: {', '.join(found)})" if len(found) >= MIN_SIGNALS else None
+    return f"noise ({kind}: {', '.join(found)})" if len(found) >= MIN_SIGNALS else None

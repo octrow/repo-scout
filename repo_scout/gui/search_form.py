@@ -1,4 +1,4 @@
-"""Форма «Поиск» без UI: состояние формы <-> параметры CLI, черновики, текст промпта."""
+"""Search form logic without UI: form state <-> CLI parameters, drafts, prompt text."""
 import shlex
 import sys
 import tomllib
@@ -15,32 +15,32 @@ DEV_DIR = Path.home() / "dev"
 NUMBER_KEYS = ("months", "new_days", "limit", "min_closeness", "from_index", "round2_k", "stars_k")
 FLAG_KEYS = ("no_round2", "no_stars_check")
 
-AGENT_PROMPT = """Задача (для поиска готовых решений на GitHub):
+AGENT_PROMPT = """Task (to find ready-made solutions on GitHub):
 {task}
 
-Подбери для repo-scout 3-6 вариантов Запросов:
-1. Описание задачи на английском, 1-3 фразы, что нужно: оно идёт в --task, по нему считается Близость.
-2. Запросы: синонимы, английские термины, `language:`, `topic:`, `in:readme`. `stars:` не ставь: мало звёзд не повод отсекать.
-Жёсткие условия по необходимости: --lang, --must REGEX (обязательные слова), --exclude REGEX (запрещённые).
+Suggest 3-6 query variants for repo-scout:
+1. Task description in English, 1-3 sentences, what is needed: goes to --task, used to calculate Closeness.
+2. Queries: synonyms, English terms, `language:`, `topic:`, `in:readme`. Do not use `stars:`: low stars count is no reason to drop.
+Hard filters if needed: --lang, --must REGEX (required words), --exclude REGEX (forbidden words).
 
-Ответь ОДНОЙ строкой вида `repo-scout --task "..." "запрос 1" "запрос 2" ...` без пояснений."""
+Reply with ONE line of format `repo-scout --task "..." "query 1" "query 2" ...` without explanations."""
 
 
 @dataclass(frozen=True)
 class Draft:
-    key: str  # "run:<имя файла без .json>" или "eval:<имя>"
+    key: str  # "run:<filename without .json>" or "eval:<name>"
     label: str
     path: Path
 
 
 def default_state() -> dict:
-    """Пустая форма: значения по умолчанию берутся из парсера CLI."""
+    """Empty form: defaults taken from CLI parser."""
     ns = _parser().parse_args(["--task", "x", "q"])
     return params_to_state({**search_params(ns), "task": "", "queries": []})
 
 
 def params_to_state(params: dict) -> dict:
-    """Параметры поиска -> значения полей формы (списки склеены в строки по строке на элемент)."""
+    """Search parameters -> form field values (lists joined into newline-separated strings)."""
     base = search_params(_parser().parse_args(["--task", "x", "q"]))
     p = {**base, **{k: v for k, v in params.items() if k in base}}
     state = {k: p[k] for k in (*NUMBER_KEYS, *FLAG_KEYS, "task")}
@@ -54,7 +54,7 @@ def _lines(text: str) -> list[str]:
 
 
 def state_to_params(state: dict) -> dict:
-    """Поля формы -> параметры поиска (как `cli.search_params`)."""
+    """Form fields -> search parameters (as in `cli.search_params`)."""
     params = search_params(_parser().parse_args(["--task", "x", "q"]))
     for k in (*NUMBER_KEYS, *FLAG_KEYS):
         if state.get(k) is not None:
@@ -68,7 +68,7 @@ def state_to_params(state: dict) -> dict:
 
 
 def command_text(state: dict) -> str | None:
-    """Строка `repo-scout …` для предпросмотра; None, пока нет задачи или запросов."""
+    """`repo-scout …` string for preview; None while task or queries are missing."""
     params = state_to_params(state)
     if not params["task"] or not params["queries"]:
         return None
@@ -76,7 +76,7 @@ def command_text(state: dict) -> str | None:
 
 
 def run_argv(state: dict, out: Path) -> list[str]:
-    """argv подпроцесса: тот же интерпретатор, `-m repo_scout`, путь Прогона известен заранее."""
+    """Subprocess argv: same interpreter, `-m repo_scout`, Run path known in advance."""
     return [sys.executable, "-m", "repo_scout", *to_argv(state_to_params(state), ["--out", str(out)])]
 
 
@@ -85,7 +85,7 @@ def out_path(task: str, now: datetime) -> Path:
 
 
 def check_queries(text: str) -> str | None:
-    """Ошибка первого запроса или None."""
+    """Error of first invalid query or None."""
     for q in _lines(text):
         try:
             validate_query(q)
@@ -103,12 +103,12 @@ def check_regexes(flag: str, text: str) -> str | None:
 
 
 def form_errors(state: dict) -> list[str]:
-    """Всё, что мешает запуску."""
+    """All issues preventing a search run."""
     errors = []
     if not (state.get("task") or "").strip():
-        errors.append("Опишите задачу")
+        errors.append("Task description is required")
     if not _lines(state.get("queries", "")):
-        errors.append("Добавьте хотя бы один запрос")
+        errors.append("Add at least one query")
     errors += [e for e in (check_queries(state.get("queries", "")),
                            check_regexes("--must", state.get("must", "")),
                            check_regexes("--exclude", state.get("exclude", ""))) if e]
@@ -116,17 +116,17 @@ def form_errors(state: dict) -> list[str]:
 
 
 def draft_to_state(d: llm.Draft, need: str) -> dict:
-    """Черновик LLM -> поля формы (поиск не запускается; остальные поля не трогаем)."""
+    """LLM draft -> form fields (search is not launched; other fields untouched)."""
     state = params_to_state(cli.draft_params(d, need))
     return {k: state[k] for k in ("task", "queries", "must", "exclude", "lang", "need")}
 
 
 def agent_prompt(task: str) -> str:
-    return AGENT_PROMPT.format(task=task.strip() or "(опишите задачу)")
+    return AGENT_PROMPT.format(task=task.strip() or "(describe the task)")
 
 
 def eval_to_state(path: Path) -> dict:
-    """Набор eval/*.toml -> форма."""
+    """Dataset eval/*.toml -> form."""
     data = tomllib.loads(path.read_text(encoding="utf-8"))
     return params_to_state({"task": data.get("task", ""), "queries": data.get("queries", []),
                             "lang": data.get("lang") or None, "must": data.get("must", []),
@@ -138,8 +138,8 @@ def run_to_state(path: Path) -> dict:
 
 
 def list_drafts(eval_dir: Path = EVAL_DIR) -> list[Draft]:
-    """Прошлые Прогоны (новые первыми, битые пропускаются) и наборы eval."""
-    out = [Draft(f"{RUN_PREFIX}{s.path.stem}", f"Прогон: {(s.created_at or '')[:10]} {s.task}", s.path)
+    """Past Runs (newest first, corrupt skipped) and eval datasets."""
+    out = [Draft(f"{RUN_PREFIX}{s.path.stem}", f"Run: {(s.created_at or '')[:10]} {s.task}", s.path)
            for s in runs.list_runs() if not s.error]
     for p in sorted(eval_dir.glob("*.toml")):
         try:
@@ -155,7 +155,7 @@ def load_draft(draft: Draft) -> dict:
 
 
 def project_suggestions(verdict_projects: list[str], dev_dir: Path = DEV_DIR) -> list[str]:
-    """Проекты из вердиктов Индекса и имена папок в ~/dev, без повторов."""
+    """Projects from Index verdicts and folder names in ~/dev, deduplicated."""
     dirs = sorted(p.name for p in dev_dir.iterdir() if p.is_dir() and not p.name.startswith(".")) \
         if dev_dir.is_dir() else []
     return list(dict.fromkeys([*verdict_projects, *dirs]))

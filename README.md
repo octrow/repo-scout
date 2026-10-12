@@ -8,6 +8,10 @@
   <img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+">
 </p>
 
+<p align="center">
+  <b>English</b> | <a href="README.ru.md">Русский</a>
+</p>
+
 Search GitHub for something you can reuse before you write it yourself. Small new projects count too: they rank by how close they are to your task, not by stars.
 
 <p align="center">
@@ -42,7 +46,7 @@ Hard conditions: `--lang python`, `--must REGEX` (a required word group, repeata
 Every search is saved as a run in `~/.local/share/repo-scout/runs/<date>-<slug>.json` (`$REPO_SCOUT_RUNS`). Use `--out FILE` to pick the path or `--no-save` to skip saving. Pass `--project P` to tie the run to a project.
 
 ```bash
-repo-scout verdict owner/repo "→ Разбор (how the window hides from screen share)" --project P --task "..."
+repo-scout verdict owner/repo "→ Study (how the window hides from screen share)" --project P --task "..."
 repo-scout gui [--port 8790]   # Search, Runs, Index, Eval
 ```
 
@@ -86,7 +90,7 @@ repo-scout eval --fake-stars [--all-grid]                # precision/recall/FPR 
 uv sync && uv run pytest -q
 ```
 
-The domain glossary is in [`CONTEXT.md`](CONTEXT.md), and design decisions are in [`docs/adr/`](docs/adr/). Both are in Russian, as are the CLI messages.
+The domain glossary is in [`CONTEXT.md`](CONTEXT.md), and design decisions are in [`docs/adr/`](docs/adr/).
 
 ## License
 

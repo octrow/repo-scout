@@ -1,4 +1,4 @@
-"""Содержательный коммит и пересчёт свежести по нему (CONTEXT.md)."""
+"""Substantive commit detection and freshness recalculation (CONTEXT.md)."""
 import re
 from datetime import datetime
 
@@ -6,10 +6,10 @@ SERVICE_BOTS = {"dependabot", "renovate", "github-actions", "pre-commit-ci", "al
                 "semantic-release-bot"}
 AI_AGENTS = ("claude", "copilot", "codex", "devin", "cursor", "openai", "deepseek")
 COSMETIC_PREFIX = re.compile(r"^(docs|chore\(deps\)|ci|style)(\(.*\))?:|^merge", re.IGNORECASE)
-COSMETIC_WORDS = re.compile(r"\b(bump(ed)?|release\s+v?\d|typos?|readme)\b", re.IGNORECASE)  # только для небольших правок
+COSMETIC_WORDS = re.compile(r"\b(bump(ed)?|release\s+v?\d|typos?|readme)\b", re.IGNORECASE)  # small edits only
 TEXT_WORDS = re.compile(r"\b(text|docs?|comments?|wording|spelling|changelog|license|format\w*)\b", re.IGNORECASE)
 TINY_CHANGE = 5
-WORDS_MAX_CHANGE = 100  # крупный коммит с «README» в сообщении содержательный
+WORDS_MAX_CHANGE = 100  # large commit mentioning README is treated as substantive
 
 
 def is_service_bot(commit: dict) -> bool:
@@ -34,8 +34,8 @@ def is_substantive(commit: dict) -> bool:
 
 
 def last_substantive(commits: list[dict], now: datetime) -> tuple[str, bool] | None:
-    """(дата, только_косметика): последний содержательный или самый старый из списка.
-    Коммиты из будущего (дозапись снапшота позже now) игнорируются. None, если коммитов нет."""
+    """(date, is_only_cosmetic): latest substantive commit or oldest in the list.
+    Commits from the future (recorded snapshots after `now`) are ignored. None if no commits."""
     commits = [c for c in commits if datetime.fromisoformat(c["committedDate"]) <= now]
     if not commits:
         return None

@@ -1,9 +1,8 @@
-"""Живой монитор прогонов run_pool: очередь, статус, лог, отмена.
+"""Live run monitor for run_pool: queue, status, log, cancellation.
 
-Ключевое правило: таймер НИКОГДА не пересобирает элементы существующих
-прогонов, только мутирует их (у NiceGUI нет virtual DOM — пересборка убивает
-раскрытость expansion, скролл лога и фокус). Удаление — только для прогонов,
-вытесненных из пула историей (см. `run_pool.FINISHED_HISTORY_LIMIT`).
+Key rule: timer NEVER rebuilds elements of existing runs, only mutates them
+(NiceGUI has no virtual DOM — rebuilding kills expansion state, log scroll, and focus).
+Deletion is only for runs evicted from the pool by history limit (see `run_pool.FINISHED_HISTORY_LIMIT`).
 """
 
 from collections.abc import Callable
@@ -11,14 +10,14 @@ from dataclasses import dataclass
 
 from nicegui import ui
 
-from . import layout, run_pool  # repo-scout: relative import
-from .run_pool import RunState  # repo-scout: relative import
+from . import layout, run_pool
+from .run_pool import RunState
 
 DEFAULT_LOG_MAX_LINES = 2000  # DOM cap only; RunState.lines keeps the full log
 DEFAULT_ERROR_TAIL_LINES = 15
 DEFAULT_POLL_INTERVAL_SECONDS = 1.0
 LOG_VISIBLE_LINES = 14  # the log grows with its lines up to this, then scrolls
-COPY_TEXT = "Скопировать для чата"  # icon-only button: tooltip + aria-label
+COPY_TEXT = "Copy for chat"  # icon-only button: tooltip + aria-label
 
 _STATUS_CSS_CLASSES = {
     run_pool.QUEUED: "ic-status--idle",
@@ -30,7 +29,7 @@ _STATUS_CSS_CLASSES = {
 
 @dataclass
 class RunView:
-    """Виджеты одного прогона в мониторе + счётчики уже показанного."""
+    """Widgets of a single run in the monitor + counters of rendered content."""
 
     expansion: ui.expansion
     status_label: ui.label
@@ -46,57 +45,55 @@ def run_status_text(state: RunState) -> tuple[str, str]:
     """(human status, css class) - shared by every page that lists runs."""
     css_class = _STATUS_CSS_CLASSES.get(state.status, "ic-status--error")
     if state.status == run_pool.QUEUED:
-        text = f"в очереди · №{run_pool.queued_position(state)}"
+        text = f"queued · #{run_pool.queued_position(state)}"
     elif state.status == run_pool.RUNNING:
-        text = "идёт"
+        text = "running"
     elif state.status == run_pool.DONE:
-        text = "готово"
+        text = "done"
     elif state.status == run_pool.CANCELLED:
-        text = "остановлено пользователем"
+        text = "cancelled by user"
     else:
-        text = f"ошибка · код {state.return_code}"
+        text = f"error · code {state.return_code}"
     return text, css_class
 
 
 def _chat_report(state: RunState, error_tail_lines: int) -> str:
-    """Что копируется «для чата»: название, статус, хвост лога. Без разбора лога (это домен)."""
+    """Chat export content: label, status, log tail without log parsing."""
     tail = "\n".join(state.lines[-error_tail_lines:])
-    return f"{state.label or 'прогон'}: {run_status_text(state)[0]}\n\n{tail}"
+    return f"{state.label or 'run'}: {run_status_text(state)[0]}\n\n{tail}"
 
 
 def _confirm_cancel(state: RunState) -> None:
-    """Остановить может любой, но только через диалог подтверждения."""
+    """Cancellation requires confirmation dialog."""
     with ui.dialog() as dialog, ui.card().classes("ic-card p-4 items-stretch"):
-        ui.label("Остановить этот прогон?").classes("t-title-section")
+        ui.label("Stop this run?").classes("t-title-section")
         ui.label(state.label or "—").classes("t-meta")
         with layout.actions_row():
-            layout.button("Отмена", kind="quiet", on_click=dialog.close)
+            layout.button("Cancel", kind="quiet", on_click=dialog.close)
 
             def _confirm() -> None:
                 dialog.close()
                 run_pool.request_cancel(state.run_id)
 
-            layout.button("Остановить", kind="danger", on_click=_confirm)
+            layout.button("Stop", kind="danger", on_click=_confirm)
     dialog.open()
 
 
 def _create_run_view(
     runs_container: ui.column, state: RunState, *, log_max_lines: int, error_tail_lines: int,
 ) -> RunView:
-    """Шапка — колонки: [название ……] [статус-бейдж] [длительность], статус
-    и время стоят ровно друг под другом во всех строках. Внутри — один лог со своей
-    шапкой: «Вывод: N строк» слева, действия справа."""
+    """Header columns: [label] [status badge] [duration]. Inside: single log with header."""
     with runs_container:
         with ui.expansion().classes("w-full ic-run border rounded") as expansion:
             with expansion.add_slot("header"), ui.row().classes("ic-run-head"):
-                ui.label(state.label or "прогон").classes("ic-run-title")
+                ui.label(state.label or "run").classes("ic-run-title")
                 status_label = ui.label("").classes("ic-badge ic-status--idle")
                 duration_label = ui.label("").classes("t-meta ic-run-time")
             with ui.column().classes("ic-log-panel w-full"):
                 with ui.row().classes("ic-log-head w-full items-center justify-between"):
                     log_caption = ui.label("").classes("t-meta ic-log-caption")
                     with ui.row().classes("ic-actions items-center"):
-                        cancel_button = layout.button("Остановить", kind="danger", size="row")
+                        cancel_button = layout.button("Stop", kind="danger", size="row")
                         copy_button = layout.button(
                             kind="quiet", size="row", icon="content_copy",
                             on_click=lambda: _copy_report(state, error_tail_lines),
@@ -115,9 +112,7 @@ def _copy_report(state: RunState, error_tail_lines: int) -> None:
 
 
 def _lines_word(n: int) -> str:
-    if n % 10 == 1 and n % 100 != 11:
-        return "строка"
-    return "строки" if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14 else "строк"
+    return "line" if n == 1 else "lines"
 
 
 def _update_run_view(view: RunView, state: RunState) -> None:
@@ -128,7 +123,7 @@ def _update_run_view(view: RunView, state: RunState) -> None:
     is_pending = state.status in run_pool.PENDING_STATUSES
     view.cancel_button.set_visibility(is_pending)
     view.cancel_button.set_text(
-        "Убрать из очереди" if state.status == run_pool.QUEUED else "Остановить",
+        "Remove from queue" if state.status == run_pool.QUEUED else "Stop",
     )
     view.copy_button.set_visibility(bool(state.lines))
     if view.shown == len(state.lines) and view.log_caption.text:
@@ -137,7 +132,7 @@ def _update_run_view(view: RunView, state: RunState) -> None:
         view.log.push(state.lines[view.shown])
         view.shown += 1
     n = len(state.lines)
-    view.log_caption.text = f"Вывод: {n} {_lines_word(n)}" if n else "Вывода пока нет"
+    view.log_caption.text = f"Output: {n} {_lines_word(n)}" if n else "No output yet"
     # ui.log is a QScrollArea and can't grow by itself: its height follows the line count
     view.log.style(f"--ic-log-lines: {min(max(n, 1), LOG_VISIBLE_LINES)}")
 
@@ -145,12 +140,12 @@ def _update_run_view(view: RunView, state: RunState) -> None:
 def attach_run_monitor(
     *,
     run_filter: "Callable[[RunState], bool] | None" = None,
-    idle_text: str = "Сейчас ничего не выполняется",
+    idle_text: str = "Nothing is currently running",
     poll_interval_seconds: float = DEFAULT_POLL_INTERVAL_SECONDS,
     log_max_lines: int = DEFAULT_LOG_MAX_LINES,
     error_tail_lines: int = DEFAULT_ERROR_TAIL_LINES,
 ) -> None:
-    """Живой список прогонов пула: очередь, активные и история."""
+    """Live list of pool runs: queue, active, and history."""
     empty_label = ui.label(idle_text).classes("t-status ic-status--idle")
     runs_container = ui.column().classes("ic-stack w-full items-stretch")
     views: dict[str, RunView] = {}
@@ -171,7 +166,7 @@ def attach_run_monitor(
                 )
                 views[state.run_id] = view
                 if state is states[-1]:
-                    view.expansion.open()  # свежий — раскрыт; закрыть вправе юзер
+                    view.expansion.open()
             _update_run_view(view, state)
         alive = {state.run_id for state in states}
         for run_id in [run_id for run_id in views if run_id not in alive]:

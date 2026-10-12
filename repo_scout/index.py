@@ -1,4 +1,4 @@
-"""Индекс (ADR-0001): stdlib sqlite3, векторы float32 BLOB, перебор косинуса в numpy; Вердикты."""
+"""Index (ADR-0001): stdlib sqlite3, float32 BLOB vectors, cosine search via numpy; Verdicts."""
 import json
 import os
 import re
@@ -21,17 +21,19 @@ def default_path() -> Path:
     return Path(os.environ.get("REPO_SCOUT_INDEX") or Path.home() / ".local/share/repo-scout/index.db")
 
 
-VERDICT = re.compile(r"→ Осмотр|→ Разбор \(.+\)|отсев \(.+\)|спорно \(.+\)")
+VERDICT = re.compile(r"→ (?:Inspect|Study \(.+\)|\u041e\u0441\u043c\u043e\u0442\u0440|\u0420\u0430\u0437\u0431\u043e\u0440 \(.+\))|(?:drop|doubt|\u043e\u0442\u0441\u0435\u0432|\u0441\u043f\u043e\u0440\u043d\u043e) \(.+\)")
 
 
 def validate_verdict(repo: str, verdict: str, project: str, task: str) -> None:
     if not re.fullmatch(r"[A-Za-z0-9-]+/[A-Za-z0-9._-]+", repo, re.ASCII) or repo.split("/")[1] in (".", ".."):
-        raise ValueError(f"репо {repo!r}: нужен вид owner/repo")
+        raise ValueError(f"repo {repo!r}: owner/repo format required")
     if not VERDICT.fullmatch(verdict) or "\n" in verdict:
-        raise ValueError(f"вердикт {verdict!r}: «→ Осмотр», «→ Разбор (цель)», «отсев (причина)» или «спорно (что уточнить)»")
-    for label, value in (("проект", project), ("задача", task)):
+        raise ValueError(
+            f"verdict {verdict!r}: '→ Inspect', '→ Study (goal)', 'drop (reason)', or 'doubt (what to clarify)'"
+        )
+    for label, value in (("project", project), ("task", task)):
         if not value.strip() or "\n" in value or "\r" in value:
-            raise ValueError(f"{label} {value!r}: нужна непустая строка без переводов строки")
+            raise ValueError(f"{label} {value!r}: non-empty string without newlines required")
 
 
 class Index:
@@ -43,7 +45,7 @@ class Index:
         self._reembed()
 
     def _reembed(self) -> None:
-        """Смена модели: вектора из сохранённых README и метаданных, без API."""
+        """Model migration: recompute vectors from saved READMEs and metadata without API calls."""
         stale = self.db.execute("SELECT name, meta, readme FROM repos WHERE model != ?", (self.model,)).fetchall()
         if not stale:
             return
@@ -62,8 +64,7 @@ class Index:
                  (now or datetime.now(UTC)).isoformat(), np.asarray(vec, dtype=np.float32).tobytes(), self.model))
 
     def top(self, task: str, n: int) -> list[str]:
-        """Топ-n имён по Близости к задаче; перебор по всем векторам.
-        ponytail: brute force; sqlite-vec when index >~200k or search >~200 ms (ADR-0001)"""
+        """Top-n repo names by closeness to task; linear scan across all vectors."""
         rows = self.db.execute("SELECT display_name, vec FROM repos").fetchall()
         if not rows:
             return []
@@ -78,7 +79,7 @@ class Index:
                             (repo.lower(), project, task, verdict, (now or datetime.now(UTC)).date().isoformat()))
 
     def rows(self) -> list[dict]:
-        """Репо Индекса без векторов: key, name, meta, fetched_at, has_readme; по имени без регистра."""
+        """Index repos without vectors: key, name, meta, fetched_at, has_readme; case-insensitive name order."""
         q = "SELECT name, display_name, meta, fetched_at, readme != '' FROM repos ORDER BY display_name COLLATE NOCASE"
         return [{"key": k, "name": n, "meta": json.loads(m), "fetched_at": f, "has_readme": bool(r)}
                 for k, n, m, f, r in self.db.execute(q)]
@@ -88,7 +89,7 @@ class Index:
         return row[0] or None if row else None
 
     def seen(self, names: list[str]) -> dict[str, str]:
-        """«проект: вердикт (дата)» — последний вердикт по каждому проекту, свежие первыми; ключ — имя в нижнем регистре."""
+        """'project: verdict (date)' — latest verdict per project, newest first; lower-case key."""
         out: dict[str, list[str]] = {}
         for name in names:
             q = ("SELECT project, verdict, date FROM verdicts WHERE name = ? ORDER BY date DESC, rowid DESC")
@@ -100,12 +101,12 @@ class Index:
         return {k: "; ".join(v) for k, v in out.items()}
 
     def forget(self, name: str) -> None:
-        """Репо удалено на GitHub: убрать из поиска (Вердикты остаются)."""
+        """Repo deleted on GitHub: remove from search (verdicts remain)."""
         with self.db:
             self.db.execute("DELETE FROM repos WHERE name = ?", (name.lower(),))
 
     def rename(self, old: str, new: str) -> None:
-        """Репо переименовано: старая запись уходит, Вердикты переезжают на новое имя."""
+        """Repo renamed: old entry removed, verdicts migrate to new name."""
         with self.db:
             self.db.execute("DELETE FROM repos WHERE name = ?", (old.lower(),))
             self.db.execute("UPDATE verdicts SET name = ? WHERE name = ?", (new.lower(), old.lower()))

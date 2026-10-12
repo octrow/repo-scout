@@ -12,7 +12,7 @@ from nicegui import app, ui
 
 # --- theme: colors + typography ---------------------------------------------
 # One authored accent (deep teal-petrol, OKLCH 0.525 0.085 220) replaces the
-# default framework blue. Warm = "внимание", red = "упало", green = "готово".
+# default framework blue. Warm = "warning", red = "failed", green = "done".
 # Self-hosted Inter Variable (SIL OFL 1.1) + system mono stack, fully offline;
 # degrades to a Cyrillic-safe system stack when the woff2 is absent.
 
@@ -87,9 +87,9 @@ _COLORS = dict(
 )
 
 # header button cycles these: mode -> (icon, tooltip)
-THEME_MODES = {"system": ("brightness_auto", "Тема: как в системе"),
-               "light": ("light_mode", "Тема: светлая"),
-               "dark": ("dark_mode", "Тема: тёмная")}
+THEME_MODES = {"system": ("brightness_auto", "Theme: system"),
+               "light": ("light_mode", "Theme: light"),
+               "dark": ("dark_mode", "Theme: dark")}
 
 
 def luminance(hex_color: str) -> float:

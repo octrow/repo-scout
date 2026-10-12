@@ -1,14 +1,16 @@
+**English** | **[Русский](VENDORED.ru.md)**
+
 # Vendored nicegui-kit
 
-Копия из `~/dev/pylibs/nicegui-kit/src/nicegui_kit/`, коммит `adf21c1`, дата копирования 2026-10-11.
-Модули: `theme`, `layout`, `table`, `run_pool`, `run_monitor`, `assets/fonts` (Inter, OFL, `LICENSE.txt`). `hotkeys` не копировался.
+Copied from `~/dev/pylibs/nicegui-kit/src/nicegui_kit/`, commit `adf21c1`, copy date 2026-10-11.
+Modules: `theme`, `layout`, `table`, `run_pool`, `run_monitor`, `assets/fonts` (Inter, OFL, `LICENSE.txt`). `hotkeys` was not vendored.
 
-Каждая правка кода помечена `# repo-scout:`. Общие улучшения отправлять в кит через `docs/proposals/`.
+Every code modification is marked with `# repo-scout:`. General improvements should be submitted upstream to the kit via `docs/proposals/`.
 
-## Правки
+## Modifications
 
-- `run_monitor.py`: абсолютные импорты `nicegui_kit` заменены на относительные.
-- `__init__.py`: докстринг заменён на ссылку на этот файл (помечено `# repo-scout:`).
-- Остальное без изменений (строки `nicegui-kit` в константах — ключ localStorage и имя таска — оставлены как есть).
-- Файлы длиннее 400 строк (`theme.py`) не правим: это копия.
-- Python: копия работает на 3.12; ограничение `requires-python >=3.11` сохранено, если тесты проходят.
+- `run_monitor.py`: absolute `nicegui_kit` imports replaced with relative imports.
+- `__init__.py`: docstring replaced with reference to this file (marked `# repo-scout:`).
+- Everything else unchanged (`nicegui-kit` strings in constants — localStorage key and task name — left as is).
+- Files longer than 400 lines (`theme.py`) are kept as-is since this is a vendored copy.
+- Python: vendored copy works on 3.12; `requires-python >=3.11` constraint is maintained as tests pass.

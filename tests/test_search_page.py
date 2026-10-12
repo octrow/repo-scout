@@ -18,10 +18,10 @@ def _values(user: User) -> dict:
 
 async def test_page_opens_with_nav_and_empty_form(user: User) -> None:
     await user.open("/")
-    await user.should_see("Поиск")
-    for nav in ("Прогоны", "Индекс", "Eval"):
+    await user.should_see("Search")
+    for nav in ("Runs", "Index", "Eval"):
         await user.should_see(nav)
-    await user.should_see("Заполните задачу и запросы")
+    await user.should_see("Fill in task and queries")
 
 
 async def test_form_fills_from_draft(user: User) -> None:
@@ -29,7 +29,7 @@ async def test_form_fills_from_draft(user: User) -> None:
     path = runs.save(params, [], [], datetime(2026, 1, 1))
     await user.open(f"/?draft=run:{path.stem}")
     v = _values(user)
-    assert v["Задача (англ.)"] == "Draft task" and v["Запросы"] == "qa\nqb" and v["Язык"] == "go"
+    assert v["Task (English)"] == "Draft task" and v["Queries"] == "qa\nqb" and v["Language"] == "go"
     await user.should_see("--lang=go")
 
 
@@ -38,32 +38,32 @@ async def test_draft_by_path_is_ignored(user: User) -> None:
     path = runs.save(params, [], [], datetime(2026, 1, 1))
     for draft in (f"run:{path}", "run:../x", f"run:{path.stem}/.."):
         await user.open(f"/?draft={draft}")
-        assert _values(user)["Задача (англ.)"] == ""
+        assert _values(user)["Task (English)"] == ""
 
 
 async def test_paste_command_fills_fields(user: User) -> None:
     await user.open("/")
-    user.find(content="Вставить команду").click()
-    area = next(e for e in user.find(ui.input).elements if e.props.get("label") == "Команда")
+    user.find(content="Paste command").click()
+    area = next(e for e in user.find(ui.input).elements if e.props.get("label") == "Command")
     area.value = 'repo-scout --task "Pasted task" --months=2 "q one" "q two"'
-    user.find(content="Применить").click()
+    user.find(content="Apply").click()
     v = _values(user)
-    assert v["Задача (англ.)"] == "Pasted task" and v["Запросы"] == "q one\nq two"
+    assert v["Task (English)"] == "Pasted task" and v["Queries"] == "q one\nq two"
     await user.should_see("--months=2")
 
 
 async def test_paste_invalid_command_shows_error_in_dialog(user: User) -> None:
     await user.open("/")
-    user.find(content="Вставить команду").click()
-    area = next(e for e in user.find(ui.input).elements if e.props.get("label") == "Команда")
+    user.find(content="Paste command").click()
+    area = next(e for e in user.find(ui.input).elements if e.props.get("label") == "Command")
     area.value = "repo-scout --nope"
-    user.find(content="Применить").click()
+    user.find(content="Apply").click()
     await user.should_see("the following arguments")
 
 
 async def test_invalid_regex_shows_error(user: User) -> None:
     await user.open("/")
-    must = next(e for e in user.find(ui.input).elements if e.props.get("label") == "Обязательные слова")
+    must = next(e for e in user.find(ui.input).elements if e.props.get("label") == "Required words")
     must.value = "("
     assert must.validate() is False
     await user.should_see("--must")
@@ -82,16 +82,16 @@ async def test_run_calls_submit_with_argv_and_notifies_on_done(user: User, monke
     run_pool.RUNS.clear()
     await user.open("/")
     by_label = {e.props.get("label"): e for e in user.find(ui.input).elements}
-    by_label["Задача (англ.)"].value = "Real task"
-    by_label["Запросы"].value = "alpha\nbeta"
-    user.find(content="Запустить").click()
+    by_label["Task (English)"].value = "Real task"
+    by_label["Queries"].value = "alpha\nbeta"
+    user.find(content="Launch").click()
     assert len(calls) == 1
     argv, out = calls[0].argv, calls[0].meta["out"]
     a = cli._parser().parse_args(argv[3:])
     assert argv[1:3] == ["-m", "repo_scout"] and a.out == out
     assert a.queries == ["alpha", "beta"] and Path(out).parent == runs.runs_dir()
-    user.notify.contains("Поиск запущен")
-    await asyncio.sleep(1.5)  # таймер страницы замечает завершение
+    user.notify.contains("Search started")
+    await asyncio.sleep(1.5)
     user.notify.contains(f"/runs/{Path(out).stem}")
     await user.should_see("Real task")
     run_pool.RUNS.clear()
@@ -100,27 +100,34 @@ async def test_run_calls_submit_with_argv_and_notifies_on_done(user: User, monke
 async def test_run_with_empty_form_does_not_submit(user: User, monkeypatch) -> None:
     monkeypatch.setattr(run_pool, "submit", lambda *a, **k: pytest.fail("submit"))
     await user.open("/")
-    user.find(content="Запустить").click()
-    user.notify.contains("Опишите задачу")
+    user.find(content="Launch").click()
+    user.notify.contains("Task description is required")
 
 
 async def test_need_field_hidden_without_key(user: User) -> None:
     await user.open("/")
-    await user.should_not_see("Черновик из LLM")
+    await user.should_not_see("Draft from LLM")
+
+
+async def test_need_field_hidden_with_key_but_without_opt_in(user: User, monkeypatch) -> None:
+    monkeypatch.setenv("OMNIROUTE_API_KEY", "k")
+    await user.open("/")
+    await user.should_not_see("Draft from LLM")
 
 
 async def test_llm_draft_fills_form_without_search(user: User, monkeypatch) -> None:
     from repo_scout import llm
     monkeypatch.setenv("OMNIROUTE_API_KEY", "k")
+    monkeypatch.setenv("REPO_SCOUT_GUI_DRAFT", "1")
     monkeypatch.setattr(run_pool, "submit", lambda *a, **k: pytest.fail("submit"))
     monkeypatch.setattr(llm, "draft", lambda need: llm.Draft("Drafted task", ("qa", "qb"), "go", ("m",), ("e",)))
     await user.open("/")
     by_label = {e.props.get("label"): e for e in user.find(ui.input).elements}
-    by_label["Что ищем (любым языком)"].value = "найти штуку"
-    user.find(content="Черновик из LLM").click()
+    by_label["What to search for (any language)"].value = "find a thing"
+    user.find(content="Draft from LLM").click()
     await asyncio.sleep(0.5)
     v = _values(user)
-    assert v["Задача (англ.)"] == "Drafted task" and v["Запросы"] == "qa\nqb" and v["Язык"] == "go"
+    assert v["Task (English)"] == "Drafted task" and v["Queries"] == "qa\nqb" and v["Language"] == "go"
     await user.should_see("--need")
 
 
@@ -128,15 +135,16 @@ async def test_llm_draft_error_notifies_without_internals(user: User, monkeypatc
     from repo_scout import llm
 
     def boom(need):
-        raise llm.LLMError("LLM недоступна")
+        raise llm.LLMError("LLM unavailable")
     monkeypatch.setenv("OMNIROUTE_API_KEY", "k")
+    monkeypatch.setenv("REPO_SCOUT_GUI_DRAFT", "1")
     monkeypatch.setattr(llm, "draft", boom)
     await user.open("/")
     by_label = {e.props.get("label"): e for e in user.find(ui.input).elements}
-    by_label["Что ищем (любым языком)"].value = "x"
-    button = user.find(content="Черновик из LLM")
+    by_label["What to search for (any language)"].value = "x"
+    button = user.find(content="Draft from LLM")
     button.click()
     await asyncio.sleep(0.5)
-    user.notify.contains("Подробности в логе")
-    assert not any("LLM недоступна" in str(m) for m in user.notify.messages)
+    user.notify.contains("See logs")
+    assert not any("LLM unavailable" in str(m) for m in user.notify.messages)
     assert all(b.enabled for b in button.elements)

@@ -1,4 +1,4 @@
-"""Контраст AA у вендорной темы (перенесено из тестов nicegui-kit)."""
+"""AA contrast of vendored theme (ported from nicegui-kit tests)."""
 from pathlib import Path
 
 import pytest

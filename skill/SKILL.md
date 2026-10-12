@@ -1,28 +1,30 @@
+**English** | **[Русский](SKILL.ru.md)**
+
 ---
 name: repo-scout
-description: Поиск готовых решений на GitHub перед тем, как писать своё: свежие проекты с малым числом звёзд тоже в счёт. Используй, когда пользователь хочет что-то сделать и надо проверить, нет ли готового или близкого репо, которое можно взять за основу; на «найди на гитхабе», «есть ли готовое», «поищи аналоги», «repo-scout».
+description: Search for existing GitHub solutions before building your own: recent low-star projects count too. Use whenever the user wants to implement something and needs to check if there is an existing or close repository to build upon; on "find on github", "is there something ready-made", "search for analogs", "repo-scout".
 ---
 
 # repo-scout
 
-Методика: `docs/repo-triage.md` (стоп-правила, флаги, баллы, Шаги 1–3, формат результата). Прочитай её перед началом.
-Команда `repo-scout` делает Шаг 1 механически: поиск, стоп-правила, флаги, общие баллы (свежесть + популярность).
+Methodology: `docs/repo-triage.md` (stop rules, flags, scores, Steps 1–3, output format). Read it before starting.
+The `repo-scout` CLI command performs Step 1 mechanically: search, stop rules, flags, and aggregate scores (freshness + popularity).
 
-## Порядок
+## Workflow
 
-1. **Описание задачи** на английском (1–3 фразы, что нужно; переведи с русского) идёт в `--task`: по нему считается Близость. Если есть `<проект>/docs/repo-triage.md` с проектными осями и порогом, возьми их.
-2. **Запросы.** (Запросы пишешь сам; `repo-scout draft` и Черновик LLM из GUI не используй: они для человека без агента.) 3–6 вариантов: синонимы, англ. термины, `language:`, `topic:`, `in:readme`. `stars:` не ставь: мало звёзд не повод отсекать.
+1. **Task description** in English (1–3 sentences stating what is needed) goes into `--task`: it is used to compute Closeness. If `<project>/docs/repo-triage.md` exists with project axes and thresholds, use them.
+2. **Queries.** (Write queries yourself; do not use `repo-scout draft` or the LLM Draft in the GUI: those are for humans without an agent.) 3–6 query variants: synonyms, English terms, `language:`, `topic:`, `in:readme`. Avoid `stars:` filters: low stars are not a reason to exclude a repo.
    ```bash
    repo-scout --task "Find open-source live speech transcription with an overlay, runs on Linux" "whisper live transcription" "speech to text overlay language:python" "topic:asr linux"
    ```
-   Жёсткие условия: `--lang python`, `--must REGEX` (обязательные слова, повторяемо), `--exclude REGEX` (запрещённые). Ниже порога Близости (`--min-closeness`, 0.64) строки отсеяны как «не по теме»; если выдача узкая или широкая, переформулируй задачу, а не порог. Ход работы пишется в stderr и в `~/.local/state/repo-scout/run.log` (перезаписывается; пользователь может смотреть `tail -f`), `-q` — в stderr только предупреждения. Остальное: `--months 6`, `--new-days 60`, `--all` (с отсеянными), `--json`. Передавай `--project <имя>`: поиск сохраняется как Прогон (путь — в логе), и пользователь может открыть его в GUI (`repo-scout gui`, страница «Прогоны») и ставить Вердикты кликами.
-3. **Второй круг и Индекс срабатывают сами.** Из `topics` топ-10 строится до 5 Запросов `topic:<slug>` (`--round2-k`, `--no-round2`; использованные topics выводятся в stderr), в выдачу добавляются ближайшие из Индекса (`--from-index N`, 50).
-   Флаг `всплеск★ N% ранних` (доля первых ~1000★ в днях-всплесках; REST-история звёзд для топ-10 с ≥50★; `--stars-k`, `--no-stars-check`) — измерение: покупка или вирусный запуск неразличимы; смотри график звёзд при Осмотре, вердиктом не считай.
-4. **Проектные оси.** Для прошедших стоп-правила добавь баллы по осям проекта (платформа, стек, фичи). README читай только если без него не решить: `gh api repos/OWNER/REPO/readme -H 'Accept: application/vnd.github.raw' | head -c 15000`, лучше grep по ключевым словам.
-5. **Осмотр** лучших 3–7 по методичке: без клонирования, с бюджетом токенов. Цель Разбора уточняй у пользователя.
-6. **Результат.** Строки-сводки в формате методички (`триаж: шаг 1 · близ 0.81 · баллы … · флаги: … · вердикт: …`). Детали Шагов 2–3 — в `<проект>/docs/analogs/<repo>.md`.
-7. **Вердикты.** После Осмотра или Разбора запиши в Индекс (`~/.local/share/repo-scout/index.db`, `$REPO_SCOUT_INDEX`):
+   Hard conditions: `--lang python`, `--must REGEX` (required words, repeatable), `--exclude REGEX` (excluded words). Below the Closeness threshold (`--min-closeness`, 0.64), rows are filtered out as "off topic"; if results are too narrow or broad, reformulate the task description rather than the threshold. Progress is logged to stderr and `~/.local/state/repo-scout/run.log` (overwritten; the user can run `tail -f`), `-q` sends only warnings to stderr. Additional flags: `--months 6`, `--new-days 60`, `--all` (include filtered out), `--json`. Pass `--project <name>`: searches are saved as Runs (path shown in log), and the user can open them in the GUI (`repo-scout gui`, "Runs" page) to record Verdicts with clicks.
+3. **Round two and the Index trigger automatically.** From the top-10 `topics`, up to 5 `topic:<slug>` queries are built (`--round2-k`, `--no-round2`; used topics are logged to stderr), and closest entries from the local Index are added (`--from-index N`, 50).
+   The `spike★ N% early` flag (share of the first ~1000★ in burst days; REST stars history for top-10 with ≥50★; `--stars-k`, `--no-stars-check`) is a measurement: purchased stars and viral launches look identical; check the star history chart during Inspection, do not treat as an automatic discard.
+4. **Project axes.** For candidates passing stop rules, add scores along project axes (platform, stack, features). Only read READMEs if required to decide: `gh api repos/OWNER/REPO/readme -H 'Accept: application/vnd.github.raw' | head -c 15000`, preferably grep for keywords.
+5. **Inspection** of top 3–7 per methodology: without cloning, within token budget. Clarify Deep dive objective with the user.
+6. **Result.** Summary lines following methodology format (`triage: step 1 · close 0.81 · scores … · flags: … · verdict: …`). Steps 2–3 details go into `<project>/docs/analogs/<repo>.md`.
+7. **Verdicts.** After Inspection or Deep dive, save verdict to the Index (`~/.local/share/repo-scout/index.db`, `$REPO_SCOUT_INDEX`):
    ```bash
-   repo-scout verdict owner/repo "→ Разбор (как прячут окно от screen share)" --project linux-coding --task "interview assistant"
+   repo-scout verdict owner/repo "→ Deep dive (how the window is hidden from screen share)" --project linux-coding --task "interview assistant"
    ```
-   Формы: `→ Осмотр`, `→ Разбор (<цель>)`, `отсев (<причина>)`, `спорно (<что уточнить>)`. Вердикт никого не скрывает, только показывается при следующих поисках.
+   Formats: `→ Inspect`, `→ Deep dive (<goal>)`, `discard (<reason>)`, `unclear (<what to clarify>)`. A verdict never hides a repo, it is simply displayed in subsequent searches.

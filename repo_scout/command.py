@@ -1,18 +1,18 @@
-"""Команда `repo-scout …` <-> параметры поиска: разбор строки, argv по параметрам."""
+"""Command `repo-scout …` <-> search parameters: string parsing and argv serialization."""
 import argparse
 import shlex
 
-NON_SEARCH = {"out", "no_save", "json", "all", "record", "replay", "quiet"}  # не параметры поиска
+NON_SEARCH = {"out", "no_save", "json", "all", "record", "replay", "quiet"}  # not search parameters
 
 
 def search_params(a: argparse.Namespace) -> dict:
-    """Параметры поиска из Namespace (JSON-безопасный dict, без вывода и снапшотов)."""
+    """Search parameters from Namespace (JSON-serializable dict, excluding output and snapshot options)."""
     return {k: v for k, v in vars(a).items() if k not in NON_SEARCH}
 
 
 def parse_command(text: str) -> argparse.Namespace:
-    """Строка `repo-scout …` (можно с ведущим `$`) -> Namespace; любая ошибка — ValueError."""
-    from repo_scout.cli import _parser, validate_query  # поздний импорт: cli реэкспортирует этот модуль
+    """Parse `repo-scout …` string (optional leading `$`) into Namespace; raises ValueError on error."""
+    from repo_scout.cli import _parser, validate_query  # lazy import: cli re-exports this module
 
     tokens = shlex.split(text)
     while tokens and tokens[0].lstrip("$") in ("", "repo-scout", "repo_scout"):
@@ -22,16 +22,16 @@ def parse_command(text: str) -> argparse.Namespace:
     try:
         a = ap.parse_args(tokens)
     except SystemExit as e:  # -h
-        raise ValueError("справка недоступна в команде") from e
+        raise ValueError("help is not available in command") from e
     for q in a.queries:
         validate_query(q)
     return a
 
 
 def to_argv(params: dict, extra: list[str] | None = None) -> list[str]:
-    """Аргументы после имени программы по параметрам поиска; значения по умолчанию опускаются.
+    """Arguments after program name from search parameters; default values are omitted.
 
-    `extra` (например `["--out", path]`) ставится до `--`, иначе станет запросом.
+    `extra` (such as `["--out", path]`) is placed before `--`, otherwise it becomes a positional query.
     """
     from repo_scout.cli import _parser
 

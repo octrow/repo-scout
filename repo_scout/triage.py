@@ -1,4 +1,4 @@
-"""Стоп-правила, флаги и баллы Шага 1 из docs/repo-triage.md."""
+"""Stop rules, flags, and Step 1 scoring from docs/repo-triage.md."""
 from datetime import datetime
 
 FRESH = [(7, 4), (14, 3), (30, 2), (90, 1)]  # (days since push <=, points)
@@ -16,30 +16,30 @@ def topics_of(r: dict) -> list[str]:
 
 
 def triage(r: dict, now: datetime, new_days: int, last_push: str | None = None) -> dict:
-    """Return the row dict with score, flags and stop reason (None = passes).
+    """Return the row dict with score, flags, and stop reason (None = passes).
 
-    last_push: дата последнего содержательного коммита вместо pushedAt."""
+    last_push: date of the latest substantive commit instead of pushedAt."""
     stars, pushed = r["stargazerCount"], days_since(last_push or r["pushedAt"], now)
     target = (r.get("defaultBranchRef") or {}).get("target") or {}
     commits = (target.get("history") or {}).get("totalCount", 0)
 
     stop = None
     if pushed > 180 or (pushed > 120 and commits < 500):
-        stop = f"мёртвый ({pushed} дн)"
+        stop = f"dead ({pushed}d)"
     elif commits < 50 and stars == 0:
-        stop = f"игрушка ({commits} комм, 0★)"
+        stop = f"toy ({commits} commits, 0★)"
     elif not commits:
-        stop = "нет кода"
+        stop = "no code"
 
     flags = []
     if r["isFork"]:
-        flags.append(f"форк {(r.get('parent') or {}).get('nameWithOwner', '?')}")
+        flags.append(f"fork {(r.get('parent') or {}).get('nameWithOwner', '?')}")
     if stars >= HYPE_MIN_STARS and stars > HYPE_RATIO * max(commits, 1):
         flags.append("stars≫commits")
     if r["isArchived"]:
         flags.append("archived")
     if days_since(r["createdAt"], now) <= new_days:
-        flags.append("новый")
+        flags.append("new")
 
     fresh = next((p for d, p in FRESH if pushed <= d), 0)
     pop = next((p for s, p in POP if stars >= s), 0)
@@ -53,4 +53,4 @@ def triage(r: dict, now: datetime, new_days: int, last_push: str | None = None) 
 
 
 def verdict(r: dict) -> str:
-    return ", ".join(r["flags"] + ([f"**отсев: {r['stop']}**"] if r["stop"] else [])) or "—"
+    return ", ".join(r["flags"] + ([f"**dropped: {r['stop']}**"] if r["stop"] else [])) or "—"

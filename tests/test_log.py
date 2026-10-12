@@ -1,11 +1,36 @@
-from repo_scout import log
+import os
+
+from repo_scout import log as logmod
 
 
-def test_setup_writes_progress_to_file(capsys):
-    path = log.setup(quiet=True)
-    log.log.info("поиск 1/1")
-    log.log.warning("предупреждение")
-    text = path.read_text()
-    assert "поиск 1/1" in text and "предупреждение" in text
-    err = capsys.readouterr().err
-    assert "предупреждение" in err and "поиск 1/1" not in err
+def test_runs_do_not_overwrite_each_other(tmp_path, monkeypatch):
+    first = logmod.setup(quiet=True)
+    logmod.log.info("first")
+    monkeypatch.setattr(os, "getpid", lambda: 999_999)  # second process in the same second
+    second = logmod.setup(quiet=True)
+    logmod.log.info("second")
+    assert first != second and "first" in first.read_text() and "second" not in first.read_text()
+    assert logmod.log_path().resolve() == second.resolve()  # run.log points to the latest
+
+
+def test_prune_keeps_total_under_limit_and_current(tmp_path):
+    files = []
+    for i in range(4):
+        p = tmp_path / f"{i}.log"
+        p.write_bytes(b"x" * 100)
+        os.utime(p, (i, i))
+        files.append(p)
+    logmod.prune(tmp_path, keep=files[0], limit=250)
+    assert [p.exists() for p in files] == [True, False, False, True]
+
+
+def test_fatal_exit_message_goes_to_log_file():
+    import pytest
+    path = logmod.setup(quiet=True)
+
+    @logmod.logged_exit
+    def main() -> None:
+        raise SystemExit("eval: LLM unavailable")
+    with pytest.raises(SystemExit):
+        main()
+    assert "ERROR eval: LLM unavailable" in path.read_text()

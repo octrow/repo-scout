@@ -1,17 +1,19 @@
-# 0001. Индекс: stdlib sqlite3 + векторы BLOB + перебор в numpy
+**English** | **[Русский](0001-index-sqlite-blob-numpy.ru.md)**
 
-Дата: 2026-10-11 · Статус: принято
+# 0001. Index: stdlib sqlite3 + BLOB vectors + numpy scan
 
-## Контекст
-Индекс пополняется только кандидатами, которые мы и так скачали (прошли стоп-правила, есть README). Ожидаемый объём — тысячи, максимум десятки тысяч репо. Эмбеддинги — fastembed (`bge-small`, 384 float32), numpy приходит с ним.
+Date: 2026-10-11 · Status: accepted
 
-## Решение
-Одна таблица в stdlib `sqlite3`: метаданные, `fetched_at`, вектор как BLOB. Поиск — полный перебор косинуса в numpy. 20 000 × 384 × 4 Б ≈ 30 MB, перебор — миллисекунды.
+## Context
+The index is populated only with candidates that we downloaded anyway (passed stop rules, have a README). Expected scale — thousands, at most tens of thousands of repositories. Embeddings — fastembed (`bge-small`, 384 float32), numpy is pulled in alongside it.
 
-## Отвергнутые варианты (на будущее)
-- **fastembed + LanceDB** (как у DeepGit, `external_examples/DeepGit/src/deepgit/retrieval/semantic.py`). Готовый `merge_insert`, масштаб до миллионов. Минус: pyarrow (~100+ MB), колоночная БД ради тысяч строк.
-- **fastembed + sqlite-vec.** Настоящий ANN-поиск, тот же один файл sqlite, лёгкое расширение. Минус: лишняя нативная зависимость, пока перебор справляется.
+## Decision
+A single table in standard library `sqlite3`: metadata, `fetched_at`, vector as BLOB. Search is an exact numpy cosine scan over all entries. 20,000 × 384 × 4 B ≈ 30 MB; scanning takes milliseconds.
 
-## Когда пересмотреть
-- Индекс > ~200k репо или поиск по нему > ~200 мс → sqlite-vec (меняется только функция поиска).
-- Появился полноценный индекс с массовой выкачкой (вариант «(б)» из обсуждения, GH Archive/крон) → LanceDB или sqlite-vec.
+## Rejected Alternatives (for future reference)
+- **fastembed + LanceDB** (as in DeepGit, `external_examples/DeepGit/src/deepgit/retrieval/semantic.py`). Out-of-the-box `merge_insert`, scales up to millions. Drawback: pyarrow (~100+ MB), columnar DB for a few thousand rows.
+- **fastembed + sqlite-vec.** True ANN search, same single sqlite file, lightweight extension. Drawback: redundant native dependency while linear numpy scan suffices.
+
+## When to Revisit
+- Index > ~200k repositories or search latency > ~200 ms → sqlite-vec (only the search function needs to change).
+- If a full-blown bulk-crawled index is introduced (GH Archive / cron job) → LanceDB or sqlite-vec.

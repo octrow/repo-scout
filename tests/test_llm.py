@@ -48,8 +48,8 @@ def test_defaults(monkeypatch):
 
 
 def test_draft_parses_fenced_json(monkeypatch):
-    fake_post(monkeypatch, "Вот:\n```json\n" + json.dumps(GOOD) + "\n```")
-    d = llm.draft("живая расшифровка речи")
+    fake_post(monkeypatch, "Here:\n```json\n" + json.dumps(GOOD) + "\n```")
+    d = llm.draft("live speech recognition")
     assert d == llm.Draft(GOOD["task"], tuple(GOOD["queries"]), "python", ("whisper",), ("^$x",))
     assert llm.last_stats["tokens"] == 10
 
@@ -106,18 +106,18 @@ def test_record_then_replay(monkeypatch, tmp_path):
 
 def test_replay_without_snapshot(tmp_path):
     github.configure("replay", tmp_path)
-    with pytest.raises(llm.LLMError, match="снапшота"):
+    with pytest.raises(llm.LLMError, match="snapshot"):
         llm.draft("need")
 
 
 def test_cli_draft_prints_one_line(monkeypatch, capsys):
     fake_post(monkeypatch, json.dumps(GOOD))
-    monkeypatch.setattr("sys.argv", ["repo-scout", "draft", "расшифровка речи"])
+    monkeypatch.setattr("sys.argv", ["repo-scout", "draft", "speech recognition"])
     cli.main()
     line = capsys.readouterr().out.strip()
     assert "\n" not in line
     a = cli.parse_command(line)
-    assert a.task == GOOD["task"] and a.queries == GOOD["queries"] and a.need == "расшифровка речи"
+    assert a.task == GOOD["task"] and a.queries == GOOD["queries"] and a.need == "speech recognition"
     assert a.lang == "python" and a.must == ["whisper"]
 
 
@@ -130,8 +130,8 @@ def test_cli_draft_without_key(monkeypatch):
 
 
 def test_need_roundtrips_through_command():
-    p = cli.search_params(cli.parse_command('repo-scout --task t --need "расшифровка речи" -- q'))
-    assert p["need"] == "расшифровка речи"
+    p = cli.search_params(cli.parse_command('repo-scout --task t --need "speech recognition" -- q'))
+    assert p["need"] == "speech recognition"
     assert cli.parse_command("repo-scout " + " ".join(__import__("shlex").quote(t) for t in cli.to_argv(p))).need == p["need"]
 
 
@@ -217,3 +217,10 @@ def test_redirect_is_not_followed():
     import urllib.request
     req = urllib.request.Request("http://a/x", headers={"Authorization": "Bearer k"})
     assert llm._NoRedirect().redirect_request(req, None, 302, "Found", {}, "http://evil/") is None
+
+
+def test_refused_connection_is_not_reported_as_timeout():
+    import urllib.error
+    from repo_scout import llm
+    assert "refused" in llm._why(urllib.error.URLError(ConnectionRefusedError()))
+    assert "no response" in llm._why(urllib.error.URLError(TimeoutError()))

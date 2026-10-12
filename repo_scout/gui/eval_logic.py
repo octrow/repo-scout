@@ -1,4 +1,4 @@
-"""Страница «Eval» без UI: наборы eval/*.toml и argv подпроцесса."""
+"""Eval page logic without UI: eval/*.toml datasets and subprocess argv."""
 import sys
 import tomllib
 from dataclasses import dataclass, field
@@ -16,13 +16,13 @@ class EvalSet:
     path: Path
     task: str
     n_expected: int
-    snapshot: str  # дата снимка: analysis_date набора или mtime каталога снапшотов
+    snapshot: str  # snapshot date: dataset analysis_date or snapshot directory mtime
 
 
 @dataclass
 class EvalOptions:
     sets: list[Path] = field(default_factory=list)
-    record: bool = False  # по умолчанию --replay: без сети
+    record: bool = False  # defaults to --replay: offline
     detail: bool = False
     sweep: bool = False
     top: int = 0
@@ -47,9 +47,8 @@ def list_sets(eval_dir: Path = EVAL_DIR) -> list[EvalSet]:
     return out
 
 
-
 def eval_argv(o: EvalOptions, out: Path) -> list[str]:
-    """argv `repo-scout eval …`: наборы, режим, флаги и `--out`."""
+    """argv for `repo-scout eval …`: datasets, mode, flags, and `--out`."""
     argv = [sys.executable, "-m", "repo_scout", "eval"]
     if not o.fake_stars:
         argv += [str(p) for p in o.sets]
@@ -73,5 +72,5 @@ def export_argv(project: str | None, out: Path) -> list[str]:
 
 def eval_errors(o: EvalOptions) -> list[str]:
     if not o.fake_stars and not o.sets:
-        return ["Выберите хотя бы один набор"]
+        return ["Select at least one set"]
     return []

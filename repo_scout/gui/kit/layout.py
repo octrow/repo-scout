@@ -26,7 +26,7 @@ BUTTON_KINDS = {
     "quiet": "flat color=primary",
     "danger": "outline color=negative",
 }
-COPIED_TEXT = "Скопировано — вставьте в чат"
+COPIED_TEXT = "Copied — paste into chat"
 
 # Field kind -> native input attributes: the right mobile keyboard (inputmode),
 # browser/password-manager autofill (autocomplete) and the Enter key label
@@ -47,7 +47,7 @@ FIELD_KINDS: dict[str, dict[str, str]] = {
     "password": {"autocomplete": "current-password"},
     "new-password": {"autocomplete": "new-password"},
 }
-REQUIRED_TEXT = "Заполните поле «{label}»"
+REQUIRED_TEXT = "Please fill in '{label}'"
 
 
 def heading(text: str, *, level: int = 2) -> ui.element:
@@ -170,7 +170,7 @@ def empty(text: str, action: tuple[str, Callable] | None = None) -> ui.row:
     return row
 
 
-def waiting(text: str = "Загружается") -> ui.row:
+def waiting(text: str = "Loading") -> ui.row:
     """A spinner with words, for anything slower than a blink."""
     with ui.row().classes("ic-state items-center") as row:
         ui.spinner(size="1.25rem", color="primary")
@@ -184,7 +184,7 @@ def failed(text: str, retry: Callable | None = None) -> ui.row:
         ui.icon("error_outline").classes("ic-status--error").props('aria-hidden="true"')
         ui.label(text).classes("ic-status--error")
         if retry:
-            button("Повторить", size="row", on_click=retry)
+            button("Retry", size="row", on_click=retry)
     return row
 
 
@@ -210,4 +210,4 @@ def copy_for_chat_button(text: str) -> ui.button:
         ui.clipboard.write(text)
         ui.notify(COPIED_TEXT, type="positive")
 
-    return button("Скопировать для чата", icon="content_copy", on_click=_copy)
+    return button("Copy for chat", icon="content_copy", on_click=_copy)

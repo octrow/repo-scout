@@ -15,7 +15,7 @@ def busy_port():
 
 
 def _never(_q: str, _d: bool) -> bool:
-    raise AssertionError("не должно спрашивать")
+    raise AssertionError("should not ask")
 
 
 def test_free_port_is_used_without_asking():
@@ -39,7 +39,7 @@ def test_foreign_program_declined_returns_none(busy_port, monkeypatch):
 
 def test_our_gui_shows_link_and_does_not_restart_by_default(busy_port, monkeypatch, capsys):
     monkeypatch.setattr(portmod, "our_pid", lambda p: 4242)
-    monkeypatch.setattr(portmod, "stop", lambda pid, p: pytest.fail("перезапуск без согласия"))
+    monkeypatch.setattr(portmod, "stop", lambda pid, p: pytest.fail("restart without consent"))
     asked = []
     assert portmod.choose(busy_port, ask=lambda q, d: asked.append(d) or d) is None
     assert asked == [False]
@@ -56,7 +56,7 @@ def test_our_gui_restart_when_confirmed(busy_port, monkeypatch):
 
 def test_stop_refuses_foreign_process(monkeypatch):
     monkeypatch.setattr(portmod, "_is_repo_scout", lambda pid: False)
-    monkeypatch.setattr(portmod.os, "kill", lambda *a: pytest.fail("сигнал чужому процессу"))
+    monkeypatch.setattr(portmod.os, "kill", lambda *a: pytest.fail("signal to foreign process"))
     with pytest.raises(RuntimeError):
         portmod.stop(4242, 1)
 

@@ -7,7 +7,7 @@ from repo_scout import runs
 
 NOW = datetime(2026, 5, 1, 12, 30, 5, tzinfo=UTC)
 PARAMS = {"task": "Find a CLI tool for X!", "queries": ["q"], "project": "p"}
-ROWS = [{"repo": "a/b", "stop": None}, {"repo": "c/d", "stop": "мёртвый"}]
+ROWS = [{"repo": "a/b", "stop": None}, {"repo": "c/d", "stop": "dead"}]
 
 
 def test_save_load_roundtrip():
@@ -20,7 +20,7 @@ def test_save_load_roundtrip():
 
 
 def test_slug_fallback_and_limit():
-    assert runs.slug("Привет, мир") == "run"
+    assert runs.slug("!!!") == "run"
     assert len(runs.slug("a" * 100)) == 40
 
 
@@ -29,14 +29,15 @@ def test_no_collision():
 
 
 def test_non_ascii_not_escaped():
-    path = runs.save(PARAMS, ROWS, [], NOW)
-    assert "мёртвый" in path.read_text(encoding="utf-8")
+    row_unicode = [{"repo": "a/b", "stop": "★ unicode"}]
+    path = runs.save(PARAMS, row_unicode, [], NOW)
+    assert "★ unicode" in path.read_text(encoding="utf-8")
 
 
 def test_list_runs_with_broken_file():
     good = runs.save(PARAMS, ROWS, [], NOW)
     bad = runs.runs_dir() / "20260101-000000-bad.json"
-    bad.write_text("{не json")
+    bad.write_text("{not json")
     s = {x.path: x for x in runs.list_runs()}
     assert s[good].error is None and s[good].n_total == 2 and s[good].n_kept == 1
     assert s[good].task == PARAMS["task"] and s[good].project == "p"

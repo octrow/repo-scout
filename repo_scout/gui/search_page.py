@@ -1,4 +1,4 @@
-"""Страница «Поиск» (`/`): форма, команда, запуск подпроцессом с живым логом."""
+"""Search page (`/`): form, command preview, subprocess execution with live logs."""
 import html
 import sqlite3
 import tomllib
@@ -15,28 +15,28 @@ from . import shell
 from .kit import layout, run_monitor, run_pool
 
 NOTIFY_PERIOD = 1.0
-COMMAND_HINT = "Заполните задачу и запросы: команда появится здесь"
-NUMBER_LABELS = {"months": "Месяцев с последнего push (0 — без фильтра)", "new_days": "Флаг «новый»: младше, дней",
-                 "limit": "Результатов на запрос", "min_closeness": "Порог Близости",
-                 "from_index": "Ближайших из Индекса", "round2_k": "Тем для второго круга",
-                 "stars_k": "Репо для проверки звёзд"}
-FLAG_LABELS = {"no_round2": "Без второго круга", "no_stars_check": "Без проверки всплеска звёзд"}
+COMMAND_HINT = "Fill in task and queries: command will appear here"
+NUMBER_LABELS = {"months": "Months since last push (0 — no filter)", "new_days": "'new' flag: younger than, days",
+                 "limit": "Results per query", "min_closeness": "Closeness threshold",
+                 "from_index": "Nearest from Index", "round2_k": "Topics for round 2",
+                 "stars_k": "Repos for star check"}
+FLAG_LABELS = {"no_round2": "Skip round 2", "no_stars_check": "Skip star burst check"}
 
 
 def _verdict_projects() -> list[str]:
     try:
         return list(dict.fromkeys(v[0] for v in Index(default_path()).verdicts()))
-    except (sqlite3.Error, OSError):  # Индекс только для подсказок: сломанный не мешает искать
-        log.warning("Проекты из Индекса недоступны", exc_info=True)
+    except (sqlite3.Error, OSError):  # Index only for autocomplete: broken index does not block search
+        log.warning("Index projects unavailable", exc_info=True)
         return []
 
 
 class SearchForm:
-    """Поля формы и их связь с состоянием; логика значений живёт в `search_form`."""
+    """Form fields and their connection to state; values logic lives in `search_form`."""
 
     def __init__(self) -> None:
         self.fields: dict[str, ui.element] = {}
-        self.command: ui.label | None = None  # создаётся на странице, где ему место
+        self.command: ui.label | None = None
         self.drafts = {d.key: d for d in sf.list_drafts()}
 
     def state(self) -> dict:
@@ -44,7 +44,7 @@ class SearchForm:
 
     def fill(self, state: dict, *, validate: bool = True) -> None:
         for key, value in state.items():
-            if key in self.fields:  # поле Потребности есть только при ключе LLM
+            if key in self.fields:
                 self.fields[key].value = value
         for el in self.fields.values():
             if validate and isinstance(el, ui.input):
@@ -61,7 +61,6 @@ class SearchForm:
         return el
 
     def text(self, key: str, label: str, check: Callable[[str], str | None] | None = None, **kw) -> ui.input:
-        # validation: callable, возвращающий текст ошибки; field() подключает проверку при blur
         el = layout.field(label, validation={"": lambda v: True} if check else None, **kw)
         if check:
             el.validation = lambda v: check(v or "")
@@ -75,61 +74,61 @@ def _load_draft(form: SearchForm, key: str) -> None:
     try:
         state = sf.load_draft(form.drafts[key])
     except (ValueError, OSError, tomllib.TOMLDecodeError):
-        log.warning("Черновик не загружен: %s", key, exc_info=True)
-        ui.notify("Не удалось загрузить черновик: файл повреждён или недоступен", type="negative")
+        log.warning("Draft not loaded: %s", key, exc_info=True)
+        ui.notify("Failed to load draft: file corrupt or inaccessible", type="negative")
         return
     form.fill(state)
 
 
-LLM_FAILED = "Черновик не получен: модель не ответила или ответ не прошёл проверку. Подробности в логе."
+LLM_FAILED = "Draft failed: model did not respond or response failed validation. See logs."
 
 
 async def _llm_draft(form: SearchForm, button: ui.button) -> None:
-    """Черновик из LLM заполняет форму; поиск не запускает. Ошибки без внутренних подробностей."""
+    """LLM draft fills form; does not start search. Errors without internal details."""
     need = (form.state().get("need") or "").strip()
     if not need:
-        ui.notify("Опишите, что ищем", type="negative")
+        ui.notify("Describe what to find", type="negative")
         return
     button.disable()
     try:
         d = await run.io_bound(llm.draft, need)
     except llm.LLMError as e:
-        log.warning("Черновик LLM не получен: %s", e)
+        log.warning("LLM draft failed: %s", e)
         ui.notify(LLM_FAILED, type="negative")
         return
     finally:
         button.enable()
     form.fill(sf.draft_to_state(d, need))
-    ui.notify("Черновик заполнен: проверьте и запустите поиск", type="positive")
+    ui.notify("Draft filled: review and launch search", type="positive")
 
 
 def _need_row(form: SearchForm) -> None:
-    form.area("need", "Что ищем (любым языком)", hint="Своими словами, без названий готовых решений")
-    button = layout.button("Черновик из LLM", icon="auto_awesome")
+    form.area("need", "What to search for (any language)", hint="In your own words, without mentioning specific tool names")
+    button = layout.button("Draft from LLM", icon="auto_awesome")
     button.on_click(lambda: _llm_draft(form, button))
 
 
 def _fields(form: SearchForm) -> None:
-    if llm.available():
+    if llm.gui_enabled():
         _need_row(form)
     drafts = {k: d.label for k, d in form.drafts.items()}
-    ui.select(drafts, label="Черновик", with_input=True, clearable=True,
+    ui.select(drafts, label="Draft", with_input=True, clearable=True,
               on_change=lambda e: e.value and _load_draft(form, e.value)) \
-        .props('outlined dense stack-label hint="Из прошлого Прогона или набора eval"').classes("w-full")
-    form.area("task", "Задача (англ.)", required=True, hint="1-3 фразы: что нужно найти")
-    form.area("queries", "Запросы", sf.check_queries, hint="По одному на строку; 3-6 вариантов")
-    form.text("project", "Проект", suggestions=sf.project_suggestions(_verdict_projects()))
+        .props('outlined dense stack-label hint="From a past Run or eval dataset"').classes("w-full")
+    form.area("task", "Task (English)", required=True, hint="1-3 sentences: what needs to be found")
+    form.area("queries", "Queries", sf.check_queries, hint="One per line; 3-6 variants")
+    form.text("project", "Project", suggestions=sf.project_suggestions(_verdict_projects()))
     with layout.grid():
-        form.text("lang", "Язык", hint="Например python").classes("ic-span-4")
-        form.area("must", "Обязательные слова", lambda v: sf.check_regexes("--must", v),
-                  hint="Регулярки, по одной на строку").classes("ic-span-4")
-        form.area("exclude", "Запрещённые слова", lambda v: sf.check_regexes("--exclude", v),
-                  hint="Регулярки, по одной на строку").classes("ic-span-4")
+        form.text("lang", "Language", hint="For example python").classes("ic-span-4")
+        form.area("must", "Required words", lambda v: sf.check_regexes("--must", v),
+                  hint="Regexes, one per line").classes("ic-span-4")
+        form.area("exclude", "Excluded words", lambda v: sf.check_regexes("--exclude", v),
+                  hint="Regexes, one per line").classes("ic-span-4")
 
 
 def _advanced(form: SearchForm) -> None:
     defaults = sf.default_state()
-    with ui.expansion("Дополнительно").classes("w-full"):
+    with ui.expansion("Advanced").classes("w-full"):
         with layout.grid():
             for key, label in NUMBER_LABELS.items():
                 form.add(key, ui.number(label, value=defaults[key]).props("outlined dense stack-label")
@@ -140,8 +139,8 @@ def _advanced(form: SearchForm) -> None:
 
 def _paste_dialog(form: SearchForm) -> ui.dialog:
     with ui.dialog() as dialog, layout.section_card():
-        layout.heading("Вставить команду", level=2)
-        area = layout.field("Команда", hint="Строка repo-scout …").props("type=textarea autogrow rows=3")
+        layout.heading("Paste command", level=2)
+        area = layout.field("Command", hint="repo-scout … command string").props("type=textarea autogrow rows=3")
         error = ui.label().classes("ic-status--error")
 
         def apply() -> None:
@@ -155,8 +154,8 @@ def _paste_dialog(form: SearchForm) -> ui.dialog:
             dialog.close()
 
         with layout.actions_row():
-            layout.button("Отмена", kind="quiet", on_click=dialog.close)
-            layout.button("Применить", kind="primary", on_click=apply)
+            layout.button("Cancel", kind="quiet", on_click=dialog.close)
+            layout.button("Apply", kind="primary", on_click=apply)
     return dialog
 
 
@@ -169,16 +168,16 @@ def _start(form: SearchForm, started: dict[str, str]) -> None:
         ui.notify(errors[0], type="negative")
         return
     out = sf.out_path(state["task"], datetime.now())
-    run = run_pool.submit(sf.run_argv(state, out), label=state["task"].strip(), meta={"out": str(out)})
-    if run is None:
-        ui.notify("Очередь запусков переполнена: дождитесь завершения", type="warning")
+    run_item = run_pool.submit(sf.run_argv(state, out), label=state["task"].strip(), meta={"out": str(out)})
+    if run_item is None:
+        ui.notify("Execution queue is full: wait for completion", type="warning")
         return
-    started[run.run_id] = out.stem
-    ui.notify("Поиск запущен", type="positive")
+    started[run_item.run_id] = out.stem
+    ui.notify("Search started", type="positive")
 
 
 def _watch_done(started: dict[str, str]) -> None:
-    """ui.* только здесь, в таймере страницы: из on_line вызывать нельзя."""
+    """ui.* only here in page timer: must not call from on_line."""
     for run_id, stem in list(started.items()):
         state = run_pool.RUNS.get(run_id)
         if state is None or state.status in run_pool.PENDING_STATUSES:
@@ -186,28 +185,28 @@ def _watch_done(started: dict[str, str]) -> None:
         started.pop(run_id)
         if state.status == run_pool.DONE:
             title = html.escape(state.label)
-            ui.notify(f'Готово: {title}. <a href="/runs/{stem}">Открыть прогон</a>', type="positive",
-                      html=True, close_button="Закрыть", timeout=0)
+            ui.notify(f'Done: {title}. <a href="/runs/{stem}">Open run</a>', type="positive",
+                      html=True, close_button="Close", timeout=0)
 
 
 def _buttons(form: SearchForm, started: dict[str, str]) -> None:
     paste = _paste_dialog(form)
     with layout.actions_row(end=False):
-        layout.button("Запустить", kind="primary", icon="search", on_click=lambda: _start(form, started))
+        layout.button("Launch", kind="primary", icon="search", on_click=lambda: _start(form, started))
 
         def copy_prompt() -> None:
             ui.clipboard.write(sf.agent_prompt(form.state()["task"]))
             ui.notify(layout.COPIED_TEXT, type="positive")
 
-        layout.button("Промпт для агента", icon="content_copy", on_click=copy_prompt)
-        layout.button("Вставить команду", kind="quiet", icon="content_paste", on_click=paste.open)
+        layout.button("Agent prompt", icon="content_copy", on_click=copy_prompt)
+        layout.button("Paste command", kind="quiet", icon="content_paste", on_click=paste.open)
 
 
 def search(draft: str | None = None) -> None:
     shell.shell("/", layout.PAGE_MAX_WIDTH_FORM)
     started: dict[str, str] = {}
     with layout.page_container():
-        layout.heading("Поиск", level=1)
+        layout.heading("Search", level=1)
         with ui.column().classes("w-full").style("gap: var(--ic-s4)"):
             form = SearchForm()
             with layout.section_card():
@@ -216,11 +215,11 @@ def search(draft: str | None = None) -> None:
             with layout.section_card(recessive=True):
                 with ui.row().classes("ic-split w-full items-start justify-between no-wrap"):
                     form.command = ui.label().classes("t-mono").style("min-width: 0; overflow-wrap: anywhere")
-                    layout.button("Копировать", kind="quiet", icon="content_copy", on_click=lambda: (
+                    layout.button("Copy", kind="quiet", icon="content_copy", on_click=lambda: (
                         ui.clipboard.write((sf.command_text(form.state()) or "")), ui.notify(layout.COPIED_TEXT)))
                 _buttons(form, started)
-            layout.heading("Запуски", level=2)
-            run_monitor.attach_run_monitor(idle_text="Запусков пока не было")
+            layout.heading("Runs", level=2)
+            run_monitor.attach_run_monitor(idle_text="No runs yet")
             ui.timer(NOTIFY_PERIOD, lambda: _watch_done(started))
     if draft in form.drafts:
         form.fill(sf.load_draft(form.drafts[draft]))

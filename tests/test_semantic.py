@@ -1,4 +1,4 @@
-"""Очистка README и Близость (без загрузки модели)."""
+"""README cleaning and Closeness (without loading model)."""
 import numpy as np
 
 from repo_scout import cli, semantic
@@ -39,9 +39,9 @@ def _row(repo, closeness, score=0, days=1, stop=None):
 
 
 def test_apply_closeness_and_sort():
-    rows = [_row("a", 0.9), _row("b", 0.4), _row("c", None, stop="мёртвый")]
+    rows = [_row("a", 0.9), _row("b", 0.4), _row("c", None, stop="dead")]
     cli.apply_closeness(rows, 0.5)
-    assert rows[1]["stop"] == "не по теме (0.40)" and rows[0]["stop"] is None and rows[2]["stop"] == "мёртвый"
+    assert rows[1]["stop"] == "off-topic (0.40)" and rows[0]["stop"] is None and rows[2]["stop"] == "dead"
     rows = [_row("lo", 0.7, 9), _row("hi2", 0.8, 1, 5), _row("hi1", 0.8, 1, 2), _row("hi0", 0.8, 3)]
     assert [r["repo"] for r in sorted(rows, key=cli.sort_key)] == ["hi0", "hi1", "hi2", "lo"]
 
@@ -52,7 +52,7 @@ def test_add_closeness_uses_embedder(monkeypatch):
                         lambda ts: np.array([[1, 0] if "match" in t else [0, 1] for t in ts], dtype=np.float32))
     rows = [{"repo": "o/a", "desc": "match", "topics": [], "stop": None},
             {"repo": "o/b", "desc": "x", "topics": [], "stop": None},
-            {"repo": "o/c", "desc": "match", "topics": [], "stop": "мёртвый"}]
+            {"repo": "o/c", "desc": "match", "topics": [], "stop": "dead"}]
     cli.add_closeness(rows, {"o/a": "readme"}, "task")
     assert [r.get("closeness") for r in rows] == [1.0, 0.0, None]
 
@@ -68,3 +68,18 @@ def test_clean_readme_hostile_input_is_fast():
         t = time.perf_counter()
         semantic.clean_readme(bad * (1_000_000 // len(bad)))
         assert time.perf_counter() - t < 1
+
+
+def test_embed_docs_reuses_vectors_within_process(monkeypatch):
+    seen = []
+
+    class Fake:
+        def passage_embed(self, texts, batch_size):
+            seen.append(list(texts))
+            return [[float(len(t))] + [0.0] * 383 for t in texts]
+    monkeypatch.setattr(semantic, "_get", lambda: Fake())
+    monkeypatch.setattr(semantic, "_doc_cache", {})
+    first = semantic.embed_docs(["a", "bb"])
+    again = semantic.embed_docs(["bb", "ccc", "a"])
+    assert seen == [["a", "bb"], ["ccc"]] and again.shape == (3, 384)
+    assert (again[0] == first[1]).all()

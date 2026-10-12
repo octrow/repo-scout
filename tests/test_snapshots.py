@@ -26,8 +26,9 @@ def test_record_then_replay(monkeypatch, tmp_path):
                         subprocess.CompletedProcess(cmd, 0, RESP, ""))
     now = datetime(2026, 10, 11, tzinfo=UTC)
     github.configure("record", tmp_path)
+    (tmp_path / "meta.json").write_text(json.dumps({"recorded_at": now.isoformat()}))
     rows = run(["q"], months=6, new_days=60, limit=5, lang=None, now=now)
-    assert len(calls) == 2 and rows[0]["repo"] == "a/b"  # поиск + details
+    assert len(calls) == 2 and rows[0]["repo"] == "a/b"  # search + details
     assert "recorded_at" in json.loads((tmp_path / "meta.json").read_text())
 
     monkeypatch.setattr(subprocess, "run", lambda *a, **k: pytest.fail("network in replay"))
@@ -38,7 +39,7 @@ def test_record_then_replay(monkeypatch, tmp_path):
 def test_replay_missing_snapshot(tmp_path):
     (tmp_path / "meta.json").write_text('{"recorded_at": "2026-10-11T00:00:00+00:00"}')
     github.configure("replay", tmp_path)
-    with pytest.raises(github.GitHubError, match="снапшот"):
+    with pytest.raises(github.GitHubError, match="snapshot"):
         github.search("q", 5)
 
 
@@ -82,12 +83,12 @@ def test_details_per_repo_snapshots(monkeypatch, tmp_path):
     github.configure("record", tmp_path)
     github.details(["a/b", "c/d"])
     assert len(sent) == 1 and len(list((tmp_path / "details").glob("*.json.gz"))) == 2
-    github.details(["a/b", "c/d", "e/f"])  # дозапись: только недостающее
+    github.details(["a/b", "c/d", "e/f"])  # append: missing only
     assert len(sent) == 2 and "e0:" not in sent[1] and sent[1].count("repository(") == 1
     monkeypatch.setattr(github, "_graphql_live", lambda *a: pytest.fail("network in replay"))
     github.configure("replay", tmp_path)
-    assert github.details(["e/f", "a/B"]).keys() == {"e/f", "a/B"}  # другой состав пачки, регистр не важен
-    with pytest.raises(github.GitHubError, match="снапшот"):
+    assert github.details(["e/f", "a/B"]).keys() == {"e/f", "a/B"}
+    with pytest.raises(github.GitHubError, match="snapshot"):
         github.details(["x/y"])
 
 
@@ -95,3 +96,55 @@ def test_readme_text_is_capped(monkeypatch):
     big = json.dumps({"data": {"r0": {"m0": {"text": "x" * 20_000}}}})
     monkeypatch.setattr(subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, big, ""))
     assert len(github.graphql("q", {})["data"]["r0"]["m0"]["text"]) == github.README_MAX_CHARS
+
+
+def test_shared_details_dir(monkeypatch, tmp_path):
+    sent = []
+    monkeypatch.setattr(github, "_rechecked", set())
+    monkeypatch.setattr(github, "_graphql_live", fake_live(sent))
+    shared = tmp_path / "_shared" / "details"
+    github.configure("record", tmp_path / "set1", shared)
+    github.details(["a/b", "c/d"])  # c/d deleted: None mark also in shared cache
+    github.configure("record", tmp_path / "set2", shared)
+    assert github.details(["A/b", "c/d"]).keys() == {"A/b", "c/d"}  # None mark rechecked and resurrected
+    assert len(sent) == 2 and '"b"' not in sent[1] and len(list(shared.glob("*.json.gz"))) == 2
+    assert not (tmp_path / "set1" / "details").exists()
+    monkeypatch.setattr(github, "_graphql_live", lambda *a, **k: pytest.fail("network in replay"))
+    github.configure("replay", tmp_path / "set3", shared)
+    assert github.details(["a/b"]).keys() == {"a/b"}
+
+
+def test_record_single_repo_retries_once(monkeypatch, tmp_path):
+    got = []
+    monkeypatch.setattr(github, "last_failed", set())
+    monkeypatch.setattr(github, "_graphql_live", lambda q, v, retries: got.append(retries) or (_ for _ in ()).throw(
+        github.GitHubError("502")))
+    github.configure("record", tmp_path, tmp_path / "shared")
+    assert github.details(["a/b"]) == {}
+    github.configure("record", tmp_path / "plain")  # standard eval --record
+    github.details(["a/b"])
+    assert got == [github.EVAL_SINGLE_RETRIES, github.MAX_RETRIES]
+
+
+def test_detail_chunks_fetched_concurrently(monkeypatch, tmp_path):
+    import threading
+    barrier = threading.Barrier(github.DETAILS_WORKERS, timeout=5)  # without concurrency — BrokenBarrierError
+    live = fake_live([])
+    monkeypatch.setattr(github, "_graphql_live", lambda q, v, **k: barrier.wait() is not None and live(q, v))
+    monkeypatch.setattr(github, "DETAILS_CHUNK", 1)
+    github.configure("record", tmp_path, tmp_path / "shared")
+    names = [f"o/r{i}" for i in range(github.DETAILS_WORKERS)]
+    assert list(github.details(names)) == names
+
+
+def test_spent_points_counted_for_live_calls_only(monkeypatch, tmp_path, caplog):
+    monkeypatch.setattr(github, "spent", 0)
+    monkeypatch.setattr(github, "_attempt", lambda q, v: (
+        {"data": {"rateLimit": {"cost": 2, "remaining": 4990, "resetAt": "x"}}}, None))
+    github.configure("record", tmp_path)
+    github.graphql("q", {})
+    github.graphql("q", {})  # second from snapshot: does not spend limit
+    assert github.spent == 2
+    caplog.set_level("INFO", logger="repo_scout")
+    github.log_usage()
+    assert "spent 2 GraphQL points" in caplog.text
