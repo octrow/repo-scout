@@ -1,7 +1,9 @@
-"""Step 1 from docs/repo-triage.md: search GitHub repos, apply stop rules, compute scores.
+"""Search GitHub for repos you can build on, drop dead and off-topic ones, rank the rest by closeness to your task.
 
-Usage: repo-scout --task "<English task description>" "query one" "query two" [--min-closeness 0.6] [--months 6] [--new-days 60] [--limit 50] [--lang X] [--exclude RE] [--must RE] [--no-round2] [--round2-k 10] [--stars-k 10] [--no-stars-check] [--all] [--json]
-Each query uses GitHub search syntax (language:python, topic:x ...). Requires an authenticated `gh`.
+Usage: repo-scout --task "<task in English>" "query one" "query two" [options]
+Each query uses GitHub search syntax (language:python, topic:x ...).
+Needs the GitHub CLI (gh), logged in. Check with: repo-scout doctor
+Other commands: repo-scout gui | doctor | config | draft | verdict | eval
 """
 import argparse
 import json
@@ -62,10 +64,10 @@ def validate_query(q: str) -> None:
     tokens = TOKEN.findall(q)
     text = " ".join(t for t in tokens if not QUALIFIER.fullmatch(t))
     if len(text) > MAX_TEXT_CHARS:
-        raise ValueError(f"query {q!r}: text without qualifiers is {len(text)} chars, GitHub limit is {MAX_TEXT_CHARS}")
+        raise ValueError(f"query {q!r}: the text without qualifiers has {len(text)} chars. GitHub allows {MAX_TEXT_CHARS}")
     ops = sum(t in OPERATORS for t in tokens)
     if ops > MAX_OPERATORS:
-        raise ValueError(f"query {q!r}: {ops} AND/OR/NOT operators, GitHub limit is {MAX_OPERATORS}")
+        raise ValueError(f"query {q!r}: {ops} AND/OR/NOT operators. GitHub allows {MAX_OPERATORS}")
 
 
 def _fmt_close(r: dict) -> str:
@@ -278,7 +280,7 @@ def verdict_main(argv: list[str]) -> None:
     ap.add_argument("repo", metavar="owner/repo")
     ap.add_argument("verdict", help="'→ Inspect', '→ Study (goal)', 'drop (reason)', 'doubt (details)'")
     ap.add_argument("--project", required=True)
-    ap.add_argument("--task", required=True, help="short project task description")
+    ap.add_argument("--task", required=True, help="the project task in a few words")
     a = ap.parse_args(argv)
     try:
         validate_verdict(a.repo, a.verdict, a.project, a.task)
@@ -294,7 +296,7 @@ def draft_main(argv: list[str]) -> None:
 
     from repo_scout import llm
     ap = argparse.ArgumentParser(prog="repo-scout draft")
-    ap.add_argument("need", help="User need in natural language (any language)")
+    ap.add_argument("need", help="what you are looking for, in any language")
     a = ap.parse_args(argv)
     if not llm.available():
         sys.exit(f"draft: {llm.NO_KEY}")
@@ -344,37 +346,37 @@ def _parser() -> argparse.ArgumentParser:
     ap = _Parser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("queries", nargs="+")
     ap.add_argument("--task", required=True, metavar="TEXT",
-                    help="Task description (1-3 sentences in English): used to compute closeness")
+                    help="the task in 1-3 English sentences; closeness is measured against it")
     ap.add_argument("--min-closeness", type=float, default=semantic.MIN_CLOSENESS, metavar="FLOAT",
-                    help="closeness threshold: rows below are stopped as 'off-topic' (default %(default)s)")
-    ap.add_argument("--months", type=int, default=6, help="only repos with push within N months (0 = no filter)")
-    ap.add_argument("--new-days", type=int, default=60, help="'new' flag for repos younger than N days")
+                    help="rows below this closeness are dropped as 'off-topic' (default %(default)s)")
+    ap.add_argument("--months", type=int, default=6, help="only repos pushed to within N months (0 = any)")
+    ap.add_argument("--new-days", type=int, default=60, help="flag repos younger than N days as 'new'")
     ap.add_argument("--limit", type=int, default=50, help="results per query (max 100)")
     ap.add_argument("--lang", help="add language:<X> to each query")
     ap.add_argument("--exclude", action="append", default=[], metavar="REGEX",
-                    help="drop if REGEX found in name, description, topics, or README (repeatable)")
+                    help="drop a repo if REGEX matches its name, description, topics or README (repeatable)")
     ap.add_argument("--must", action="append", default=[], metavar="REGEX",
-                    help="required word group in README, topics, or description; all groups must match (repeatable)")
+                    help="words the README, topics or description must contain; every --must must match (repeatable)")
     ap.add_argument("--from-index", type=int, default=FROM_INDEX, metavar="N",
-                    help="add N closest repos from Index to pool (0 = disable, default %(default)s)")
+                    help="add the N closest repos from the Index (0 = off, default %(default)s)")
     ap.add_argument("--round2-k", type=int, default=ROUND2_K, metavar="K",
-                    help="round two uses topics from top-K (default %(default)s)")
+                    help="round two takes topics from the top K rows (default %(default)s)")
     ap.add_argument("--stars-k", type=int, default=STARS_K, metavar="K",
-                    help="'burst★' flag for top-K with >=50★ (default %(default)s)")
-    ap.add_argument("--no-stars-check", action="store_true", help="disable 'burst★' flag check (REST star history)")
-    ap.add_argument("--no-round2", action="store_true", help="disable round two (`topic:` from top-K)")
+                    help="check the top K rows with 50+ stars for a star burst (default %(default)s)")
+    ap.add_argument("--no-stars-check", action="store_true", help="skip the star burst check")
+    ap.add_argument("--no-round2", action="store_true", help="skip round two (`topic:` queries from the top rows)")
     ap.add_argument("--no-fit", action="store_true",
-                    help="advanced mode: skip the fit column from a System One model (on when TYPESAFE_API_KEY is set)")
-    ap.add_argument("--project", help="project name for search (saved to Run)")
-    ap.add_argument("--need", metavar="TEXT", help="original need in user's words (saved to Run, not used in search)")
-    ap.add_argument("--out", metavar="PATH", help="Run output file path (default: runs directory)")
-    ap.add_argument("--no-save", action="store_true", help="do not save Run")
-    ap.add_argument("--all", action="store_true", help="show dropped rows as well")
+                    help="skip the fit column (advanced mode, on when TYPESAFE_API_KEY is set)")
+    ap.add_argument("--project", help="project name, saved with the run")
+    ap.add_argument("--need", metavar="TEXT", help="your request in your own words, saved with the run (the search ignores it)")
+    ap.add_argument("--out", metavar="PATH", help="where to save the run (default: the runs folder)")
+    ap.add_argument("--no-save", action="store_true", help="do not save the run")
+    ap.add_argument("--all", action="store_true", help="show dropped rows too")
     ap.add_argument("--json", action="store_true")
     snap = ap.add_mutually_exclusive_group()
     snap.add_argument("--record", metavar="DIR", help="record GitHub responses to DIR")
     snap.add_argument("--replay", metavar="DIR", help="replay responses from DIR without network")
-    ap.add_argument("-q", "--quiet", action="store_true", help="log progress to file only, stderr gets warnings only")
+    ap.add_argument("-q", "--quiet", action="store_true", help="write progress to the log file only; the terminal shows warnings only")
     return ap
 
 

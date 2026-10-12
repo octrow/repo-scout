@@ -42,11 +42,11 @@ def _post(body: dict) -> dict:
         with urllib.request.urlopen(req, timeout=TIMEOUT_S) as resp:
             data = json.load(resp)
     except urllib.error.HTTPError as e:
-        raise SystemOneError(f"HTTP error {e.code}; check {KEY_VAR}") from None
+        raise SystemOneError(f"HTTP error {e.code}. Check {KEY_VAR}") from None
     except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException, ValueError) as e:
-        raise SystemOneError(f"unavailable: {type(e).__name__}") from None
+        raise SystemOneError(f"the service is not reachable ({type(e).__name__})") from None
     if not isinstance(data, dict) or not isinstance(data.get("answers"), dict):
-        raise SystemOneError("unexpected response format")
+        raise SystemOneError("the reply has an unexpected format")
     return data
 
 
@@ -73,7 +73,7 @@ def add_fit(rows: list[dict], task: str | None, texts: dict[str, str], k: int) -
     try:
         scores = fit(task, {r["repo"]: texts[r["repo"]] for r in top})
     except SystemOneError as e:
-        log.warning("warning: fit column skipped: %s", e)
+        log.warning("warning: fit column skipped, %s", e)
         return
     for r in top:
         if r["repo"] in scores:

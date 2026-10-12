@@ -11,7 +11,7 @@ from . import runs_logic as rl
 from .kit import layout
 
 DB_ERRORS = (sqlite3.Error, OSError)
-DB_ERROR_TEXT = "Failed to access Index. See logs."
+DB_ERROR_TEXT = "Could not open the Index. See the log."
 
 
 def notify_db_error(context: str) -> None:
@@ -53,9 +53,9 @@ class VerdictDialog:
             self.name = ui.label().classes("t-mono")
             self.kind = ui.select(rl.VERDICT_KINDS, value="watch", label="Verdict",
                                   on_change=lambda: self._sync_note()).props("outlined dense stack-label").classes("w-full")
-            self.note = layout.field("Explanation", hint="Single line")
+            self.note = layout.field("Explanation", hint="One line")
             self.project = layout.field("Project", required=True)
-            self.task = layout.field("Task", required=True, hint="Brief: which project task")
+            self.task = layout.field("Task", required=True, hint="Which project task, in a few words")
             self.error = ui.label().classes("ic-status--error")
             with layout.actions_row():
                 layout.button("Cancel", kind="quiet", on_click=self.dialog.close)

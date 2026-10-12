@@ -144,7 +144,7 @@ def run_page(run_id: str) -> None:
         except (ValueError, OSError):
             data = None
         if data is None:
-            layout.failed("Run not found or file is corrupt")
+            layout.failed("Run not found or unreadable")
             layout.button("Back to runs", kind="quiet", on_click=lambda: ui.navigate.to("/runs"))
             return
         RunView(run_id, data).build()

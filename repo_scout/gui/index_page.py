@@ -26,7 +26,7 @@ def check_repo(value: str) -> str | None:
     """Error for owner/repo format or None."""
     v = (value or "").strip()
     if not REPO_RE.fullmatch(v) or v.split("/")[1] in (".", ".."):
-        return "Must be owner/repo format"
+        return "Use the owner/repo format"
     return None
 
 
@@ -119,7 +119,7 @@ class IndexPage:
             layout.heading("Rename repo", level=2)
             ui.label("Old record will be removed from Index; verdicts will move to the new name.").classes("t-meta")
             new = layout.field("New name", value=name, hint="owner/repo", validation={
-                "Must be owner/repo format": lambda v: check_repo(v) is None})
+                "Use the owner/repo format": lambda v: check_repo(v) is None})
 
             def apply() -> None:
                 if not new.validate():
@@ -144,7 +144,7 @@ class IndexPage:
         self.confirm.clear()
         with self.confirm, layout.section_card():
             layout.heading("Forget repo?", level=2)
-            ui.label(f"{name} will be removed from Index search. Verdicts will remain.").classes("t-meta")
+            ui.label(f"{name} leaves Index search. Its verdicts stay.").classes("t-meta")
 
             def forget() -> None:
                 try:
@@ -165,7 +165,7 @@ class IndexPage:
     def build(self) -> None:
         self.filters()
         self.table = table.empty_aware_table(COLUMNS, row_key="key", pagination={"rowsPerPage": 25},
-                                             empty_text="No repos in Index yet: they appear after search.")
+                                             empty_text="No repos in the Index yet. Run a search to add them.")
         self.table.table.on("rowClick", lambda e: self.open_panel(e.args[1]["key"]))
         self.refresh()
 

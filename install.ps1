@@ -28,31 +28,32 @@ Refresh-Path
 
 if ($env:REPO_SCOUT_UNINSTALL -eq "1") {
   if (Have uv) { uv tool uninstall repo-scout }
-  Say "repo-scout removed. Your runs and index stay in your user data folder."
+  Say "repo-scout is removed."
+  Note "Your runs and index stay in your user folder."
   return
 }
 
 # 1. uv: installs Python and the app into an isolated environment, no system Python needed
 if (-not (Have uv)) {
-  Say "Installing uv, the Python package manager repo-scout runs on"
+  Say "Installing uv (it installs Python and repo-scout)"
   Invoke-RestMethod https://astral.sh/uv/install.ps1 -ErrorAction Stop | Invoke-Expression
   Refresh-Path
-  if (-not (Have uv)) { throw "uv was installed but is not on PATH. Open a new terminal and re-run this command." }
+  if (-not (Have uv)) { throw "uv is installed, but this terminal does not see it. Open a new terminal and run this command again." }
 }
 
 # 2. gh: every GitHub search goes through the official GitHub CLI
 if (-not (Have gh)) {
   Say "Installing the GitHub CLI (gh)"
-  Note "repo-scout searches GitHub through gh, which keeps your login in Windows Credential Manager."
+  Note "repo-scout searches GitHub through gh."
   if (Have winget) {
-    Note "It comes from winget; Windows may ask you to allow the install."
+    Note "winget installs it. Windows may ask you to allow the install."
     winget install --id GitHub.cli -e --accept-source-agreements --accept-package-agreements
     Refresh-Path
   }
   if (-not (Have gh)) {
-    Warn "Could not install gh automatically."
-    Note "Install it from https://cli.github.com/ (a single .msi installer),"
-    Note "then re-run this command. Everything else is installed already."
+    Warn "Could not install gh."
+    Note "Everything else will be installed."
+    Note "Install gh from https://cli.github.com/, then run this command again."
   }
 }
 
@@ -66,13 +67,13 @@ if ($env:REPO_SCOUT_SOURCE) {
   $Version = "$env:REPO_SCOUT_VERSION".TrimStart("v")
   if (-not $Version) {
     try { $Version = (Invoke-RestMethod "https://api.github.com/repos/$Repo/releases/latest" -ErrorAction Stop).tag_name.TrimStart("v") }
-    catch { throw "No release found (or GitHub is unreachable). Set `$env:REPO_SCOUT_MAIN = `"1`" and re-run." }
+    catch { throw "No release found, or GitHub is not reachable. To install the main branch, set `$env:REPO_SCOUT_MAIN = `"1`" and run this command again." }
   }
   $Spec = "repo-scout @ https://github.com/$Repo/releases/download/v$Version/repo_scout-$Version-py3-none-any.whl"
 }
 Say "Installing repo-scout $Version"
 uv tool install --reinstall --python $Python $Spec
-if ($LASTEXITCODE -ne 0) { throw "uv tool install failed" }
+if ($LASTEXITCODE -ne 0) { throw "uv could not install repo-scout. See the uv output above." }
 uv tool update-shell *> $null
 $Bin = Join-Path (uv tool dir --bin) "repo-scout.exe"
 
@@ -81,11 +82,11 @@ if (Have gh) {
   gh auth status *> $null
   if ($LASTEXITCODE -ne 0) {
     if ($Interactive) {
-      Say "Log in to GitHub: a browser page opens, read-only access is enough"
+      Say "Log in to GitHub in the browser page that opens. Read-only access is enough."
       gh auth login --web --git-protocol https
-      if ($LASTEXITCODE -ne 0) { Warn "Login skipped. Run 'gh auth login' before your first search." }
+      if ($LASTEXITCODE -ne 0) { Warn "Not logged in. Before your first search, run: gh auth login" }
     } else {
-      Warn "Not logged in to GitHub. Run 'gh auth login' before your first search."
+      Warn "Not logged in to GitHub. Before your first search, run: gh auth login"
     }
   }
 }
@@ -93,30 +94,32 @@ if (Have gh) {
 # 5. download the embedding model now so the first search does not stall, then show what is ready
 Say "Checking the setup"
 & $Bin doctor --fix
-if ($LASTEXITCODE -ne 0) { Warn "Fix the items marked with a cross above, then check again with: repo-scout doctor" }
+if ($LASTEXITCODE -ne 0) { Warn "Fix the items marked with a cross above, then check again: repo-scout doctor" }
 
 # 6. advanced mode (optional): asked once, skipped when a key is already saved
 $EnvFile = if ($env:REPO_SCOUT_ENV) { $env:REPO_SCOUT_ENV } else { "$HOME\.config\repo-scout\.env" }
 $HasKey = (Test-Path $EnvFile) -and (Select-String -Path $EnvFile -Pattern '^(LLM_API_KEY|OMNIROUTE_API_KEY|TYPESAFE_API_KEY)=' -Quiet)
 if ($Interactive -and -not $HasKey) {
-  Note "repo-scout works fully without external models (basic mode)."
-  Note "Advanced mode adds two optional extras:"
-  Note "  - LLM draft: an OpenAI-compatible model writes the queries from your need in any language"
-  Note "    (free with OmniRoute, https://github.com/diegosouzapw/OmniRoute, or a local Ollama)"
-  Note "  - fit: Jev by TypeSafe rates how well each top result fits your task (key at https://console.typesafe.ai/keys)"
-  $answer = Read-Host "Set up advanced mode now? You can do it later with: repo-scout config [y/N]"
+  Note "repo-scout works without external models. This is basic mode."
+  Note "Advanced mode adds two extras, each with its own key:"
+  Note "- LLM draft: a model writes search queries from your request in any language."
+  Note "  Free: OmniRoute (https://github.com/diegosouzapw/OmniRoute) or a local Ollama."
+  Note "- Fit: Jev by TypeSafe rates how well each top result fits your task."
+  Note "  Key: https://console.typesafe.ai/keys"
+  Note "You can set this up later: repo-scout config"
+  $answer = Read-Host "Set up advanced mode now? [y/N]"
   if ($answer -match '^[yY]') {
     & $Bin config
-    if ($LASTEXITCODE -ne 0) { Warn "Settings not saved. Run 'repo-scout config' later." }
+    if ($LASTEXITCODE -ne 0) { Warn "Settings are not saved. To set them up later, run: repo-scout config" }
   }
 }
 
-Say "Installed. Start repo-scout any time with: repo-scout"
-Note "(open a new terminal if the command is not found; full path: $Bin)"
+Say "repo-scout is installed. To start it, run: repo-scout"
+Note "Command not found? Open a new terminal or run: $Bin"
 if ($env:REPO_SCOUT_NO_LAUNCH -ne "1" -and $Interactive) {
   $answer = Read-Host "Start repo-scout now? [Y/n]"
   if ($answer -notmatch '^[nN]') {
-    Say "Starting the GUI in your browser, press Ctrl+C here to stop it"
+    Say "Opening repo-scout in your browser. To stop it, press Ctrl+C here."
     & $Bin gui --open
   }
 }

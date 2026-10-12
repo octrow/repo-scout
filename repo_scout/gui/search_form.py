@@ -106,7 +106,7 @@ def form_errors(state: dict) -> list[str]:
     """All issues preventing a search run."""
     errors = []
     if not (state.get("task") or "").strip():
-        errors.append("Task description is required")
+        errors.append("Add a task description")
     if not _lines(state.get("queries", "")):
         errors.append("Add at least one query")
     errors += [e for e in (check_queries(state.get("queries", "")),

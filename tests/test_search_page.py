@@ -21,7 +21,7 @@ async def test_page_opens_with_nav_and_empty_form(user: User) -> None:
     await user.should_see("Search")
     for nav in ("Runs", "Index", "Eval"):
         await user.should_see(nav)
-    await user.should_see("Fill in task and queries")
+    await user.should_see("Fill in the task and queries")
 
 
 async def test_form_fills_from_draft(user: User) -> None:
@@ -101,7 +101,7 @@ async def test_run_with_empty_form_does_not_submit(user: User, monkeypatch) -> N
     monkeypatch.setattr(run_pool, "submit", lambda *a, **k: pytest.fail("submit"))
     await user.open("/")
     user.find(content="Launch").click()
-    user.notify.contains("Task description is required")
+    user.notify.contains("Add a task description")
 
 
 async def test_need_field_hidden_without_key(user: User) -> None:

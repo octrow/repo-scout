@@ -33,7 +33,7 @@ def next_free(port: int) -> int:
     for p in range(port + 1, port + 1 + PORT_SCAN):
         if is_free(p):
             return p
-    raise RuntimeError(f"no free port found in {port + 1}–{port + PORT_SCAN}")
+    raise RuntimeError(f"no free port in {port + 1}-{port + PORT_SCAN}")
 
 
 def our_pid(port: int) -> int | None:
@@ -58,7 +58,7 @@ def _is_repo_scout(pid: int) -> bool:
 
 def stop(pid: int, port: int) -> None:
     if not _is_repo_scout(pid):
-        raise RuntimeError(f"process {pid} does not look like repo-scout — refusing to stop")
+        raise RuntimeError(f"process {pid} is not repo-scout, so it was not stopped")
     os.kill(pid, signal.SIGTERM)
     deadline = time.monotonic() + STOP_WAIT_SECONDS
     while time.monotonic() < deadline:

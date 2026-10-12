@@ -25,7 +25,7 @@ def test_all_ok_exits_zero(monkeypatch, capsys):
     doctor.main([])
     out = capsys.readouterr().out
     assert out.count("✓") == 3
-    assert "Mode: basic" in out and "LLM draft (optional): off" in out and "fit (optional): off" in out
+    assert "Mode: basic" in out and "LLM draft: off" in out and "Fit: off" in out
     assert "OmniRoute" in out and "console.typesafe.ai" in out and "repo-scout config" in out
 
 
@@ -35,7 +35,7 @@ def test_llm_key_shows_draft_on_without_failing(monkeypatch, capsys):
     monkeypatch.setenv("TYPESAFE_API_KEY", "t")
     doctor.main([])
     out = capsys.readouterr().out
-    assert "Mode: advanced (LLM draft, fit)" in out and "✓ fit: model jev-latest" in out
+    assert "Mode: advanced (LLM draft, Fit)" in out and "✓ Fit: model jev-latest" in out
     assert "repo-scout config" not in out
 
 

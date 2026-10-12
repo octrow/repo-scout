@@ -17,13 +17,13 @@ UNINSTALL=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --version) [ $# -ge 2 ] || { echo "--version needs a value, e.g. --version 0.1.0" >&2; exit 2; }
+    --version) [ $# -ge 2 ] || { echo "Add a version number: --version 0.1.0" >&2; exit 2; }
                VERSION="${2#v}"; shift ;;
     --main) MAIN=1 ;;
     --no-launch) LAUNCH=0 ;;
     --uninstall) UNINSTALL=1 ;;
     -h|--help) echo "options: --version X.Y.Z | --main | --no-launch | --uninstall"; exit 0 ;;
-    *) echo "unknown option: $1 (try --help)" >&2; exit 2 ;;
+    *) echo "Unknown option: $1. See: --help" >&2; exit 2 ;;
   esac
   shift
 done
@@ -41,15 +41,16 @@ export PATH="$HOME/.local/bin:$PATH"
 
 if [ "$UNINSTALL" = 1 ]; then
   if have uv; then uv tool uninstall repo-scout || true; fi
-  say "repo-scout removed. Your runs and index stay in ~/.local/share/repo-scout."
+  say "repo-scout is removed."
+  note "Your runs and index stay in ~/.local/share/repo-scout."
   exit 0
 fi
 
 # 1. uv: installs Python and the app into an isolated environment, no system Python needed
 if ! have uv; then
-  say "Installing uv, the Python package manager repo-scout runs on"
+  say "Installing uv (it installs Python and repo-scout)"
   curl -LsSf https://astral.sh/uv/install.sh | sh
-  have uv || die "uv was installed but is not on PATH. Open a new terminal and re-run this command."
+  have uv || die "uv is installed, but this terminal does not see it. Open a new terminal and run this command again."
 fi
 
 # 2. gh: every GitHub search goes through the official GitHub CLI
@@ -64,12 +65,12 @@ install_gh() {
 }
 if ! have gh; then
   say "Installing the GitHub CLI (gh)"
-  note "repo-scout searches GitHub through gh, which keeps your login in your system keychain."
-  have brew || note "It comes from your system package manager, so you may be asked for your password (sudo)."
+  note "repo-scout searches GitHub through gh."
+  have brew || note "Your package manager installs it and may ask for your password (sudo)."
   if ! tty_run install_gh || ! have gh; then
-    warn "Could not install gh automatically."
-    note "Install it from https://cli.github.com/ (a single package for your system),"
-    note "then re-run this command. Everything else is installed already."
+    warn "Could not install gh."
+    note "Everything else will be installed."
+    note "Install gh from https://cli.github.com/, then run this command again."
   fi
 fi
 
@@ -82,8 +83,8 @@ else
   if [ -z "$VERSION" ]; then
     # /releases/latest redirects to /releases/tag/vX.Y.Z; with no release yet it lands on /releases
     URL="$(curl -fsSLo /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest")" \
-      || die "Could not reach GitHub. Check your internet connection and re-run."
-    case "$URL" in */tag/v*) VERSION="${URL##*/tag/v}" ;; *) die "No release published yet. Re-run with --main." ;; esac
+      || die "GitHub is not reachable. Check your internet connection and run this command again."
+    case "$URL" in */tag/v*) VERSION="${URL##*/tag/v}" ;; *) die "No release yet. Run this command again with --main." ;; esac
   fi
   SPEC="repo-scout @ https://github.com/$REPO/releases/download/v$VERSION/repo_scout-$VERSION-py3-none-any.whl"
 fi
@@ -95,37 +96,39 @@ BIN="$(uv tool dir --bin)/repo-scout"
 # 4. GitHub login, once
 if have gh && ! gh auth status >/dev/null 2>&1; then
   if has_tty; then
-    say "Log in to GitHub: a browser page opens, read-only access is enough"
-    tty_run gh auth login --web --git-protocol https || warn "Login skipped. Run 'gh auth login' before your first search."
+    say "Log in to GitHub in the browser page that opens. Read-only access is enough."
+    tty_run gh auth login --web --git-protocol https || warn "Not logged in. Before your first search, run: gh auth login"
   else
-    warn "Not logged in to GitHub. Run 'gh auth login' before your first search."
+    warn "Not logged in to GitHub. Before your first search, run: gh auth login"
   fi
 fi
 
 # 5. download the embedding model now so the first search does not stall, then show what is ready
 say "Checking the setup"
-"$BIN" doctor --fix || warn "Fix the ✗ items above, then check again with: repo-scout doctor"
+"$BIN" doctor --fix || warn "Fix the items marked ✗ above, then check again: repo-scout doctor"
 
 # 6. advanced mode (optional): asked once, skipped when a key is already saved
 ENV_FILE="${REPO_SCOUT_ENV:-$HOME/.config/repo-scout/.env}"
 if has_tty && ! grep -qsE '^(LLM_API_KEY|OMNIROUTE_API_KEY|TYPESAFE_API_KEY)=' "$ENV_FILE"; then
-  note "repo-scout works fully without external models (basic mode)."
-  note "Advanced mode adds two optional extras:"
-  note "  - LLM draft: an OpenAI-compatible model writes the queries from your need in any language"
-  note "    (free with OmniRoute, https://github.com/diegosouzapw/OmniRoute, or a local Ollama)"
-  note "  - fit: Jev by TypeSafe rates how well each top result fits your task (key at https://console.typesafe.ai/keys)"
-  printf 'Set up advanced mode now? You can do it later with: repo-scout config [y/N] '
+  note "repo-scout works without external models. This is basic mode."
+  note "Advanced mode adds two extras, each with its own key:"
+  note "- LLM draft: a model writes search queries from your request in any language."
+  note "  Free: OmniRoute (https://github.com/diegosouzapw/OmniRoute) or a local Ollama."
+  note "- Fit: Jev by TypeSafe rates how well each top result fits your task."
+  note "  Key: https://console.typesafe.ai/keys"
+  note "You can set this up later: repo-scout config"
+  printf 'Set up advanced mode now? [y/N] '
   read -r answer </dev/tty || answer=n
-  case "$answer" in [yY]*) tty_run "$BIN" config || warn "Settings not saved. Run 'repo-scout config' later." ;; esac
+  case "$answer" in [yY]*) tty_run "$BIN" config || warn "Settings are not saved. To set them up later, run: repo-scout config" ;; esac
 fi
 
-say "Installed. Start repo-scout any time with: repo-scout"
-note "(open a new terminal if the command is not found; full path: $BIN)"
+say "repo-scout is installed. To start it, run: repo-scout"
+note "Command not found? Open a new terminal or run: $BIN"
 if [ "$LAUNCH" = 1 ] && has_tty; then
   printf 'Start repo-scout now? [Y/n] '
   read -r answer </dev/tty || answer=n
   case "$answer" in
     [nN]*) ;;
-    *) say "Starting the GUI in your browser, press Ctrl+C here to stop it"; exec "$BIN" gui --open ;;
+    *) say "Opening repo-scout in your browser. To stop it, press Ctrl+C here."; exec "$BIN" gui --open ;;
   esac
 fi

@@ -55,7 +55,7 @@ async def test_runs_list_shows_runs_and_empty(user: User) -> None:
     await user.open("/runs")
     rows = user.find(ui.table).elements.pop().rows
     assert any(r["task"] == "Find thing" and r["count"] == "2 / 3" and r["project"] == "proj" for r in rows)
-    assert any(r["error"] and "corrupt" in r["task"].lower() for r in rows)
+    assert any(r["error"] and "unreadable" in r["task"].lower() for r in rows)
 
 
 async def test_runs_list_delete_needs_confirmation(user: User) -> None:
@@ -90,7 +90,7 @@ async def test_run_page_rejects_foreign_ids(user: User) -> None:
     runs.runs_dir().mkdir(parents=True, exist_ok=True)
     (runs.runs_dir() / "bad.json").write_text("{")
     await user.open("/runs/bad")
-    await user.should_see("corrupt")
+    await user.should_see("unreadable")
 
 
 async def test_run_panel_and_verdict_updates_seen(user: User) -> None:
@@ -139,7 +139,7 @@ async def test_panel_without_readme_does_not_fetch(user: User) -> None:
 
 async def test_index_page_lists_filters_and_forgets(user: User) -> None:
     await user.open("/index")
-    await user.should_see("No repos in Index yet")
+    await user.should_see("No repos in the Index yet")
     idx = make_index()
     idx.add_verdict("a/alpha", "→ Inspect", "proj", "task", NOW)
     await user.open("/index")
@@ -168,7 +168,7 @@ async def test_index_rename_validates(user: User) -> None:
     new.set_value("bad name")
     press(user, "Rename")
     assert [r["name"] for r in Index(default_path(), model="m1").rows()] == ["a/Alpha", "b/beta"]
-    await user.should_see("Must be owner/repo format")
+    await user.should_see("Use the owner/repo format")
     new.set_value("o/new")
     press(user, "Rename")
     assert Index(default_path(), model="m1").verdicts()[0][1] == "o/new"

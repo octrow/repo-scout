@@ -27,7 +27,7 @@ DEFAULT_MODEL, DEFAULT_URL = "free-stack", "http://127.0.0.1:20128/v1"
 TIMEOUT_S = 90  # free-stack responds in ~8s, but routes across different models
 MAX_QUERIES, MAX_QUERY_CHARS, MAX_TASK_CHARS, MAX_REGEXES = 10, 256, 600, 10
 MAX_NEED_CHARS = 2_000
-NO_KEY = f"missing LLM key: set {KEY_VAR} (and optionally {MODEL_VAR}, {URL_VAR}) in environment or .env (run: repo-scout config)"
+NO_KEY = f"LLM draft needs a key. Run: repo-scout config (or set {KEY_VAR}, and {URL_VAR} and {MODEL_VAR} if needed)"
 
 SYSTEM_PROMPT = """You turn a user's need (any language) into a draft for a GitHub repository search.
 Reply with ONE JSON object and nothing else:
@@ -143,13 +143,13 @@ def _post(messages: list[dict]) -> dict:
         with _OPENER.open(req, timeout=TIMEOUT_S) as resp:
             data = json.load(resp)
     except urllib.error.HTTPError as e:
-        raise LLMError(f"LLM returned HTTP error {e.code}; check {KEY_VAR} and {MODEL_VAR}") from None
+        raise LLMError(f"The LLM returned HTTP error {e.code}. Check {KEY_VAR} and {MODEL_VAR}") from None
     except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException) as e:
-        raise LLMError(f"LLM unavailable ({_setting(URL_VAR, DEFAULT_URL)}): {_why(e)}") from None
+        raise LLMError(f"The LLM at {_setting(URL_VAR, DEFAULT_URL)} is not reachable: {_why(e)}") from None
     except ValueError:
-        raise LLMError("LLM response was not JSON") from None
+        raise LLMError("The LLM reply is not JSON") from None
     if not isinstance(data, dict):
-        raise LLMError("LLM returned unexpected response format")
+        raise LLMError("The LLM reply has an unexpected format")
     return data
 
 
@@ -177,7 +177,7 @@ def _chat(messages: list[dict], pending: list | None = None) -> str:
     if path and path.exists():
         rec = github._read(path)
     elif mode == "replay":
-        raise LLMError(f"missing LLM response snapshot {path.name} (--record)")
+        raise LLMError(f"No LLM reply snapshot {path.name}. Record it with --record")
     else:
         started = time.monotonic()
         rec = {"response": _post(messages), "seconds": round(time.monotonic() - started, 2)}
@@ -191,7 +191,7 @@ def _chat(messages: list[dict], pending: list | None = None) -> str:
         text = response["choices"][0]["message"]["content"] or ""
         tokens = _tokens(response)
     except (KeyError, IndexError, TypeError, ValueError, AttributeError):
-        raise LLMError("LLM returned unexpected response format") from None
+        raise LLMError("The LLM reply has an unexpected format") from None
     last_stats["tokens"] = last_stats.get("tokens", 0) + tokens
     last_stats["seconds"] = round(last_stats.get("seconds", 0) + seconds, 2)
     return text
@@ -292,7 +292,7 @@ def draft(need: str) -> Draft:
     """Generate draft from need. Retries once with error explanation before raising LLMError."""
     need = need.strip()
     if not need:
-        raise LLMError("describe what you are looking for")
+        raise LLMError("Describe what you are looking for")
     last_stats.clear()
     messages = [{"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": f"Need:\n{need[:MAX_NEED_CHARS]}"}]
@@ -307,7 +307,7 @@ def draft(need: str) -> Draft:
         except ValueError as e:
             log.info("LLM draft: response validation failed (attempt %d): %s", attempt, e)
             if attempt == 2:
-                raise LLMError(f"LLM returned invalid response twice: {e}") from e
+                raise LLMError(f"The LLM gave an invalid reply twice: {e}") from e
             messages += [{"role": "assistant", "content": reply},
                          {"role": "user", "content": f"Invalid: {e}. Reply with the corrected JSON object only."}]
     raise AssertionError("unreachable")

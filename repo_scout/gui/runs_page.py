@@ -23,7 +23,7 @@ DELETE_SLOT = """<q-td :props="props"><q-btn outline dense no-caps color="negati
 
 def summary_row(s: runs.Summary) -> dict:
     if s.error:
-        return {"id": s.path.stem, "date": "", "task": f"File corrupt: {s.path.name}", "project": "",
+        return {"id": s.path.stem, "date": "", "task": f"Unreadable file: {s.path.name}", "project": "",
                 "count": "", "error": True}
     return {"id": s.path.stem, "date": (s.created_at or "")[:16].replace("T", " "), "task": s.task or s.path.stem,
                 "project": s.project or "—", "count": f"{s.n_kept} / {s.n_total}", "error": False}
@@ -49,7 +49,7 @@ class RunsList:
                     if path is not None:
                         runs.delete(path)
                 except OSError as e:
-                    ui.notify(f"Failed to delete: {e.strerror or e}", type="negative")
+                    ui.notify(f"Could not delete: {e.strerror or e}", type="negative")
                 self.dialog.close()
                 self.refresh()
 
@@ -60,7 +60,7 @@ class RunsList:
 
     def build(self) -> None:
         self.table = table.empty_aware_table(COLUMNS, row_key="id", pagination={"rowsPerPage": 25},
-                                             empty_text="No runs yet: launch a search from the Search page.")
+                                             empty_text="No runs yet. Start one on the Search page.")
         self.table.table.add_slot("body-cell-task", TASK_SLOT)
         self.table.table.add_slot("body-cell-actions", DELETE_SLOT)
         self.table.table.on("delete", lambda e: self.confirm_delete(e.args))

@@ -13,20 +13,22 @@ from repo_scout import llm, systemone
 OMNIROUTE_URL = "https://github.com/diegosouzapw/OmniRoute"
 # (title, hint, fields); field = (variable, prompt, default, secret); the first field is the section's key
 SECTIONS = (
-    ("LLM draft: any OpenAI-compatible endpoint turns a need in any language into a task description and queries",
-     f"Free option: OmniRoute ({OMNIROUTE_URL}) runs locally; the defaults below point at it.\n"
-     "Ollama works too: base URL http://localhost:11434/v1, any key (e.g. ollama), model e.g. qwen3.",
+    ("LLM draft: a model writes search queries from your request in any language.",
+     "Any OpenAI-compatible endpoint works.\n"
+     f"Free: OmniRoute ({OMNIROUTE_URL}) runs on your computer. The defaults below point at it.\n"
+     "Ollama: base URL http://localhost:11434/v1, any key (for example ollama), a model such as qwen3.",
      ((llm.KEY_VAR, "API key", "", True),
       (llm.URL_VAR, "Base URL", llm.DEFAULT_URL, False),
       (llm.MODEL_VAR, "Model", llm.DEFAULT_MODEL, False),
-      (llm.GUI_VAR, "Show the Draft button in the GUI (1 = yes, 0 = no)", "0", False))),
-    ("Fit: a System One model (Jev by TypeSafe) rates how well each top result fits your task",
-     f"Get an API key at {systemone.KEYS_URL}",
+      (llm.GUI_VAR, "Show the Draft button in the GUI? 1 = yes, 0 = no", "0", False))),
+    ("Fit: Jev by TypeSafe rates how well each top result fits your task.",
+     f"Get a key: {systemone.KEYS_URL}",
      ((systemone.KEY_VAR, "TypeSafe API key", "", True),)),
 )
 CLEAR = "-"
-INTRO = """Advanced mode adds external models on top of the basic search, which works fully without them.
-Press Enter to keep the value in [brackets], type - to clear it, leave a key empty to skip that part."""
+INTRO = """Advanced mode adds external models. Basic search works without them.
+Press Enter to keep the value in [brackets]. Type - to clear it.
+Leave a key empty to skip that part."""
 
 
 def update_env(path: Path, values: dict[str, str]) -> None:
@@ -79,4 +81,4 @@ def main(argv: list[str]) -> None:
     path = llm.user_env_path()
     print(f"{INTRO}\nSettings file: {path}")
     update_env(path, ask_values(llm.parse_env(path), input, getpass.getpass, print))
-    print("\nSaved. See what is on with: repo-scout doctor")
+    print("\nSaved. To see what is on, run: repo-scout doctor")

@@ -40,7 +40,7 @@ def test_out_path_in_runs_dir() -> None:
 
 
 def test_form_errors() -> None:
-    assert sf.form_errors(sf.default_state()) == ["Task description is required", "Add at least one query"]
+    assert sf.form_errors(sf.default_state()) == ["Add a task description", "Add at least one query"]
     assert sf.form_errors(_state(must="(")) and "--must" in sf.form_errors(_state(must="("))[0]
     assert sf.form_errors(_state()) == []
 

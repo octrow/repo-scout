@@ -15,11 +15,11 @@ from . import shell
 from .kit import layout, run_monitor, run_pool
 
 NOTIFY_PERIOD = 1.0
-COMMAND_HINT = "Fill in task and queries: command will appear here"
-NUMBER_LABELS = {"months": "Months since last push (0 — no filter)", "new_days": "'new' flag: younger than, days",
+COMMAND_HINT = "Fill in the task and queries to see the command"
+NUMBER_LABELS = {"months": "Months since last push (0 = any)", "new_days": "Days a repo counts as new",
                  "limit": "Results per query", "min_closeness": "Closeness threshold",
-                 "from_index": "Nearest from Index", "round2_k": "Topics for round 2",
-                 "stars_k": "Repos for star check"}
+                 "from_index": "Closest repos from Index", "round2_k": "Repos for round 2 topics",
+                 "stars_k": "Repos to check for star bursts"}
 FLAG_LABELS = {"no_round2": "Skip round 2", "no_stars_check": "Skip star burst check"}
 
 
@@ -75,12 +75,12 @@ def _load_draft(form: SearchForm, key: str) -> None:
         state = sf.load_draft(form.drafts[key])
     except (ValueError, OSError, tomllib.TOMLDecodeError):
         log.warning("Draft not loaded: %s", key, exc_info=True)
-        ui.notify("Failed to load draft: file corrupt or inaccessible", type="negative")
+        ui.notify("Could not load the draft: the file is damaged or unreadable", type="negative")
         return
     form.fill(state)
 
 
-LLM_FAILED = "Draft failed: model did not respond or response failed validation. See logs."
+LLM_FAILED = "Draft failed: the model did not answer or sent an invalid answer. See the log."
 
 
 async def _llm_draft(form: SearchForm, button: ui.button) -> None:
@@ -99,11 +99,11 @@ async def _llm_draft(form: SearchForm, button: ui.button) -> None:
     finally:
         button.enable()
     form.fill(sf.draft_to_state(d, need))
-    ui.notify("Draft filled: review and launch search", type="positive")
+    ui.notify("Draft ready. Check it, then launch the search.", type="positive")
 
 
 def _need_row(form: SearchForm) -> None:
-    form.area("need", "What to search for (any language)", hint="In your own words, without mentioning specific tool names")
+    form.area("need", "What to search for (any language)", hint="In your own words, without tool names")
     button = layout.button("Draft from LLM", icon="auto_awesome")
     button.on_click(lambda: _llm_draft(form, button))
 
@@ -115,7 +115,7 @@ def _fields(form: SearchForm) -> None:
     ui.select(drafts, label="Draft", with_input=True, clearable=True,
               on_change=lambda e: e.value and _load_draft(form, e.value)) \
         .props('outlined dense stack-label hint="From a past Run or eval dataset"').classes("w-full")
-    form.area("task", "Task (English)", required=True, hint="1-3 sentences: what needs to be found")
+    form.area("task", "Task (English)", required=True, hint="1-3 sentences: what you need")
     form.area("queries", "Queries", sf.check_queries, hint="One per line; 3-6 variants")
     form.text("project", "Project", suggestions=sf.project_suggestions(_verdict_projects()))
     with layout.grid():
@@ -140,7 +140,7 @@ def _advanced(form: SearchForm) -> None:
 def _paste_dialog(form: SearchForm) -> ui.dialog:
     with ui.dialog() as dialog, layout.section_card():
         layout.heading("Paste command", level=2)
-        area = layout.field("Command", hint="repo-scout … command string").props("type=textarea autogrow rows=3")
+        area = layout.field("Command", hint="A repo-scout command").props("type=textarea autogrow rows=3")
         error = ui.label().classes("ic-status--error")
 
         def apply() -> None:
@@ -170,7 +170,7 @@ def _start(form: SearchForm, started: dict[str, str]) -> None:
     out = sf.out_path(state["task"], datetime.now())
     run_item = run_pool.submit(sf.run_argv(state, out), label=state["task"].strip(), meta={"out": str(out)})
     if run_item is None:
-        ui.notify("Execution queue is full: wait for completion", type="warning")
+        ui.notify("Too many runs at once. Wait for one to finish.", type="warning")
         return
     started[run_item.run_id] = out.stem
     ui.notify("Search started", type="positive")

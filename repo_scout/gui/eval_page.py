@@ -15,9 +15,9 @@ from .verdict_dialog import open_index
 
 POLL_PERIOD = 1.0
 REPORTS_DIR = "eval-reports"
-FLAG_LABELS = {"detail": "List repos by dataset", "sweep": "Closeness thresholds 0.50–0.90", "no_round2": "Skip round 2",
-               "calls": "API call counts", "index_check": "Index check (Phase 5)",
-               "fake_stars": "Flag 'burst★' (eval/fake-stars)", "all_grid": "With it: full threshold grid"}
+FLAG_LABELS = {"detail": "List repos per set", "sweep": "Closeness thresholds 0.50-0.90", "no_round2": "Skip round 2",
+               "calls": "API call counts", "index_check": "Index check",
+               "fake_stars": "Star burst flag", "all_grid": "Star burst: full threshold grid"}
 
 
 def report_path(now: datetime) -> Path:
@@ -52,7 +52,7 @@ class EvalPage:
         out.parent.mkdir(parents=True, exist_ok=True)
         run_item = run_pool.submit(argv, label=label, meta={"out": str(out)})
         if run_item is None:
-            ui.notify("Execution queue is full: wait for completion", type="warning")
+            ui.notify("Too many runs at once. Wait for one to finish.", type="warning")
             return
         self.pending[run_item.run_id] = out
         ui.notify("Eval started", type="positive")
@@ -79,7 +79,7 @@ class EvalPage:
                     layout.heading("Report", level=2)
                     layout.markdown_reader(out.read_text(encoding="utf-8"))
                 elif state.status == run_pool.FAILED:
-                    layout.failed("Eval failed with error: see execution log above for details")
+                    layout.failed("Eval failed. See the log above.")
 
     def cards(self) -> None:
         with layout.grid(min_col="18rem"):
@@ -95,7 +95,7 @@ class EvalPage:
             with layout.grid():
                 for key, label in FLAG_LABELS.items():
                     self.opts[key] = ui.checkbox(label).classes("ic-span-6")
-                self.opts["top"] = ui.number("Show top-N results (0 — do not show)", value=0, min=0, precision=0) \
+                self.opts["top"] = ui.number("Top results to show (0 = none)", value=0, min=0, precision=0) \
                     .props("outlined dense stack-label").classes("ic-span-6 w-full")
             export = self.export_dialog()
             with layout.actions_row(end=False):
@@ -121,7 +121,7 @@ class EvalPage:
 
     def build(self) -> None:
         if not self.sets:
-            layout.empty("eval/*.toml datasets not found")
+            layout.empty("No eval sets found (eval/*.toml)")
         else:
             self.cards()
         self.controls()
