@@ -2,7 +2,7 @@
 
 # Contributing
 
-Bug reports, ideas and pull requests are welcome. For a large change, open an issue first so we can agree on the approach.
+Bug reports, ideas and pull requests are welcome. By taking part you agree to the [Code of Conduct](CODE_OF_CONDUCT.md). For a large change, open an issue first so we can agree on the approach.
 
 ## Set up
 
