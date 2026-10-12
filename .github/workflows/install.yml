@@ -18,7 +18,7 @@ jobs:
       REPO_SCOUT_NO_LAUNCH: "1"
       GH_TOKEN: ${{ github.token }}  # so `gh auth status` and doctor pass
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - if: runner.os != 'Windows'
         run: |
           sh install.sh --no-launch
