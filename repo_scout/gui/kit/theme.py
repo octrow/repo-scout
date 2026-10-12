@@ -260,9 +260,9 @@ body.body--dark .q-table { color: var(--ic-text); }
 .q-table__container.ic-table { container: ic-table / inline-size; }
 .ic-cell-sub { max-width: min(var(--ic-cell-max), var(--ic-cell-share)); overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap; font-size: var(--ic-fs-sm); color: var(--ic-text-secondary); }
-.ic-table .q-table tr > :first-child { position: sticky; left: 0; z-index: 1;
-  background: var(--ic-surface); border-right: 1px solid var(--ic-border); }
-.ic-table .q-table tbody tr:hover > td:first-child { background: var(--ic-surface-sunken); }
+.ic-table--picked .q-table tr > :first-child { position: sticky; left: 0; z-index: 1;
+  background: var(--ic-canvas); border-right: 1px solid var(--ic-border); }
+.ic-table--picked .q-table tbody tr:hover > td:first-child { background: var(--ic-surface-sunken); }
 .ic-menu-body { padding: var(--ic-s2) var(--ic-s3); }
 
 /* --- links, focus, selection, scrollbars -----------------------------------*/

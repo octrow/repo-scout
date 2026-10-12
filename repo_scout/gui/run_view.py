@@ -35,6 +35,10 @@ COLUMNS = [
 TABLE_CSS = """
 .rs-run-table .q-table td { white-space: nowrap; }
 .rs-clamp { max-width: min(var(--ic-cell-max), var(--ic-cell-share)); overflow: hidden; text-overflow: ellipsis; }
+/* Repo is first and stays put when the table scrolls sideways */
+.rs-run-table .q-table tr > :first-child { position: sticky; left: 0; z-index: 1;
+  background: var(--ic-canvas); border-right: 1px solid var(--ic-border); }
+.rs-run-table .q-table tbody tr:hover > td:first-child { background: var(--ic-surface-sunken); }
 .rs-run-table tbody tr { cursor: pointer; }
 .rs-repo { font-weight: var(--ic-fw-semibold); color: var(--ic-accent-700); }
 tr:hover .rs-repo { text-decoration: underline; }
