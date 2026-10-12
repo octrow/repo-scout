@@ -62,6 +62,7 @@ def table_row(r: dict) -> dict:
     close = r.get("closeness")
     g = r.get
     return {"repo": g("repo", "?"), "url": g("url", ""), "close": "—" if close is None else f"{close:.2f}",
+            "fit": "—" if g("fit") is None else f"{g('fit'):.2f}",
             "source": g("source", ""), "score": f"{g('score', 0)} (fresh {g('fresh', 0)}, pop {g('pop', 0)})",
             "stars": g("stars", 0), "forks": g("forks", 0), "commits": g("commits", 0),
             "pushed": g("pushed_days", ""), "created": g("created", ""), "lang": g("lang", ""),

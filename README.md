@@ -22,7 +22,7 @@ repo-scout runs several GitHub searches, merges the results, and does the mechan
 
 ## Install
 
-One command. It installs [uv](https://docs.astral.sh/uv/) (which brings its own Python) and the [GitHub CLI](https://cli.github.com/) if they are missing, installs the latest [release](https://github.com/octrow/repo-scout/releases), walks you through `gh auth login` once, downloads the local embedding model, and offers to open the GUI.
+One command. It installs [uv](https://docs.astral.sh/uv/) (which brings its own Python) and the [GitHub CLI](https://cli.github.com/) if they are missing, installs the latest [release](https://github.com/octrow/repo-scout/releases), walks you through `gh auth login` once, downloads the local embedding model, and offers to set up the optional [advanced mode](#basic-and-advanced-mode) and to open the GUI.
 
 ```bash
 # macOS / Linux
@@ -85,21 +85,32 @@ A verdict is stored in the Index and shown on later searches. It never hides a r
 
 Progress goes to stderr and to `~/.local/state/repo-scout/run.log` (`$REPO_SCOUT_LOG`), so you can `tail -f` it from another terminal. Use `-q` to send it only to the log file.
 
-## Optional LLM draft
+## Basic and advanced mode
 
-Everything above works without any API key. The LLM draft is an extra: with `OMNIROUTE_API_KEY` set, a model can turn a need written in any language into a task description, queries and hard conditions. It only fills in the form. You still review it and run the search yourself.
+**Basic mode** is the default and needs no API keys: search, triage, closeness and ranking run on GitHub data and a local CPU model. **Advanced mode** adds two optional extras, each turned on by its own key. They add information and never drop or reorder results ([ADR 0002](docs/adr/0002-advanced-mode-external-models.md)).
+
+| Extra | What it does | Key | Free option |
+|---|---|---|---|
+| LLM draft | turns a need written in any language into a task description, queries and hard conditions; you review and run the search yourself | `LLM_API_KEY` | [OmniRoute](https://github.com/diegosouzapw/OmniRoute) (local gateway, the default URL) or [Ollama](https://ollama.com/) (`LLM_BASE_URL=http://localhost:11434/v1`, any key) |
+| Fit | Jev, a TypeSafe System One model, rates 0–1 how well each of the top 20 results can serve as the base for your task; shown as a `fit` column next to closeness | `TYPESAFE_API_KEY` | key at [console.typesafe.ai](https://console.typesafe.ai/keys) |
 
 ```bash
-repo-scout draft "<what you need, any language>"   # prints a ready `repo-scout …` command
+repo-scout config                                  # asks for the keys, saves ~/.config/repo-scout/.env
+repo-scout doctor                                  # shows the mode and what is on
+repo-scout draft "<what you need, any language>"   # LLM draft: prints a ready `repo-scout …` command
+repo-scout --no-fit ...                            # one search without the fit column
 ```
 
 | Variable | Default |
 |---|---|
-| `OMNIROUTE_API_KEY` | none (the feature is off without it) |
-| `OMNIROUTE_MODEL` | `free-stack` |
-| `OMNIROUTE_BASE_URL` | `http://127.0.0.1:20128/v1` (OpenAI-compatible `/chat/completions`) |
+| `LLM_API_KEY` | none (LLM draft is off) |
+| `LLM_BASE_URL` | `http://127.0.0.1:20128/v1` (any OpenAI-compatible `/chat/completions`) |
+| `LLM_MODEL` | `free-stack` |
+| `REPO_SCOUT_GUI_DRAFT` | `0`; `1` shows the Draft button in the GUI |
+| `TYPESAFE_API_KEY` | none (fit is off) |
+| `TYPESAFE_MODEL` | `jev-latest` |
 
-`repo-scout config` asks for these and saves them to `~/.config/repo-scout/.env` (`$REPO_SCOUT_ENV`, readable only by you). Press Enter to keep a value, type `-` to clear it. `repo-scout doctor` shows whether the draft is on. Real environment variables take precedence over the file. In a clone, a git-ignored `.env` in the repo root works too and overrides the user file. `REPO_SCOUT_GUI_DRAFT=1` shows the Draft button in the GUI.
+The settings file is `~/.config/repo-scout/.env` (`$REPO_SCOUT_ENV`, readable only by you). Real environment variables take precedence over it. In a clone, a git-ignored `.env` in the repo root works too and overrides the user file. The older `OMNIROUTE_API_KEY`, `OMNIROUTE_MODEL` and `OMNIROUTE_BASE_URL` still work. Replayed runs and evals never call Fit.
 
 ## Evaluation
 

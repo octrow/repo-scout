@@ -78,7 +78,7 @@ def test_parse_rejects(patch):
 
 def test_no_key_error_names_variables(monkeypatch):
     monkeypatch.delenv("OMNIROUTE_API_KEY")
-    with pytest.raises(llm.LLMError, match="OMNIROUTE_API_KEY"):
+    with pytest.raises(llm.LLMError, match="LLM_API_KEY"):
         llm._post([])
 
 
@@ -126,7 +126,7 @@ def test_cli_draft_without_key(monkeypatch):
     monkeypatch.setattr("sys.argv", ["repo-scout", "draft", "x"])
     with pytest.raises(SystemExit) as e:
         cli.main()
-    assert "OMNIROUTE_API_KEY" in str(e.value)
+    assert "LLM_API_KEY" in str(e.value)
 
 
 def test_need_roundtrips_through_command():
@@ -224,3 +224,11 @@ def test_refused_connection_is_not_reported_as_timeout():
     from repo_scout import llm
     assert "refused" in llm._why(urllib.error.URLError(ConnectionRefusedError()))
     assert "no response" in llm._why(urllib.error.URLError(TimeoutError()))
+
+
+def test_generic_name_wins_over_older_alias(monkeypatch):
+    monkeypatch.setenv("OMNIROUTE_API_KEY", "old")
+    monkeypatch.setenv("LLM_API_KEY", "new")
+    assert llm.setting(llm.KEY_VAR) == "new"
+    monkeypatch.delenv("LLM_API_KEY")
+    assert llm.setting(llm.KEY_VAR) == "old"

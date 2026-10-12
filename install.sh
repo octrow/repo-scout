@@ -106,12 +106,15 @@ fi
 say "Checking the setup"
 "$BIN" doctor --fix || warn "Fix the ✗ items above, then check again with: repo-scout doctor"
 
-# 6. optional settings: asked once, skipped when a key is already saved
+# 6. advanced mode (optional): asked once, skipped when a key is already saved
 ENV_FILE="${REPO_SCOUT_ENV:-$HOME/.config/repo-scout/.env}"
-if has_tty && ! grep -qs '^OMNIROUTE_API_KEY=' "$ENV_FILE"; then
-  note "Optional: an LLM can turn a need written in any language into search queries."
-  note "repo-scout works fully without it. You can set it up later with: repo-scout config"
-  printf 'Set up the optional LLM draft now? (needs an OpenAI-compatible API key) [y/N] '
+if has_tty && ! grep -qsE '^(LLM_API_KEY|OMNIROUTE_API_KEY|TYPESAFE_API_KEY)=' "$ENV_FILE"; then
+  note "repo-scout works fully without external models (basic mode)."
+  note "Advanced mode adds two optional extras:"
+  note "  - LLM draft: an OpenAI-compatible model writes the queries from your need in any language"
+  note "    (free with OmniRoute, https://github.com/diegosouzapw/OmniRoute, or a local Ollama)"
+  note "  - fit: Jev by TypeSafe rates how well each top result fits your task (key at https://console.typesafe.ai/keys)"
+  printf 'Set up advanced mode now? You can do it later with: repo-scout config [y/N] '
   read -r answer </dev/tty || answer=n
   case "$answer" in [yY]*) tty_run "$BIN" config || warn "Settings not saved. Run 'repo-scout config' later." ;; esac
 fi

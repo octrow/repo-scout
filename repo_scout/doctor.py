@@ -4,7 +4,7 @@ import shutil
 import subprocess
 import sys
 
-from repo_scout import llm, semantic
+from repo_scout import config, llm, semantic, systemone
 
 GH_URL = "https://cli.github.com/"
 LOGIN_HINT = "run: gh auth login --web"
@@ -42,11 +42,22 @@ def checks(fix: bool = False) -> list[tuple[bool, str, str]]:
 
 
 def optional() -> list[str]:
-    """Extras that never fail the check: everything works without them."""
-    if not llm.available():
-        return ["○ LLM draft (optional): off — to turn it on run: repo-scout config"]
-    gui = "with" if llm.gui_enabled() else "without"
-    return [f"✓ LLM draft (optional): on, model {llm.model()}, {gui} the GUI button"]
+    """Advanced mode: extras that never fail the check, since basic mode works without them."""
+    draft, fit = llm.available(), systemone.available()
+    on = [name for name, ok in (("LLM draft", draft), ("fit", fit)) if ok]
+    lines = [f"Mode: advanced ({', '.join(on)})" if on else "Mode: basic (no external models)"]
+    if draft:
+        gui = "with" if llm.gui_enabled() else "without"
+        lines.append(f"✓ LLM draft: model {llm.model()} at {llm.setting(llm.URL_VAR, llm.DEFAULT_URL)}, {gui} the GUI button")
+    else:
+        lines.append(f"○ LLM draft (optional): off — free with OmniRoute ({config.OMNIROUTE_URL}) or Ollama")
+    if fit:
+        lines.append(f"✓ fit: model {systemone.model()}")
+    else:
+        lines.append(f"○ fit (optional): off — Jev by TypeSafe, key at {systemone.KEYS_URL}")
+    if not (draft and fit):
+        lines.append("  turn these on with: repo-scout config")
+    return lines
 
 
 def main(argv: list[str]) -> None:

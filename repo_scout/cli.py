@@ -12,7 +12,7 @@ from pathlib import Path
 
 import numpy as np
 
-from repo_scout import github, runs, semantic, stars
+from repo_scout import github, runs, semantic, stars, systemone
 from repo_scout import log as logmod
 from repo_scout.command import parse_command, search_params, to_argv  # noqa: F401  (re-export)
 from repo_scout.commits import last_substantive
@@ -72,10 +72,18 @@ def _fmt_close(r: dict) -> str:
     return "—" if r.get("closeness") is None else f"{r['closeness']:.2f}"
 
 
+def _fmt_fit(r: dict) -> str:
+    return f" {r.get('fit', '—')} |"
+
+
 def to_markdown(rows: list[dict]) -> str:
-    head = "| close | source | score | repo | ★ | forks | commits | pushed, d | created | lang | flags / stop | seen | desc |\n" + "|---" * 13 + "|"
+    fit = any("fit" in r for r in rows)  # advanced mode: a fit column right after closeness
+    cols = ["close", *(["fit"] if fit else []), "source", "score", "repo", "★", "forks", "commits", "pushed, d",
+            "created", "lang", "flags / stop", "seen", "desc"]
+    head = "| " + " | ".join(cols) + " |\n" + "|---" * len(cols) + "|"
     lines = [
-        f"| {_fmt_close(r)} | {r['source']} | {r['score']} (fresh {r['fresh']}, pop {r['pop']}) | [{r['repo']}]({r['url']}) | {r['stars']} | {r['forks']} "
+        f"| {_fmt_close(r)} |{_fmt_fit(r) if fit else ''} {r['source']} "
+        f"| {r['score']} (fresh {r['fresh']}, pop {r['pop']}) | [{r['repo']}]({r['url']}) | {r['stars']} | {r['forks']} "
         f"| {r['commits']} | {r['pushed_days']} | {r['created']} | {r['lang']} "
         f"| {verdict(r)} | {r.get('seen') or '—'} "
         f"| {r['desc'][:120]} |"
@@ -169,8 +177,9 @@ def sort_key(r: dict) -> tuple:
 
 def _process(nodes: dict, live: set[str], source: str, *, now: datetime, new_days: int, lang: str | None,
              exclude: list[re.Pattern], must: list[re.Pattern], task: str | None, min_closeness: float,
-             index: Index | None, known: dict[str, dict]) -> list[dict]:
-    """Pipeline for a set of nodes: triage, noise, conditions, details, closeness, threshold, index upsert."""
+             index: Index | None, known: dict[str, dict], texts: dict[str, str] | None = None) -> list[dict]:
+    """Pipeline for a set of nodes: triage, noise, conditions, details, closeness, threshold, index upsert.
+    `texts` collects candidate texts of rows that passed, for the optional fit column."""
     log.info("pipeline (%s): %d candidates", source, len(nodes))
     rows = [triage(n, now, new_days) for n in nodes.values()]
     for r in rows:
@@ -184,6 +193,8 @@ def _process(nodes: dict, live: set[str], source: str, *, now: datetime, new_day
                 if r["repo"] in vecs and readmes.get(r["repo"]):
                     index.upsert(r, readmes[r["repo"]], vecs[r["repo"]], now)
         apply_closeness(rows, min_closeness)
+        if texts is not None:
+            texts.update({r["repo"]: semantic.candidate_text(r, readmes.get(r["repo"])) for r in rows if not r["stop"]})
     return rows
 
 
@@ -211,7 +222,8 @@ def _round2(rows: list[dict], queries: list[str], pool: dict, *, k: int, floor: 
 def run(queries: list[str], *, months: int, new_days: int, limit: int, lang: str | None, now: datetime,
         exclude: list[re.Pattern] = (), must: list[re.Pattern] = (), task: str | None = None,
         min_closeness: float = semantic.MIN_CLOSENESS, index: Index | None = None,
-        from_index: int = FROM_INDEX, round2: bool = True, round2_k: int = ROUND2_K, stars_k: int = 0) -> list[dict]:
+        from_index: int = FROM_INDEX, round2: bool = True, round2_k: int = ROUND2_K, stars_k: int = 0,
+        fit_k: int = 0) -> list[dict]:
     """All triage rows (including dropped), sorted by closeness, then score."""
     global last_round2_topics
     last_round2_topics = []
@@ -221,7 +233,7 @@ def run(queries: list[str], *, months: int, new_days: int, limit: int, lang: str
     live = set(nodes)
     known = _from_index(index, task, nodes, from_index) if index and task and from_index else {}
     kw = {"now": now, "new_days": new_days, "lang": lang, "exclude": list(exclude), "must": list(must),
-          "task": task, "min_closeness": min_closeness, "index": index}
+          "task": task, "min_closeness": min_closeness, "index": index, "texts": {} if fit_k else None}
     rows = _process(nodes, live, "query", known=known, **kw)
     if task and round2:
         extra, topics = _round2(rows, queries, nodes, k=round2_k, floor=max(min_closeness, semantic.MIN_CLOSENESS),
@@ -235,6 +247,8 @@ def run(queries: list[str], *, months: int, new_days: int, limit: int, lang: str
             r["seen"] = seen.get(r["repo"].lower(), "")
     rows.sort(key=sort_key)
     add_stars_flag(rows, stars_k, now)
+    if fit_k:
+        systemone.add_fit(rows, task, kw["texts"], fit_k)
     return rows
 
 
@@ -349,6 +363,8 @@ def _parser() -> argparse.ArgumentParser:
                     help="'burst★' flag for top-K with >=50★ (default %(default)s)")
     ap.add_argument("--no-stars-check", action="store_true", help="disable 'burst★' flag check (REST star history)")
     ap.add_argument("--no-round2", action="store_true", help="disable round two (`topic:` from top-K)")
+    ap.add_argument("--no-fit", action="store_true",
+                    help="advanced mode: skip the fit column from a System One model (on when TYPESAFE_API_KEY is set)")
     ap.add_argument("--project", help="project name for search (saved to Run)")
     ap.add_argument("--need", metavar="TEXT", help="original need in user's words (saved to Run, not used in search)")
     ap.add_argument("--out", metavar="PATH", help="Run output file path (default: runs directory)")
@@ -382,7 +398,8 @@ def _main(a: argparse.Namespace) -> None:
                    exclude=exclude, must=must, task=a.task, min_closeness=a.min_closeness,
                    index=None if a.record or a.replay else Index(default_path()), from_index=a.from_index,
                    round2=not a.no_round2, round2_k=a.round2_k,
-                   stars_k=0 if a.no_stars_check else a.stars_k)
+                   stars_k=0 if a.no_stars_check else a.stars_k,
+                   fit_k=0 if a.no_fit or a.record or a.replay else systemone.FIT_K)
     except ValueError as e:
         print(e, file=sys.stderr)
         sys.exit(2)

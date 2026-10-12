@@ -20,7 +20,9 @@ from repo_scout.conditions import compile_all
 from repo_scout.log import log
 
 ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
-KEY_VAR, MODEL_VAR, URL_VAR = "OMNIROUTE_API_KEY", "OMNIROUTE_MODEL", "OMNIROUTE_BASE_URL"
+# any OpenAI-compatible /chat/completions endpoint; the defaults point at a local OmniRoute (free models)
+KEY_VAR, MODEL_VAR, URL_VAR = "LLM_API_KEY", "LLM_MODEL", "LLM_BASE_URL"
+ALIASES = {KEY_VAR: "OMNIROUTE_API_KEY", MODEL_VAR: "OMNIROUTE_MODEL", URL_VAR: "OMNIROUTE_BASE_URL"}  # older names
 DEFAULT_MODEL, DEFAULT_URL = "free-stack", "http://127.0.0.1:20128/v1"
 TIMEOUT_S = 90  # free-stack responds in ~8s, but routes across different models
 MAX_QUERIES, MAX_QUERY_CHARS, MAX_TASK_CHARS, MAX_REGEXES = 10, 256, 600, 10
@@ -103,9 +105,14 @@ def _env_file() -> dict[str, str]:
     return {**parse_env(user_env_path()), **parse_env(ENV_FILE)}
 
 
-def _setting(name: str, default: str = "") -> str:
-    """Real environment takes precedence over .env."""
-    return (os.environ.get(name) or _env_file().get(name) or default).strip()
+def setting(name: str, default: str = "") -> str:
+    """Real environment takes precedence over .env; an older alias name counts after the new one."""
+    names = [name, *([ALIASES[name]] if name in ALIASES else [])]
+    file = _env_file()
+    return next((v for v in [*(os.environ.get(n) for n in names), *(file.get(n) for n in names)] if v), default).strip()
+
+
+_setting = setting
 
 
 def available() -> bool:

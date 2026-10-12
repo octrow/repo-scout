@@ -11,7 +11,10 @@ Triage guide: [`docs/repo-triage.md`](docs/repo-triage.md).
 - **New** — created within the last 60 days. A flag, not a score.
 - **Inspect** (Step 2) — reviewing GitHub web pages without cloning; yields a verdict and a goal for Study.
 - **Study** (Step 3) — cloning into `external_examples/` and inspecting code with a specific goal.
-- **Without LLM** — Search, Triage, Closeness, and ranking operate without generative models: deterministic rules, GitHub API, and local embedding models (CPU, offline). A generative model is allowed only optionally and strictly before search — for query drafting; it does not alter search output, and everything works without it.
+- **Without LLM** — Search, Triage, Closeness, and ranking operate without generative or external models: deterministic rules, GitHub API, and local embedding models (CPU, offline). Holds in both modes: external models may add to the output, never drop or reorder it.
+- **Basic mode** — the default: no external models and no API keys. Everything except LLM draft and Fit works.
+- **Advanced mode** — Basic mode plus external models the user turns on with their own keys: an OpenAI-compatible model for LLM draft (before search) and a System One model for Fit (after Triage). Each part is optional on its own; without a key it is off.
+- **Fit** — a System One model's probability (0–1) that a candidate can serve as the base for the task. Advanced mode only, for the top kept candidates of a run. Not a score and not a stop rule: a column next to Closeness that never drops or reorders rows.
 - **Task description** — 1–3 English sentences describing what the user needs. Used to compute semantic Closeness.
 - **Need** — what the user wants to find, in their own words in any language, without naming specific solutions. Used to generate the task description and queries (by human, agent, or LLM draft).
 - **LLM draft** — task description, queries, and hard conditions suggested by an LLM based on the user's need. Merely fills out the form; the user reviews and launches the search.

@@ -11,6 +11,7 @@ from .verdict_dialog import DB_ERRORS, VerdictDialog, notify_db_error, open_inde
 
 COLUMNS = [
     {"name": "close", "label": "Closeness", "field": "close", "align": "right", "sortable": True},
+    {"name": "fit", "label": "Fit", "field": "fit", "align": "right", "sortable": True},  # advanced mode only
     {"name": "source", "label": "Source", "field": "source", "align": "left", "sortable": True},
     {"name": "score", "label": "Score", "field": "score", "align": "left"},
     {"name": "repo", "label": "Repo", "field": "repo", "align": "left", "sortable": True},
@@ -126,7 +127,9 @@ class RunView:
         if self.data.get("round2_topics"):
             ui.label("Round 2: " + ", ".join(self.data.get("round2_topics"))).classes("t-meta")
         self.filters()
-        self.table = table.empty_aware_table(COLUMNS, row_key="repo", pagination={"rowsPerPage": 25},
+        has_fit = any("fit" in r for r in self.rows)
+        columns = [c for c in COLUMNS if c["name"] != "fit" or has_fit]
+        self.table = table.empty_aware_table(columns, row_key="repo", pagination={"rowsPerPage": 25},
                                              empty_text="No rows match these filters.")
         self.table.table.on("rowClick", lambda e: self.open_panel(e.args[1]["repo"]))
         self.refresh()

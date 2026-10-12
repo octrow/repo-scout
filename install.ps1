@@ -95,13 +95,16 @@ Say "Checking the setup"
 & $Bin doctor --fix
 if ($LASTEXITCODE -ne 0) { Warn "Fix the items marked with a cross above, then check again with: repo-scout doctor" }
 
-# 6. optional settings: asked once, skipped when a key is already saved
+# 6. advanced mode (optional): asked once, skipped when a key is already saved
 $EnvFile = if ($env:REPO_SCOUT_ENV) { $env:REPO_SCOUT_ENV } else { "$HOME\.config\repo-scout\.env" }
-$HasKey = (Test-Path $EnvFile) -and (Select-String -Path $EnvFile -Pattern '^OMNIROUTE_API_KEY=' -Quiet)
+$HasKey = (Test-Path $EnvFile) -and (Select-String -Path $EnvFile -Pattern '^(LLM_API_KEY|OMNIROUTE_API_KEY|TYPESAFE_API_KEY)=' -Quiet)
 if ($Interactive -and -not $HasKey) {
-  Note "Optional: an LLM can turn a need written in any language into search queries."
-  Note "repo-scout works fully without it. You can set it up later with: repo-scout config"
-  $answer = Read-Host "Set up the optional LLM draft now? (needs an OpenAI-compatible API key) [y/N]"
+  Note "repo-scout works fully without external models (basic mode)."
+  Note "Advanced mode adds two optional extras:"
+  Note "  - LLM draft: an OpenAI-compatible model writes the queries from your need in any language"
+  Note "    (free with OmniRoute, https://github.com/diegosouzapw/OmniRoute, or a local Ollama)"
+  Note "  - fit: Jev by TypeSafe rates how well each top result fits your task (key at https://console.typesafe.ai/keys)"
+  $answer = Read-Host "Set up advanced mode now? You can do it later with: repo-scout config [y/N]"
   if ($answer -match '^[yY]') {
     & $Bin config
     if ($LASTEXITCODE -ne 0) { Warn "Settings not saved. Run 'repo-scout config' later." }
