@@ -294,6 +294,8 @@ def draft_main(argv: list[str]) -> None:
 
 @logmod.logged_exit
 def main() -> None:
+    for stream in (sys.stdout, sys.stderr):  # ★/✓/→ on a legacy Windows code page (redirected output) must not crash
+        stream.reconfigure(errors="replace")
     if sys.argv[1:2] == ["eval"]:
         from repo_scout import evaluate
         return evaluate.main(sys.argv[2:])

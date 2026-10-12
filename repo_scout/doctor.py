@@ -45,7 +45,6 @@ def main(argv: list[str]) -> None:
     ap = argparse.ArgumentParser(prog="repo-scout doctor", description="Check that repo-scout is ready to search")
     ap.add_argument("--fix", action="store_true", help="download the embedding model if it is missing")
     a = ap.parse_args(argv)
-    sys.stdout.reconfigure(errors="replace")  # ✓/✗ on a legacy Windows code page must not crash the check
     results = checks(a.fix)
     for ok, label, hint in results:
         print(f"✓ {label}" if ok else f"✗ {label} — {hint}")

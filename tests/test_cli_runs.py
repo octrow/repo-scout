@@ -1,4 +1,5 @@
 """Run from CLI, parse_command / to_argv, python -m repo_scout."""
+import os
 import shlex
 import subprocess
 import sys
@@ -111,3 +112,10 @@ def test_main_prints_before_save_and_survives_oserror(monkeypatch, capsys):
     monkeypatch.setattr(cli.runs, "save", boom)
     _go(monkeypatch, _argv())
     assert "a/b" in capsys.readouterr().out
+
+
+def test_help_survives_legacy_code_page():
+    """Windows with redirected output encodes stdout as cp1252, which has no ★ or →."""
+    env = {**os.environ, "PYTHONIOENCODING": "cp1252"}
+    r = subprocess.run([sys.executable, "-m", "repo_scout", "--help"], capture_output=True, env=env)
+    assert r.returncode == 0, r.stderr.decode(errors="replace")
