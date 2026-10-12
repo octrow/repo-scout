@@ -1,6 +1,5 @@
 """Search form logic without UI: form state <-> CLI parameters, drafts, prompt text."""
 import shlex
-import sys
 import tomllib
 from dataclasses import dataclass
 from datetime import datetime
@@ -8,6 +7,7 @@ from pathlib import Path
 
 from .. import cli, llm, runs
 from ..cli import _parser, compile_all, search_params, to_argv, validate_query
+from ..command import self_argv
 
 RUN_PREFIX, EVAL_PREFIX = "run:", "eval:"
 EVAL_DIR = Path(__file__).resolve().parents[2] / "eval"
@@ -76,8 +76,8 @@ def command_text(state: dict) -> str | None:
 
 
 def run_argv(state: dict, out: Path) -> list[str]:
-    """Subprocess argv: same interpreter, `-m repo_scout`, Run path known in advance."""
-    return [sys.executable, "-m", "repo_scout", *to_argv(state_to_params(state), ["--out", str(out)])]
+    """Subprocess argv: this repo-scout (see self_argv), Run path known in advance."""
+    return [*self_argv(), *to_argv(state_to_params(state), ["--out", str(out)])]
 
 
 def out_path(task: str, now: datetime) -> Path:

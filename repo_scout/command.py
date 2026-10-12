@@ -1,6 +1,7 @@
 """Command `repo-scout …` <-> search parameters: string parsing and argv serialization."""
 import argparse
 import shlex
+import sys
 
 NON_SEARCH = {"out", "no_save", "json", "all", "record", "replay", "quiet"}  # not search parameters
 
@@ -49,3 +50,8 @@ def to_argv(params: dict, extra: list[str] | None = None) -> list[str]:
         else:
             out.append(f"{flag}={val}")
     return [*out, *(extra or []), "--", *params["queries"]]
+
+
+def self_argv() -> list[str]:
+    """argv prefix that re-runs repo-scout: the frozen release binary itself, or this interpreter with -m."""
+    return [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, "-m", "repo_scout"]

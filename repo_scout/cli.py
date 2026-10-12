@@ -301,11 +301,14 @@ def main() -> None:
         return evaluate.main(sys.argv[2:])
     if sys.argv[1:2] == ["gui"] or not sys.argv[1:]:
         from repo_scout.gui import app
-        return app.main(sys.argv[2:])
+        return app.main(sys.argv[2:] if sys.argv[1:] else ["--open"])  # bare run (or double-click) opens the browser
     if sys.argv[1:2] == ["verdict"]:
         return verdict_main(sys.argv[2:])
     if sys.argv[1:2] == ["draft"]:
         return draft_main(sys.argv[2:])
+    if sys.argv[1:2] == ["config"]:
+        from repo_scout import config
+        return config.main(sys.argv[2:])
     if sys.argv[1:2] == ["doctor"]:
         from repo_scout import doctor
         return doctor.main(sys.argv[2:])

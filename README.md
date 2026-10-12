@@ -38,6 +38,19 @@ Run the same command again to update. Options: `sh -s -- --version 0.1.0`, `--ma
 
 Something not working? `repo-scout doctor` checks gh, the GitHub login and the model, and says how to fix each one.
 
+### Or download a ready build
+
+Each [release](https://github.com/octrow/repo-scout/releases/latest) has standalone builds that need no Python and no uv. Unpack the archive and run `repo-scout` inside it (on Windows, double-click `repo-scout.exe`). With no arguments it opens the GUI in your browser.
+
+| System | File |
+|---|---|
+| Windows x64 | `repo-scout-<version>-windows-x86_64.zip` |
+| macOS Apple Silicon | `repo-scout-<version>-macos-arm64.tar.gz` |
+| Linux x64 (glibc 2.35+, e.g. Ubuntu 22.04+) | `repo-scout-<version>-linux-x86_64.tar.gz` |
+| Linux arm64 | `repo-scout-<version>-linux-arm64.tar.gz` |
+
+You still need the [GitHub CLI](https://cli.github.com/) with `gh auth login` done once; `repo-scout doctor --fix` checks it and downloads the model. The builds are not code-signed: Windows SmartScreen asks you to confirm ("More info" → "Run anyway"), and on macOS a browser-downloaded build needs `xattr -dr com.apple.quarantine repo-scout` once. An Intel Mac can use the one-command install.
+
 ## Quick start
 
 From a clone, with Python 3.11+, uv and an authenticated `gh`:
@@ -46,7 +59,7 @@ From a clone, with Python 3.11+, uv and an authenticated `gh`:
 uv sync && uv tool install --editable .   # puts `repo-scout` on PATH
 repo-scout --task "Live speech transcription with an overlay, runs on Linux" \
   "whisper live transcription" "speech to text overlay language:python" "topic:asr linux"
-repo-scout                                # no arguments: opens the GUI at 127.0.0.1
+repo-scout                                # no arguments: opens the GUI in your browser
 ```
 
 ## How a search works
@@ -74,7 +87,7 @@ Progress goes to stderr and to `~/.local/state/repo-scout/run.log` (`$REPO_SCOUT
 
 ## Optional LLM draft
 
-Without LLM is the default. If you set `OMNIROUTE_API_KEY`, a model can turn a need written in any language into a task description, queries and hard conditions. It only fills in the form. You still review it and run the search yourself.
+Everything above works without any API key. The LLM draft is an extra: with `OMNIROUTE_API_KEY` set, a model can turn a need written in any language into a task description, queries and hard conditions. It only fills in the form. You still review it and run the search yourself.
 
 ```bash
 repo-scout draft "<what you need, any language>"   # prints a ready `repo-scout …` command
@@ -86,7 +99,7 @@ repo-scout draft "<what you need, any language>"   # prints a ready `repo-scout 
 | `OMNIROUTE_MODEL` | `free-stack` |
 | `OMNIROUTE_BASE_URL` | `http://127.0.0.1:20128/v1` (OpenAI-compatible `/chat/completions`) |
 
-Real environment variables take precedence over a `.env` file in the repo root. `.env` is git-ignored.
+`repo-scout config` asks for these and saves them to `~/.config/repo-scout/.env` (`$REPO_SCOUT_ENV`, readable only by you). Press Enter to keep a value, type `-` to clear it. `repo-scout doctor` shows whether the draft is on. Real environment variables take precedence over the file. In a clone, a git-ignored `.env` in the repo root works too and overrides the user file. `REPO_SCOUT_GUI_DRAFT=1` shows the Draft button in the GUI.
 
 ## Evaluation
 

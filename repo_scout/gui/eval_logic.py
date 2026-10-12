@@ -1,10 +1,10 @@
 """Eval page logic without UI: eval/*.toml datasets and subprocess argv."""
-import sys
 import tomllib
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from ..command import self_argv
 from .search_form import EVAL_DIR
 
 NO_DATE = "—"
@@ -49,7 +49,7 @@ def list_sets(eval_dir: Path = EVAL_DIR) -> list[EvalSet]:
 
 def eval_argv(o: EvalOptions, out: Path) -> list[str]:
     """argv for `repo-scout eval …`: datasets, mode, flags, and `--out`."""
-    argv = [sys.executable, "-m", "repo_scout", "eval"]
+    argv = [*self_argv(), "eval"]
     if not o.fake_stars:
         argv += [str(p) for p in o.sets]
     argv.append("--record" if o.record else "--replay")
@@ -64,7 +64,7 @@ def eval_argv(o: EvalOptions, out: Path) -> list[str]:
 
 
 def export_argv(project: str | None, out: Path) -> list[str]:
-    argv = [sys.executable, "-m", "repo_scout", "eval", "--export-verdicts"]
+    argv = [*self_argv(), "eval", "--export-verdicts"]
     if project:
         argv += ["--project", project]
     return [*argv, "--out", str(out)]

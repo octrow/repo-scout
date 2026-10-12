@@ -25,7 +25,7 @@ DEFAULT_MODEL, DEFAULT_URL = "free-stack", "http://127.0.0.1:20128/v1"
 TIMEOUT_S = 90  # free-stack responds in ~8s, but routes across different models
 MAX_QUERIES, MAX_QUERY_CHARS, MAX_TASK_CHARS, MAX_REGEXES = 10, 256, 600, 10
 MAX_NEED_CHARS = 2_000
-NO_KEY = f"missing LLM key: set {KEY_VAR} (and optionally {MODEL_VAR}, {URL_VAR}) in environment or .env"
+NO_KEY = f"missing LLM key: set {KEY_VAR} (and optionally {MODEL_VAR}, {URL_VAR}) in environment or .env (run: repo-scout config)"
 
 SYSTEM_PROMPT = """You turn a user's need (any language) into a draft for a GitHub repository search.
 Reply with ONE JSON object and nothing else:
@@ -74,10 +74,15 @@ class Draft:
     exclude: tuple[str, ...] = ()
 
 
-def _env_file() -> dict[str, str]:
-    """Parse KEY=VALUE from .env (comments and blank lines ignored, quotes stripped)."""
+def user_env_path() -> Path:
+    """Settings file of an installed repo-scout (`repo-scout config` writes it); ENV_FILE is the dev checkout's."""
+    return Path(os.environ.get("REPO_SCOUT_ENV") or Path.home() / ".config/repo-scout/.env")
+
+
+def parse_env(path: Path) -> dict[str, str]:
+    """Parse KEY=VALUE from a .env file (comments and blank lines ignored, quotes stripped)."""
     try:
-        lines = ENV_FILE.read_text(encoding="utf-8").splitlines()
+        lines = path.read_text(encoding="utf-8").splitlines()
     except OSError:
         return {}
     out = {}
@@ -91,6 +96,11 @@ def _env_file() -> dict[str, str]:
             value = value[1:-1]
         out[key.strip()] = value
     return out
+
+
+def _env_file() -> dict[str, str]:
+    """User settings, overridden by the dev checkout's .env."""
+    return {**parse_env(user_env_path()), **parse_env(ENV_FILE)}
 
 
 def _setting(name: str, default: str = "") -> str:

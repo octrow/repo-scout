@@ -4,7 +4,7 @@ import shutil
 import subprocess
 import sys
 
-from repo_scout import semantic
+from repo_scout import llm, semantic
 
 GH_URL = "https://cli.github.com/"
 LOGIN_HINT = "run: gh auth login --web"
@@ -41,6 +41,14 @@ def checks(fix: bool = False) -> list[tuple[bool, str, str]]:
     return [*out, _model_check(fix)]
 
 
+def optional() -> list[str]:
+    """Extras that never fail the check: everything works without them."""
+    if not llm.available():
+        return ["○ LLM draft (optional): off — to turn it on run: repo-scout config"]
+    gui = "with" if llm.gui_enabled() else "without"
+    return [f"✓ LLM draft (optional): on, model {llm.model()}, {gui} the GUI button"]
+
+
 def main(argv: list[str]) -> None:
     ap = argparse.ArgumentParser(prog="repo-scout doctor", description="Check that repo-scout is ready to search")
     ap.add_argument("--fix", action="store_true", help="download the embedding model if it is missing")
@@ -48,5 +56,6 @@ def main(argv: list[str]) -> None:
     results = checks(a.fix)
     for ok, label, hint in results:
         print(f"✓ {label}" if ok else f"✗ {label} — {hint}")
+    print(*optional(), sep="\n")
     if not all(ok for ok, _, _ in results):
         sys.exit(1)

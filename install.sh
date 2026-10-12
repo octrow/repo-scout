@@ -106,6 +106,16 @@ fi
 say "Checking the setup"
 "$BIN" doctor --fix || warn "Fix the ✗ items above, then check again with: repo-scout doctor"
 
+# 6. optional settings: asked once, skipped when a key is already saved
+ENV_FILE="${REPO_SCOUT_ENV:-$HOME/.config/repo-scout/.env}"
+if has_tty && ! grep -qs '^OMNIROUTE_API_KEY=' "$ENV_FILE"; then
+  note "Optional: an LLM can turn a need written in any language into search queries."
+  note "repo-scout works fully without it. You can set it up later with: repo-scout config"
+  printf 'Set up the optional LLM draft now? (needs an OpenAI-compatible API key) [y/N] '
+  read -r answer </dev/tty || answer=n
+  case "$answer" in [yY]*) tty_run "$BIN" config || warn "Settings not saved. Run 'repo-scout config' later." ;; esac
+fi
+
 say "Installed. Start repo-scout any time with: repo-scout"
 note "(open a new terminal if the command is not found; full path: $BIN)"
 if [ "$LAUNCH" = 1 ] && has_tty; then

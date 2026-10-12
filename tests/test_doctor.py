@@ -23,7 +23,16 @@ def _env(monkeypatch, *, gh=True, auth=True, cached=True):
 def test_all_ok_exits_zero(monkeypatch, capsys):
     _env(monkeypatch)
     doctor.main([])
-    assert capsys.readouterr().out.count("✓") == 3
+    out = capsys.readouterr().out
+    assert out.count("✓") == 3
+    assert "LLM draft (optional): off" in out and "repo-scout config" in out
+
+
+def test_llm_key_shows_draft_on_without_failing(monkeypatch, capsys):
+    _env(monkeypatch)
+    monkeypatch.setenv("OMNIROUTE_API_KEY", "k")
+    doctor.main([])
+    assert "LLM draft (optional): on" in capsys.readouterr().out
 
 
 def test_missing_gh_fails_with_hint_and_skips_auth(monkeypatch, capsys):
@@ -47,7 +56,7 @@ def test_fix_downloads_missing_model(monkeypatch, capsys):
     loads = _env(monkeypatch, cached=False)
     doctor.main(["--fix"])
     assert loads == [True, False]  # cache probe, then download
-    assert capsys.readouterr().out.count("✓") == 3
+    assert capsys.readouterr().out.count("✓") == 3  # optional LLM line is "○" when off
 
 
 def test_failed_download_is_reported_not_raised(monkeypatch, capsys):

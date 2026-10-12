@@ -38,6 +38,19 @@ powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/oct
 
 Что-то не работает? `repo-scout doctor` проверяет gh, вход в GitHub и модель и подсказывает, как исправить каждый пункт.
 
+### Или скачайте готовую сборку
+
+В каждом [релизе](https://github.com/octrow/repo-scout/releases/latest) есть автономные сборки, которым не нужны Python и uv. Распакуйте архив и запустите `repo-scout` внутри него (в Windows — двойной щелчок по `repo-scout.exe`). Без аргументов он открывает GUI в браузере.
+
+| Система | Файл |
+|---|---|
+| Windows x64 | `repo-scout-<версия>-windows-x86_64.zip` |
+| macOS Apple Silicon | `repo-scout-<версия>-macos-arm64.tar.gz` |
+| Linux x64 (glibc 2.35+, например Ubuntu 22.04+) | `repo-scout-<версия>-linux-x86_64.tar.gz` |
+| Linux arm64 | `repo-scout-<версия>-linux-arm64.tar.gz` |
+
+[GitHub CLI](https://cli.github.com/) по-прежнему нужен, а `gh auth login` надо один раз выполнить; `repo-scout doctor --fix` это проверит и скачает модель. Сборки не подписаны: Windows SmartScreen попросит подтвердить запуск («Подробнее» → «Выполнить в любом случае»), а на macOS для сборки, скачанной браузером, один раз нужен `xattr -dr com.apple.quarantine repo-scout`. На Mac с Intel используйте установку одной командой.
+
 ## Быстрый старт
 
 Из клона, при наличии Python 3.11+, uv и авторизованного `gh`:
@@ -46,7 +59,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/oct
 uv sync && uv tool install --editable .   # добавляет repo-scout в PATH
 repo-scout --task "Live speech transcription with an overlay, runs on Linux" \
   "whisper live transcription" "speech to text overlay language:python" "topic:asr linux"
-repo-scout                                # без аргументов: открывает GUI на 127.0.0.1
+repo-scout                                # без аргументов: открывает GUI в браузере
 ```
 
 ## Как работает поиск
@@ -74,7 +87,7 @@ repo-scout gui [--port 8790]   # Поиск, Прогоны, Индекс, Eval
 
 ## Черновик из LLM (опционально)
 
-По умолчанию поиск работает полностью без LLM. При наличии `OMNIROUTE_API_KEY` модель может преобразовать потребность на любом языке в описание задачи, поисковые запросы и жёсткие условия. Она лишь заполняет черновик — вы проверяете его и запускаете поиск самостоятельно.
+Всё описанное выше работает без каких-либо API-ключей. Черновик из LLM — дополнение: если задан `OMNIROUTE_API_KEY`, модель может преобразовать потребность на любом языке в описание задачи, поисковые запросы и жёсткие условия. Она лишь заполняет черновик — вы проверяете его и запускаете поиск самостоятельно.
 
 ```bash
 repo-scout draft "<что нужно найти на любом языке>"   # выводит готовую команду `repo-scout …`
@@ -85,6 +98,8 @@ repo-scout draft "<что нужно найти на любом языке>"   #
 | `OMNIROUTE_API_KEY` | не задана (функция отключена) |
 | `OMNIROUTE_MODEL` | `free-stack` |
 | `OMNIROUTE_BASE_URL` | `http://127.0.0.1:20128/v1` (OpenAI-совместимый `/chat/completions`) |
+
+`repo-scout config` спрашивает эти значения и сохраняет в `~/.config/repo-scout/.env` (`$REPO_SCOUT_ENV`, файл доступен только вам). Enter оставляет значение, `-` очищает. `repo-scout doctor` показывает, включён ли черновик. Настоящие переменные окружения важнее файла. В клоне работает и `.env` в корне репозитория (в `.gitignore`), он переопределяет пользовательский файл. `REPO_SCOUT_GUI_DRAFT=1` показывает кнопку «Черновик» в GUI.
 
 ## Оценка качества (Eval)
 

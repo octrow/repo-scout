@@ -27,3 +27,4 @@ def isolated_llm(tmp_path, monkeypatch):
     for var in ("OMNIROUTE_API_KEY", "OMNIROUTE_MODEL", "OMNIROUTE_BASE_URL", "REPO_SCOUT_GUI_DRAFT"):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setattr(llm, "ENV_FILE", tmp_path / "no-such.env")
+    monkeypatch.setenv("REPO_SCOUT_ENV", str(tmp_path / "user.env"))
