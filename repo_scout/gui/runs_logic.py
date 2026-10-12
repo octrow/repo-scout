@@ -3,6 +3,7 @@ from pathlib import Path
 
 from .. import runs
 from ..cli import sort_key
+from .i18n import t
 
 ALL = "All"
 FLAGS_ALL = "All flags"
@@ -54,7 +55,7 @@ def filter_rows(rows: list[dict], *, text: str = "", source: str = SOURCES_ALL, 
 
 def flags_text(r: dict) -> str:
     stop = r.get("stop")
-    return ", ".join([*r.get("flags", []), *([f"dropped: {stop}"] if stop else [])]) or "—"
+    return ", ".join([*r.get("flags", []), *([t("dropped: {stop}").format(stop=stop)] if stop else [])]) or "—"
 
 
 def table_row(r: dict) -> dict:
@@ -76,9 +77,9 @@ def compose_verdict(kind: str, note: str) -> str:
         return prefix
     note = " ".join((note or "").split())
     if not note:
-        raise ValueError(f"{NOTE_LABELS[kind]}: explanation required")
+        raise ValueError(f"{t(NOTE_LABELS[kind])}: {t('explanation required')}")
     return f"{prefix} ({note})"
 
 
 def verdict_filter_options() -> dict[str, str]:
-    return {"": ALL, **{k: VERDICT_PREFIX[k] for k in VERDICT_KINDS}}
+    return {"": t(ALL), **{k: VERDICT_PREFIX[k] for k in VERDICT_KINDS}}

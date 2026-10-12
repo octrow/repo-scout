@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from ..command import self_argv
+from .i18n import t
 from .search_form import EVAL_DIR
 
 NO_DATE = "—"
@@ -72,5 +73,5 @@ def export_argv(project: str | None, out: Path) -> list[str]:
 
 def eval_errors(o: EvalOptions) -> list[str]:
     if not o.fake_stars and not o.sets:
-        return ["Select at least one set"]
+        return [t("Select at least one set")]
     return []

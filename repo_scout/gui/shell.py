@@ -1,6 +1,7 @@
 """Navigation header shared across all pages (patterned after `_shell` from showcase nicegui-kit)."""
 from nicegui import ui
 
+from .i18n import LANGS, current, set_lang, t
 from .kit import theme
 
 PAGES = {"/": "Search", "/runs": "Runs", "/index": "Index", "/eval": "Eval"}
@@ -18,7 +19,19 @@ def shell(here: str, max_width: str) -> None:
             ui.label(BRAND).classes("t-brand gt-xs")
             with ui.element("nav").style("display: flex; flex-direction: row; gap: var(--ic-s4)"):
                 for path, title in PAGES.items():
-                    link = ui.link(title, path).classes("ic-nav-link")
+                    link = ui.link(t(title), path).classes("ic-nav-link")
                     if path == here or (path != "/" and here.startswith(path + "/")):
                         link.classes("ic-nav-link--here").props('aria-current="page"')
-        theme.theme_toggle()
+        with ui.row().classes("items-center").style("gap: var(--ic-s3); flex-wrap: nowrap"):
+            _lang_toggle()
+            theme.theme_toggle()
+
+
+def _lang_toggle() -> None:
+    """EN | RU switch: saves the choice and reloads the page so every label is drawn in the new language."""
+    def pick(e) -> None:
+        if e.value and e.value != current():
+            set_lang(e.value)
+            ui.navigate.reload()
+    ui.toggle({lang: lang.upper() for lang in LANGS}, value=current(), on_change=pick) \
+        .props(f'dense flat no-caps aria-label="{t("Interface language")}"')

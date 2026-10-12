@@ -8,6 +8,7 @@ from nicegui import ui
 from ..index import Index, default_path, validate_verdict
 from ..log import log
 from . import runs_logic as rl
+from .i18n import t
 from .kit import layout
 
 DB_ERRORS = (sqlite3.Error, OSError)
@@ -17,7 +18,7 @@ DB_ERROR_TEXT = "Could not open the Index. See the log."
 def notify_db_error(context: str) -> None:
     """Logs current exception with context and notifies user with short message."""
     log.exception("%s", context)
-    ui.notify(DB_ERROR_TEXT, type="negative")
+    ui.notify(t(DB_ERROR_TEXT), type="negative")
 
 
 @contextmanager
@@ -49,23 +50,23 @@ class VerdictDialog:
         self.on_saved = on_saved
         self.repo = ""
         with ui.dialog() as self.dialog, layout.section_card():
-            self.title = layout.heading("Verdict", level=2)
+            self.title = layout.heading(t("Verdict"), level=2)
             self.name = ui.label().classes("t-mono")
-            self.kind = ui.select(rl.VERDICT_KINDS, value="watch", label="Verdict",
+            self.kind = ui.select({k: t(v) for k, v in rl.VERDICT_KINDS.items()}, value="watch", label=t("Verdict"),
                                   on_change=lambda: self._sync_note()).props("outlined dense stack-label").classes("w-full")
-            self.note = layout.field("Explanation", hint="One line")
-            self.project = layout.field("Project", required=True)
-            self.task = layout.field("Task", required=True, hint="Which project task, in a few words")
+            self.note = layout.field(t("Explanation"), hint=t("One line"))
+            self.project = layout.field(t("Project"), required=True)
+            self.task = layout.field(t("Task"), required=True, hint=t("Which project task, in a few words"))
             self.error = ui.label().classes("ic-status--error")
             with layout.actions_row():
-                layout.button("Cancel", kind="quiet", on_click=self.dialog.close)
-                layout.button("Save verdict", kind="primary", on_click=self.save)
+                layout.button(t("Cancel"), kind="quiet", on_click=self.dialog.close)
+                layout.button(t("Save verdict"), kind="primary", on_click=self.save)
 
     def _sync_note(self) -> None:
         label = rl.NOTE_LABELS.get(self.kind.value)
         self.note.set_visibility(label is not None)
         if label:
-            self.note.props(f'label="{label}"')
+            self.note.props(f'label="{t(label)}"')
 
     def open(self, repo: str, project: str = "", task: str = "") -> None:
         self.repo = repo
@@ -91,5 +92,5 @@ class VerdictDialog:
             notify_db_error(f"Failed to save Verdict: {self.repo}")
             return
         self.dialog.close()
-        ui.notify(f"Verdict saved: {self.repo}", type="positive")
+        ui.notify(t("Verdict saved: {repo}").format(repo=self.repo), type="positive")
         self.on_saved(self.repo)

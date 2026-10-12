@@ -6,6 +6,7 @@ from nicegui import ui
 from ..index import Index
 from . import runs_logic as rl
 from . import shell
+from .i18n import t
 from .kit import layout, table
 from .verdict_dialog import DB_ERRORS, VerdictDialog, notify_db_error, open_index
 
@@ -26,7 +27,7 @@ def check_repo(value: str) -> str | None:
     """Error for owner/repo format or None."""
     v = (value or "").strip()
     if not REPO_RE.fullmatch(v) or v.split("/")[1] in (".", ".."):
-        return "Use the owner/repo format"
+        return t("Use the owner/repo format")
     return None
 
 
@@ -47,7 +48,7 @@ def index_rows(idx: Index, *, project: str = "", kind: str = "", text: str = "")
             continue
         out.append({"key": r["key"], "name": r["name"], "desc": (m.get("desc") or "")[:rl.DESC_LIMIT],
                     "stars": m.get("stars"), "lang": m.get("lang") or "—", "date": (r["fetched_at"] or "")[:10],
-                    "readme": "yes" if r["has_readme"] else "no", "seen": seen.get(r["key"], "—"),
+                    "readme": t("yes") if r["has_readme"] else t("no"), "seen": seen.get(r["key"], "—"),
                     "url": m.get("url") or f"https://github.com/{r['name']}"})
     return out
 
@@ -71,7 +72,7 @@ class IndexPage:
             return
         self.rows = {r["key"]: r for r in rows}
         self.table.set_rows(rows)  # type: ignore[union-attr]
-        self.count.set_text(f"Showing {len(rows)} of {total}")  # type: ignore[union-attr]
+        self.count.set_text(t("Showing {shown} of {total}").format(shown=len(rows), total=total))  # type: ignore[union-attr]
 
     def set_filter(self, key: str, value: str | None) -> None:
         self.flt[key] = value or ""
@@ -83,11 +84,12 @@ class IndexPage:
         with open_index() as idx:
             projects = list(dict.fromkeys(v[0] for v in idx.verdicts()))
         with layout.filter_bar():
-            layout.search_field("Search by repo and description", on_change=lambda e: self.set_filter("text", e.value))
-            ui.select([ALL_PROJECTS, *projects], value=ALL_PROJECTS,
-                      on_change=lambda e: self.set_filter("project", e.value)).props('outlined dense aria-label="Project"')
+            layout.search_field(t("Search by repo and description"), on_change=lambda e: self.set_filter("text", e.value))
+            ui.select({ALL_PROJECTS: t(ALL_PROJECTS), **{p: p for p in projects}}, value=ALL_PROJECTS,
+                      on_change=lambda e: self.set_filter("project", e.value)) \
+                .props(f'outlined dense aria-label="{t("Project")}"')
             ui.select(rl.verdict_filter_options(), value="",
-                      on_change=lambda e: self.set_filter("kind", e.value)).props('outlined dense aria-label="Verdict"')
+                      on_change=lambda e: self.set_filter("kind", e.value)).props(f'outlined dense aria-label="{t("Verdict")}"')
             ui.space()
             self.count = ui.label().classes("t-meta")
 
@@ -96,30 +98,30 @@ class IndexPage:
         self.panel.clear()
         with self.panel, layout.section_card():
             layout.heading(row["name"], level=2)
-            ui.link("Open on GitHub", row["url"], new_tab=True)
+            ui.link(t("Open on GitHub"), row["url"], new_tab=True)
             ui.label(row["desc"]).classes("t-meta")
-            ui.label(f"Verdicts: {row['seen']}")
+            ui.label(t("Verdicts: {seen}").format(seen=row["seen"]))
             with open_index() as idx:
                 readme = idx.readme(row["name"])
             if readme:
                 layout.markdown_reader(readme, max_height="60vh")
             else:
-                ui.label("No README in Index").classes("t-meta")
+                ui.label(t("No README in Index")).classes("t-meta")
             with layout.actions_row():
-                layout.button("Close", kind="quiet", on_click=self.panel.close)
-                layout.button("Rename", icon="edit", on_click=lambda: self.rename_dialog(row["name"]))
-                layout.button("Forget", kind="danger", on_click=lambda: self.forget_dialog(row["name"]))
-                layout.button("Set verdict", kind="primary", icon="rate_review",
+                layout.button(t("Close"), kind="quiet", on_click=self.panel.close)
+                layout.button(t("Rename"), icon="edit", on_click=lambda: self.rename_dialog(row["name"]))
+                layout.button(t("Forget"), kind="danger", on_click=lambda: self.forget_dialog(row["name"]))
+                layout.button(t("Set verdict"), kind="primary", icon="rate_review",
                               on_click=lambda: self.verdicts.open(row["name"]))
         self.panel.open()
 
     def rename_dialog(self, name: str) -> None:
         self.confirm.clear()
         with self.confirm, layout.section_card():
-            layout.heading("Rename repo", level=2)
-            ui.label("Old record will be removed from Index; verdicts will move to the new name.").classes("t-meta")
-            new = layout.field("New name", value=name, hint="owner/repo", validation={
-                "Use the owner/repo format": lambda v: check_repo(v) is None})
+            layout.heading(t("Rename repo"), level=2)
+            ui.label(t("Old record will be removed from Index; verdicts will move to the new name.")).classes("t-meta")
+            new = layout.field(t("New name"), value=name, hint="owner/repo", validation={
+                t("Use the owner/repo format"): lambda v: check_repo(v) is None})
 
             def apply() -> None:
                 if not new.validate():
@@ -132,19 +134,19 @@ class IndexPage:
                     return
                 self.confirm.close()
                 self.panel.close()
-                ui.notify(f"Renamed: {new.value.strip()}", type="positive")
+                ui.notify(t("Renamed: {name}").format(name=new.value.strip()), type="positive")
                 self.refresh()
 
             with layout.actions_row():
-                layout.button("Cancel", kind="quiet", on_click=self.confirm.close)
-                layout.button("Rename", kind="primary", on_click=apply)
+                layout.button(t("Cancel"), kind="quiet", on_click=self.confirm.close)
+                layout.button(t("Rename"), kind="primary", on_click=apply)
         self.confirm.open()
 
     def forget_dialog(self, name: str) -> None:
         self.confirm.clear()
         with self.confirm, layout.section_card():
-            layout.heading("Forget repo?", level=2)
-            ui.label(f"{name} leaves Index search. Its verdicts stay.").classes("t-meta")
+            layout.heading(t("Forget repo?"), level=2)
+            ui.label(t("{name} leaves Index search. Its verdicts stay.").format(name=name)).classes("t-meta")
 
             def forget() -> None:
                 try:
@@ -158,14 +160,15 @@ class IndexPage:
                 self.refresh()
 
             with layout.actions_row():
-                layout.button("Cancel", kind="quiet", on_click=self.confirm.close)
-                layout.button("Forget", kind="danger", on_click=forget)
+                layout.button(t("Cancel"), kind="quiet", on_click=self.confirm.close)
+                layout.button(t("Forget"), kind="danger", on_click=forget)
         self.confirm.open()
 
     def build(self) -> None:
         self.filters()
-        self.table = table.empty_aware_table(COLUMNS, row_key="key", pagination={"rowsPerPage": 25},
-                                             empty_text="No repos in the Index yet. Run a search to add them.")
+        columns = [{**c, "label": t(c["label"])} for c in COLUMNS]
+        self.table = table.empty_aware_table(columns, row_key="key", pagination={"rowsPerPage": 25},
+                                             empty_text=t("No repos in the Index yet. Run a search to add them."))
         self.table.table.on("rowClick", lambda e: self.open_panel(e.args[1]["key"]))
         self.refresh()
 
@@ -173,7 +176,7 @@ class IndexPage:
 def index_page() -> None:
     shell.shell("/index", layout.PAGE_MAX_WIDTH_WIDE)
     with layout.page_container(max_width=layout.PAGE_MAX_WIDTH_WIDE):
-        layout.heading("Index", level=1)
+        layout.heading(t("Index"), level=1)
         IndexPage().build()
 
 

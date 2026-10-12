@@ -12,6 +12,7 @@ from ..index import Index, default_path
 from ..log import log
 from . import search_form as sf
 from . import shell
+from .i18n import t
 from .kit import layout, run_monitor, run_pool
 
 NOTIFY_PERIOD = 1.0
@@ -53,7 +54,7 @@ class SearchForm:
 
     def refresh(self) -> None:
         if self.command is not None:
-            self.command.set_text("$ " + (sf.command_text(self.state()) or COMMAND_HINT))
+            self.command.set_text("$ " + (sf.command_text(self.state()) or t(COMMAND_HINT)))
 
     def add(self, key: str, el: ui.element) -> ui.element:
         self.fields[key] = el
@@ -75,7 +76,7 @@ def _load_draft(form: SearchForm, key: str) -> None:
         state = sf.load_draft(form.drafts[key])
     except (ValueError, OSError, tomllib.TOMLDecodeError):
         log.warning("Draft not loaded: %s", key, exc_info=True)
-        ui.notify("Could not load the draft: the file is damaged or unreadable", type="negative")
+        ui.notify(t("Could not load the draft: the file is damaged or unreadable"), type="negative")
         return
     form.fill(state)
 
@@ -87,24 +88,24 @@ async def _llm_draft(form: SearchForm, button: ui.button) -> None:
     """LLM draft fills form; does not start search. Errors without internal details."""
     need = (form.state().get("need") or "").strip()
     if not need:
-        ui.notify("Describe what to find", type="negative")
+        ui.notify(t("Describe what to find"), type="negative")
         return
     button.disable()
     try:
         d = await run.io_bound(llm.draft, need)
     except llm.LLMError as e:
         log.warning("LLM draft failed: %s", e)
-        ui.notify(LLM_FAILED, type="negative")
+        ui.notify(t(LLM_FAILED), type="negative")
         return
     finally:
         button.enable()
     form.fill(sf.draft_to_state(d, need))
-    ui.notify("Draft ready. Check it, then launch the search.", type="positive")
+    ui.notify(t("Draft ready. Check it, then launch the search."), type="positive")
 
 
 def _need_row(form: SearchForm) -> None:
-    form.area("need", "What to search for (any language)", hint="In your own words, without tool names")
-    button = layout.button("Draft from LLM", icon="auto_awesome")
+    form.area("need", t("What to search for (any language)"), hint=t("In your own words, without tool names"))
+    button = layout.button(t("Draft from LLM"), icon="auto_awesome")
     button.on_click(lambda: _llm_draft(form, button))
 
 
@@ -112,35 +113,35 @@ def _fields(form: SearchForm) -> None:
     if llm.gui_enabled():
         _need_row(form)
     drafts = {k: d.label for k, d in form.drafts.items()}
-    ui.select(drafts, label="Draft", with_input=True, clearable=True,
+    ui.select(drafts, label=t("Draft"), with_input=True, clearable=True,
               on_change=lambda e: e.value and _load_draft(form, e.value)) \
-        .props('outlined dense stack-label hint="From a past Run or eval dataset"').classes("w-full")
-    form.area("task", "Task (English)", required=True, hint="1-3 sentences: what you need")
-    form.area("queries", "Queries", sf.check_queries, hint="One per line; 3-6 variants")
-    form.text("project", "Project", suggestions=sf.project_suggestions(_verdict_projects()))
+        .props(f'outlined dense stack-label hint="{t("From a past Run or eval dataset")}"').classes("w-full")
+    form.area("task", t("Task (English)"), required=True, hint=t("1-3 sentences: what you need"))
+    form.area("queries", t("Queries"), sf.check_queries, hint=t("One per line; 3-6 variants"))
+    form.text("project", t("Project"), suggestions=sf.project_suggestions(_verdict_projects()))
     with layout.grid():
-        form.text("lang", "Language", hint="For example python").classes("ic-span-4")
-        form.area("must", "Required words", lambda v: sf.check_regexes("--must", v),
-                  hint="Regexes, one per line").classes("ic-span-4")
-        form.area("exclude", "Excluded words", lambda v: sf.check_regexes("--exclude", v),
-                  hint="Regexes, one per line").classes("ic-span-4")
+        form.text("lang", t("Language"), hint=t("For example python")).classes("ic-span-4")
+        form.area("must", t("Required words"), lambda v: sf.check_regexes("--must", v),
+                  hint=t("Regexes, one per line")).classes("ic-span-4")
+        form.area("exclude", t("Excluded words"), lambda v: sf.check_regexes("--exclude", v),
+                  hint=t("Regexes, one per line")).classes("ic-span-4")
 
 
 def _advanced(form: SearchForm) -> None:
     defaults = sf.default_state()
-    with ui.expansion("Advanced").classes("w-full"):
+    with ui.expansion(t("Advanced")).classes("w-full"):
         with layout.grid():
             for key, label in NUMBER_LABELS.items():
-                form.add(key, ui.number(label, value=defaults[key]).props("outlined dense stack-label")
+                form.add(key, ui.number(t(label), value=defaults[key]).props("outlined dense stack-label")
                          .classes("ic-span-4 w-full"))
             for key, label in FLAG_LABELS.items():
-                form.add(key, ui.checkbox(label, value=defaults[key]).classes("ic-span-6"))
+                form.add(key, ui.checkbox(t(label), value=defaults[key]).classes("ic-span-6"))
 
 
 def _paste_dialog(form: SearchForm) -> ui.dialog:
     with ui.dialog() as dialog, layout.section_card():
-        layout.heading("Paste command", level=2)
-        area = layout.field("Command", hint="A repo-scout command").props("type=textarea autogrow rows=3")
+        layout.heading(t("Paste command"), level=2)
+        area = layout.field(t("Command"), hint=t("A repo-scout command")).props("type=textarea autogrow rows=3")
         error = ui.label().classes("ic-status--error")
 
         def apply() -> None:
@@ -154,8 +155,8 @@ def _paste_dialog(form: SearchForm) -> ui.dialog:
             dialog.close()
 
         with layout.actions_row():
-            layout.button("Cancel", kind="quiet", on_click=dialog.close)
-            layout.button("Apply", kind="primary", on_click=apply)
+            layout.button(t("Cancel"), kind="quiet", on_click=dialog.close)
+            layout.button(t("Apply"), kind="primary", on_click=apply)
     return dialog
 
 
@@ -170,10 +171,10 @@ def _start(form: SearchForm, started: dict[str, str]) -> None:
     out = sf.out_path(state["task"], datetime.now())
     run_item = run_pool.submit(sf.run_argv(state, out), label=state["task"].strip(), meta={"out": str(out)})
     if run_item is None:
-        ui.notify("Too many runs at once. Wait for one to finish.", type="warning")
+        ui.notify(t("Too many runs at once. Wait for one to finish."), type="warning")
         return
     started[run_item.run_id] = out.stem
-    ui.notify("Search started", type="positive")
+    ui.notify(t("Search started"), type="positive")
 
 
 def _watch_done(started: dict[str, str]) -> None:
@@ -185,28 +186,28 @@ def _watch_done(started: dict[str, str]) -> None:
         started.pop(run_id)
         if state.status == run_pool.DONE:
             title = html.escape(state.label)
-            ui.notify(f'Done: {title}. <a href="/runs/{stem}">Open run</a>', type="positive",
-                      html=True, close_button="Close", timeout=0)
+            ui.notify(t('Done: {title}. <a href="/runs/{stem}">Open run</a>').format(title=title, stem=stem),
+                      type="positive", html=True, close_button=t("Close"), timeout=0)
 
 
 def _buttons(form: SearchForm, started: dict[str, str]) -> None:
     paste = _paste_dialog(form)
     with layout.actions_row(end=False):
-        layout.button("Launch", kind="primary", icon="search", on_click=lambda: _start(form, started))
+        layout.button(t("Launch"), kind="primary", icon="search", on_click=lambda: _start(form, started))
 
         def copy_prompt() -> None:
             ui.clipboard.write(sf.agent_prompt(form.state()["task"]))
-            ui.notify(layout.COPIED_TEXT, type="positive")
+            ui.notify(t(layout.COPIED_TEXT), type="positive")
 
-        layout.button("Agent prompt", icon="content_copy", on_click=copy_prompt)
-        layout.button("Paste command", kind="quiet", icon="content_paste", on_click=paste.open)
+        layout.button(t("Agent prompt"), icon="content_copy", on_click=copy_prompt)
+        layout.button(t("Paste command"), kind="quiet", icon="content_paste", on_click=paste.open)
 
 
 def search(draft: str | None = None) -> None:
     shell.shell("/", layout.PAGE_MAX_WIDTH_FORM)
     started: dict[str, str] = {}
     with layout.page_container():
-        layout.heading("Search", level=1)
+        layout.heading(t("Search"), level=1)
         with ui.column().classes("w-full").style("gap: var(--ic-s4)"):
             form = SearchForm()
             with layout.section_card():
@@ -215,11 +216,11 @@ def search(draft: str | None = None) -> None:
             with layout.section_card(recessive=True):
                 with ui.row().classes("ic-split w-full items-start justify-between no-wrap"):
                     form.command = ui.label().classes("t-mono").style("min-width: 0; overflow-wrap: anywhere")
-                    layout.button("Copy", kind="quiet", icon="content_copy", on_click=lambda: (
-                        ui.clipboard.write((sf.command_text(form.state()) or "")), ui.notify(layout.COPIED_TEXT)))
+                    layout.button(t("Copy"), kind="quiet", icon="content_copy", on_click=lambda: (
+                        ui.clipboard.write((sf.command_text(form.state()) or "")), ui.notify(t(layout.COPIED_TEXT))))
                 _buttons(form, started)
-            layout.heading("Runs", level=2)
-            run_monitor.attach_run_monitor(idle_text="No runs yet")
+            layout.heading(t("Runs"), level=2)
+            run_monitor.attach_run_monitor(idle_text=t("No runs yet"))
             ui.timer(NOTIFY_PERIOD, lambda: _watch_done(started))
     if draft in form.drafts:
         form.fill(sf.load_draft(form.drafts[draft]))

@@ -7,6 +7,7 @@ from nicegui import app, ui
 
 from . import eval_page, index_page, runs_page, search_page
 from . import port as portmod
+from .i18n import QUASAR, current
 from .kit import run_pool, theme
 
 DEFAULT_PORT = 8790
@@ -41,7 +42,8 @@ def main(argv: list[str] | None = None) -> None:
     app.on_shutdown(_stop)
     # reload=False: pages are registered in this process, so NiceGUI literal-guard
     # (`__name__ in {"__main__", "__mp_main__"}`) is not needed: main() is called from CLI command
-    ui.run(host=portmod.HOST, port=port, reload=False, language="en", show=a.open, title="repo-scout")
+    # Quasar's own texts (pagination etc.) follow the language at start; the header switch changes them on restart
+    ui.run(host=portmod.HOST, port=port, reload=False, language=QUASAR[current()], show=a.open, title="repo-scout")
 
 
 if __name__ in {"__main__", "__mp_main__"}:  # python -m repo_scout.gui.app

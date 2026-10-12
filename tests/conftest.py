@@ -25,7 +25,8 @@ def isolated_runs(tmp_path, monkeypatch):
 def isolated_llm(tmp_path, monkeypatch):
     """Tests never read real .env, LLM or SystemOne environment variables."""
     for var in ("LLM_API_KEY", "LLM_MODEL", "LLM_BASE_URL", "OMNIROUTE_API_KEY", "OMNIROUTE_MODEL", "OMNIROUTE_BASE_URL",
-                "REPO_SCOUT_GUI_DRAFT", "TYPESAFE_API_KEY", "TYPESAFE_MODEL", "TYPESAFE_BASE_URL"):
+                "REPO_SCOUT_GUI_DRAFT", "TYPESAFE_API_KEY", "TYPESAFE_MODEL", "TYPESAFE_BASE_URL",
+                "REPO_SCOUT_LANG"):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setattr(llm, "ENV_FILE", tmp_path / "no-such.env")
     monkeypatch.setenv("REPO_SCOUT_ENV", str(tmp_path / "user.env"))

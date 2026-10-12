@@ -8,6 +8,7 @@ from pathlib import Path
 from .. import cli, llm, runs
 from ..cli import _parser, compile_all, search_params, to_argv, validate_query
 from ..command import self_argv
+from .i18n import t
 
 RUN_PREFIX, EVAL_PREFIX = "run:", "eval:"
 EVAL_DIR = Path(__file__).resolve().parents[2] / "eval"
@@ -106,9 +107,9 @@ def form_errors(state: dict) -> list[str]:
     """All issues preventing a search run."""
     errors = []
     if not (state.get("task") or "").strip():
-        errors.append("Add a task description")
+        errors.append(t("Add a task description"))
     if not _lines(state.get("queries", "")):
-        errors.append("Add at least one query")
+        errors.append(t("Add at least one query"))
     errors += [e for e in (check_queries(state.get("queries", "")),
                            check_regexes("--must", state.get("must", "")),
                            check_regexes("--exclude", state.get("exclude", ""))) if e]
@@ -139,14 +140,14 @@ def run_to_state(path: Path) -> dict:
 
 def list_drafts(eval_dir: Path = EVAL_DIR) -> list[Draft]:
     """Past Runs (newest first, corrupt skipped) and eval datasets."""
-    out = [Draft(f"{RUN_PREFIX}{s.path.stem}", f"Run: {(s.created_at or '')[:10]} {s.task}", s.path)
+    out = [Draft(f"{RUN_PREFIX}{s.path.stem}", f"{t('Run')}: {(s.created_at or '')[:10]} {s.task}", s.path)
            for s in runs.list_runs() if not s.error]
     for p in sorted(eval_dir.glob("*.toml")):
         try:
             tomllib.loads(p.read_text(encoding="utf-8"))
         except (OSError, tomllib.TOMLDecodeError):
             continue
-        out.append(Draft(f"{EVAL_PREFIX}{p.stem}", f"Eval: {p.stem}", p))
+        out.append(Draft(f"{EVAL_PREFIX}{p.stem}", f"{t('Eval')}: {p.stem}", p))
     return out
 
 

@@ -6,6 +6,7 @@ from .. import runs
 from ..log import log
 from . import runs_logic as rl
 from . import shell
+from .i18n import t
 from .kit import layout, table
 from .verdict_dialog import DB_ERRORS, VerdictDialog, notify_db_error, open_index
 
@@ -29,9 +30,14 @@ METRICS = (("Closeness", "close"), ("Source", "source"), ("Score", "score"), ("â
            ("Commits", "commits"), ("Pushed, days ago", "pushed"), ("Created", "created"), ("Language", "lang"))
 
 
+def _labeled(options: list[str]) -> dict[str, str]:
+    """Select options: the "All ..." choices are translated, data values (sources, flags) stay as they are."""
+    return {o: t(o) if o in (rl.SOURCES_ALL, rl.FLAGS_ALL) else o for o in options}
+
+
 def _params_line(params: dict) -> str:
-    parts = [f"project: {params['project']}"] if params.get("project") else []
-    parts.append(f"queries: {len(params.get('queries', []))}")
+    parts = [t("project: {name}").format(name=params["project"])] if params.get("project") else []
+    parts.append(t("queries: {n}").format(n=len(params.get("queries", []))))
     return " Â· ".join(parts)
 
 
@@ -54,7 +60,7 @@ class RunView:
     def refresh(self) -> None:
         shown = self.visible()
         self.table.set_rows([rl.table_row(r) for r in shown])  # type: ignore[union-attr]
-        self.count.set_text(f"Showing {len(shown)} of {len(self.rows)}")  # type: ignore[union-attr]
+        self.count.set_text(t("Showing {shown} of {total}").format(shown=len(shown), total=len(self.rows)))  # type: ignore[union-attr]
 
     def set_filter(self, key: str, value: str | bool | None) -> None:
         self.flt[key] = value if key == "stopped" else (value or "")
@@ -74,34 +80,35 @@ class RunView:
 
     def filters(self) -> None:
         with layout.filter_bar():
-            layout.search_field("Search by repo and description", on_change=lambda e: self.set_filter("text", e.value))
-            ui.select(rl.source_options(self.rows), value=rl.SOURCES_ALL,
-                      on_change=lambda e: self.set_filter("source", e.value)).props('outlined dense aria-label="Source"')
-            ui.select(rl.flag_options(self.rows), value=rl.FLAGS_ALL,
-                      on_change=lambda e: self.set_filter("flag", e.value)).props('outlined dense aria-label="Flag"')
-            ui.switch("Show dropped", on_change=lambda e: self.set_filter("stopped", e.value))
+            layout.search_field(t("Search by repo and description"), on_change=lambda e: self.set_filter("text", e.value))
+            ui.select(_labeled(rl.source_options(self.rows)), value=rl.SOURCES_ALL,
+                      on_change=lambda e: self.set_filter("source", e.value)) \
+                .props(f'outlined dense aria-label="{t("Source")}"')
+            ui.select(_labeled(rl.flag_options(self.rows)), value=rl.FLAGS_ALL,
+                      on_change=lambda e: self.set_filter("flag", e.value)).props(f'outlined dense aria-label="{t("Flag")}"')
+            ui.switch(t("Show dropped"), on_change=lambda e: self.set_filter("stopped", e.value))
             ui.space()
             self.count = ui.label().classes("t-meta")
 
     def open_panel(self, repo: str) -> None:
         row = self.by_repo[repo]
         self.panel.clear()
-        t = rl.table_row(row)
+        cells = rl.table_row(row)
         with self.panel, layout.section_card():
             layout.heading(repo, level=2)
-            ui.link("Open on GitHub", row.get("url", ""), new_tab=True)
-            ui.label(t["desc"]).classes("t-meta")
+            ui.link(t("Open on GitHub"), row.get("url", ""), new_tab=True)
+            ui.label(cells["desc"]).classes("t-meta")
             with layout.grid(min_col="10rem"):
                 for label, key in METRICS:
                     with ui.column().classes("ic-stack"):
-                        ui.label(label).classes("t-meta")
-                        ui.label(str(t[key]))
-            ui.label(f"Flags and drop: {t['flags']}")
-            ui.label(f"Already seen: {t['seen']}")
+                        ui.label(t(label)).classes("t-meta")
+                        ui.label(str(cells[key]))
+            ui.label(t("Flags and drop: {flags}").format(flags=cells["flags"]))
+            ui.label(t("Already seen: {seen}").format(seen=cells["seen"]))
             self._readme(repo)
             with layout.actions_row():
-                layout.button("Close", kind="quiet", on_click=self.panel.close)
-                layout.button("Set verdict", kind="primary", icon="rate_review",
+                layout.button(t("Close"), kind="quiet", on_click=self.panel.close)
+                layout.button(t("Set verdict"), kind="primary", icon="rate_review",
                               on_click=lambda: self.verdicts.open(repo, self.params.get("project") or "",
                                                                   self.params.get("task") or ""))
         self.panel.open()
@@ -117,20 +124,20 @@ class RunView:
         if readme:
             layout.markdown_reader(readme, max_height="60vh")
         else:
-            ui.label("No README in Index: check on GitHub").classes("t-meta")
+            ui.label(t("No README in Index: check on GitHub")).classes("t-meta")
 
     def build(self) -> None:
         with ui.row().classes("ic-split w-full items-center justify-between"):
             layout.heading(self.params.get("task") or self.stem, level=1)
-            layout.button("Rerun as draft", icon="replay", on_click=lambda: ui.navigate.to(f"/?draft=run:{self.stem}"))
+            layout.button(t("Rerun as draft"), icon="replay", on_click=lambda: ui.navigate.to(f"/?draft=run:{self.stem}"))
         ui.label(_params_line(self.params)).classes("t-meta")
         if self.data.get("round2_topics"):
-            ui.label("Round 2: " + ", ".join(self.data.get("round2_topics"))).classes("t-meta")
+            ui.label(t("Round 2: {topics}").format(topics=", ".join(self.data["round2_topics"]))).classes("t-meta")
         self.filters()
         has_fit = any("fit" in r for r in self.rows)
-        columns = [c for c in COLUMNS if c["name"] != "fit" or has_fit]
+        columns = [{**c, "label": t(c["label"])} for c in COLUMNS if c["name"] != "fit" or has_fit]
         self.table = table.empty_aware_table(columns, row_key="repo", pagination={"rowsPerPage": 25},
-                                             empty_text="No rows match these filters.")
+                                             empty_text=t("No rows match these filters."))
         self.table.table.on("rowClick", lambda e: self.open_panel(e.args[1]["repo"]))
         self.refresh()
 
@@ -144,7 +151,7 @@ def run_page(run_id: str) -> None:
         except (ValueError, OSError):
             data = None
         if data is None:
-            layout.failed("Run not found or unreadable")
-            layout.button("Back to runs", kind="quiet", on_click=lambda: ui.navigate.to("/runs"))
+            layout.failed(t("Run not found or unreadable"))
+            layout.button(t("Back to runs"), kind="quiet", on_click=lambda: ui.navigate.to("/runs"))
             return
         RunView(run_id, data).build()

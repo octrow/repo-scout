@@ -86,6 +86,8 @@ repo-scout gui [--port 8790]   # Search, Runs, Index, Eval
 
 A verdict is stored in the Index and shown on later searches. It never hides a repo. The GUI opens saved runs as a filterable table with READMEs from the Index, and you set a verdict in two clicks. Searches and evals run as subprocesses with a live log and a cancel button. The GUI uses a vendored copy of nicegui-kit ([`repo_scout/gui/kit/VENDORED.md`](repo_scout/gui/kit/VENDORED.md)).
 
+The GUI is in English by default. Switch to Russian with EN | RU in the header; the choice is saved as `REPO_SCOUT_LANG` in `~/.config/repo-scout/.env`.
+
 Progress goes to stderr and to `~/.local/state/repo-scout/run.log` (`$REPO_SCOUT_LOG`), so you can `tail -f` it from another terminal. Use `-q` to send it only to the log file.
 
 ## Basic and advanced mode

@@ -9,6 +9,7 @@ from .. import runs
 from ..log import log
 from . import eval_logic as el
 from . import shell
+from .i18n import t
 from .kit import layout, run_monitor, run_pool
 from .search_form import EVAL_DIR
 from .verdict_dialog import open_index
@@ -52,10 +53,10 @@ class EvalPage:
         out.parent.mkdir(parents=True, exist_ok=True)
         run_item = run_pool.submit(argv, label=label, meta={"out": str(out)})
         if run_item is None:
-            ui.notify("Too many runs at once. Wait for one to finish.", type="warning")
+            ui.notify(t("Too many runs at once. Wait for one to finish."), type="warning")
             return
         self.pending[run_item.run_id] = out
-        ui.notify("Eval started", type="positive")
+        ui.notify(t("Eval started"), type="positive")
 
     def start(self) -> None:
         o = self.options()
@@ -76,10 +77,10 @@ class EvalPage:
             self.report.clear()
             with self.report:
                 if state.status == run_pool.DONE and out.is_file():
-                    layout.heading("Report", level=2)
+                    layout.heading(t("Report"), level=2)
                     layout.markdown_reader(out.read_text(encoding="utf-8"))
                 elif state.status == run_pool.FAILED:
-                    layout.failed("Eval failed. See the log above.")
+                    layout.failed(t("Eval failed. See the log above."))
 
     def cards(self) -> None:
         with layout.grid(min_col="18rem"):
@@ -87,27 +88,28 @@ class EvalPage:
                 with layout.section_card(recessive=True):
                     ui.checkbox(s.name, on_change=lambda e, p=s.path: self.picked.add(p) if e.value else self.picked.discard(p))
                     ui.label(s.task[:160]).classes("t-meta")
-                    ui.label(f"Expected: {s.n_expected} · snapshot: {s.snapshot}").classes("t-meta")
+                    ui.label(t("Expected: {n} · snapshot: {date}").format(n=s.n_expected, date=s.snapshot)).classes("t-meta")
 
     def controls(self) -> None:
         with layout.section_card():
-            self.opts["mode"] = ui.toggle({"replay": "Snapshots (offline)", "record": "Record snapshots (network)"}, value="replay")
+            self.opts["mode"] = ui.toggle({"replay": t("Snapshots (offline)"), "record": t("Record snapshots (network)")},
+                                          value="replay")
             with layout.grid():
                 for key, label in FLAG_LABELS.items():
-                    self.opts[key] = ui.checkbox(label).classes("ic-span-6")
-                self.opts["top"] = ui.number("Top results to show (0 = none)", value=0, min=0, precision=0) \
+                    self.opts[key] = ui.checkbox(t(label)).classes("ic-span-6")
+                self.opts["top"] = ui.number(t("Top results to show (0 = none)"), value=0, min=0, precision=0) \
                     .props("outlined dense stack-label").classes("ic-span-6 w-full")
             export = self.export_dialog()
             with layout.actions_row(end=False):
-                layout.button("Launch eval", kind="primary", icon="play_arrow", on_click=self.start)
-                layout.button("Export verdicts", icon="download", on_click=export.open)
+                layout.button(t("Launch eval"), kind="primary", icon="play_arrow", on_click=self.start)
+                layout.button(t("Export verdicts"), icon="download", on_click=export.open)
 
     def export_dialog(self) -> ui.dialog:
         with ui.dialog() as dialog, layout.section_card():
-            layout.heading("Export verdicts", level=2)
-            ui.label("Index verdicts as [[expected]] blocks for datasets.").classes("t-meta")
-            project = ui.select(_projects(), label="Project", clearable=True) \
-                .props('outlined dense stack-label hint="Empty: all projects"').classes("w-full")
+            layout.heading(t("Export verdicts"), level=2)
+            ui.label(t("Index verdicts as [[expected]] blocks for datasets.")).classes("t-meta")
+            project = ui.select(_projects(), label=t("Project"), clearable=True) \
+                .props(f'outlined dense stack-label hint="{t("Empty: all projects")}"').classes("w-full")
 
             def go() -> None:
                 out = report_path(datetime.now())
@@ -115,18 +117,18 @@ class EvalPage:
                 dialog.close()
 
             with layout.actions_row():
-                layout.button("Cancel", kind="quiet", on_click=dialog.close)
-                layout.button("Export", kind="primary", on_click=go)
+                layout.button(t("Cancel"), kind="quiet", on_click=dialog.close)
+                layout.button(t("Export"), kind="primary", on_click=go)
         return dialog
 
     def build(self) -> None:
         if not self.sets:
-            layout.empty("No eval sets found (eval/*.toml)")
+            layout.empty(t("No eval sets found (eval/*.toml)"))
         else:
             self.cards()
         self.controls()
-        layout.heading("Runs", level=2)
-        run_monitor.attach_run_monitor(idle_text="No runs yet")
+        layout.heading(t("Runs"), level=2)
+        run_monitor.attach_run_monitor(idle_text=t("No runs yet"))
         self.report = ui.column().classes("w-full ic-stack")
         ui.timer(POLL_PERIOD, self.watch)
 
@@ -134,7 +136,7 @@ class EvalPage:
 def eval_page() -> None:
     shell.shell("/eval", layout.PAGE_MAX_WIDTH_WIDE)
     with layout.page_container(max_width=layout.PAGE_MAX_WIDTH_WIDE):
-        layout.heading("Eval", level=1)
+        layout.heading(t("Eval"), level=1)
         EvalPage().build()
 
 
