@@ -27,3 +27,7 @@ packages = ["repo_scout"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+[tool.hatch.build.targets.sdist]
+# frozen GitHub responses for offline eval (~30 MB); they live in git, not in the package
+exclude = ["eval/snapshots", "eval/snapshots-llm", "eval/fake-stars/snapshots"]
