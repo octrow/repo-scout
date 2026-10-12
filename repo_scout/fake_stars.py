@@ -44,7 +44,8 @@ def split(labels: list[tuple[str, int]]) -> tuple[list[tuple[str, int]], list[tu
 
 def score(labels: list[tuple[str, int]], hist: dict[str, stars.History], thr: float, mb: int) -> dict:
     """Confusion matrix of flag; repos without history count as unflagged."""
-    hit = lambda n: n in hist and (v := stars.share(hist[n], mb)) is not None and v >= thr
+    def hit(n):
+        return n in hist and (v := stars.share(hist[n], mb)) is not None and v >= thr
     tp = sum(y and hit(n) for n, y in labels)
     fp = sum((not y) and hit(n) for n, y in labels)
     pos = sum(y for _, y in labels)
@@ -69,7 +70,8 @@ def fork_report(labels, hist, mb: int) -> str:
     for n, y in labels:
         if n in hist and (res := stars.burst_forks(hist[n], stars.fork_dates(n), mb)) and res[0]:
             acc[y].append(100 * res[1] / res[0])
-    mean = lambda v: f"{sum(v) / len(v):.1f}" if v else "—"
+    def mean(v):
+        return f"{sum(v) / len(v):.1f}" if v else "—"
     return (f"forks per 100 burst stars (bursts within span of last 100 forks only): "
             f"positives {mean(acc[1])} (n={len(acc[1])}), negatives {mean(acc[0])} (n={len(acc[0])})")
 

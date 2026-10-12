@@ -5,6 +5,7 @@
 <p align="center">
   <a href="https://github.com/octrow/repo-scout/actions/workflows/test.yml"><img src="https://github.com/octrow/repo-scout/actions/workflows/test.yml/badge.svg" alt="test"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://github.com/octrow/repo-scout/releases/latest"><img src="https://img.shields.io/github/v/release/octrow/repo-scout" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+">
 </p>
 
@@ -133,10 +134,10 @@ repo-scout eval --fake-stars [--all-grid]                # precision/recall/FPR 
 ## Development
 
 ```bash
-uv sync && uv run pytest -q
+uv sync && uv run ruff check . && uv run pytest -q
 ```
 
-The domain glossary is in [`CONTEXT.md`](CONTEXT.md), and design decisions are in [`docs/adr/`](docs/adr/).
+The domain glossary is in [`CONTEXT.md`](CONTEXT.md), and design decisions are in [`docs/adr/`](docs/adr/). See [CONTRIBUTING.md](CONTRIBUTING.md) before a pull request; report vulnerabilities as described in [SECURITY.md](SECURITY.md).
 
 ## License
 

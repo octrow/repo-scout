@@ -7,7 +7,8 @@ NOW = datetime(2026, 10, 11, tzinfo=UTC)
 
 
 def repo(stars=0, commits=100, pushed=1, created=400, fork=False):
-    iso = lambda d: (NOW - timedelta(days=d)).isoformat().replace("+00:00", "Z")
+    def iso(d):
+        return (NOW - timedelta(days=d)).isoformat().replace("+00:00", "Z")
     return {"nameWithOwner": "a/b", "url": "u", "description": None, "stargazerCount": stars,
             "forkCount": 0, "pushedAt": iso(pushed), "createdAt": iso(created), "isArchived": False,
             "isFork": fork, "parent": {"nameWithOwner": "o/b"} if fork else None, "primaryLanguage": None,

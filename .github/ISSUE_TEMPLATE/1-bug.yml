@@ -1,0 +1,40 @@
+name: Bug report
+description: Something does not work or gives a wrong result
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got.
+    validations: {required: true}
+  - type: textarea
+    id: command
+    attributes:
+      label: Command or GUI steps
+      description: The repo-scout command you ran, or the clicks in the GUI.
+      render: shell
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of repo-scout doctor
+      render: text
+    validations: {required: true}
+  - type: input
+    id: version
+    attributes:
+      label: Version and how you installed it
+      placeholder: "0.1.3, install script / release build / from a clone"
+    validations: {required: true}
+  - type: dropdown
+    id: os
+    attributes:
+      label: System
+      options: [Linux, macOS, Windows]
+    validations: {required: true}
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: The end of ~/.local/state/repo-scout/run.log. Remove anything private.
+      render: text

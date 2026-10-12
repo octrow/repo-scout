@@ -112,7 +112,8 @@ def index_check(path: Path, mode: str, from_index: int = FROM_INDEX) -> str:
     pos = {e["repo"].lower() for e in spec["expected"] if e["verdict"].startswith(("→", "->"))}
     live = [r for r in rows if r["source"] in ("query", "\u0437\u0430\u043f\u0440\u043e\u0441")]
     from_idx = [r for r in rows if r["source"] in ("index", "\u0438\u043d\u0434\u0435\u043a\u0441")]
-    hit = lambda rs: sorted(r["repo"] for r in rs if r["repo"].lower() in pos and not r["stop"])
+    def hit(rs):
+        return sorted(r["repo"] for r in rs if r["repo"].lower() in pos and not r["stop"])
     return (f"{spec['name']}: Index after first run {sum(not r['stop'] for r in first)} rows; second run "
             f"(2 queries, alternative task): live search {len(live)}, from Index {len(from_idx)} "
             f"(passed stop rules {sum(not r['stop'] for r in from_idx)}); positives in live {hit(live) or '—'}, "

@@ -20,7 +20,8 @@ def test_skips_set_without_need(tmp_path: Path, capsys):
 
 
 def test_table_totals():
-    m = lambda f, k: {"found": f, "kept": [0] * k, "positives": 4}
+    def m(f, k):
+        return {"found": f, "kept": [0] * k, "positives": 4}
     t = eval_llm.table([{"name": "s", "agent": m(2, 1), "draft": m(3, 2), "union": m(4, 3),
                          "stats": {"tokens": 600, "seconds": 8.0}}])
     assert "| s | 4 | 2/1 | 3/2 | 4/3 | 600 | 8.0 |" in t and "total found" in t

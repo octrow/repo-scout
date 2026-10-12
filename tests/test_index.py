@@ -72,7 +72,8 @@ def test_export_collapses_whitespace(tmp_path):
 
 def test_seen_latest_per_project_and_export(tmp_path):
     idx = Index(tmp_path / "i.db")
-    d = lambda day: datetime(2026, 10, day, tzinfo=UTC)
+    def d(day):
+        return datetime(2026, 10, day, tzinfo=UTC)
     idx.add_verdict("A/b", "→ Inspect", "p1", "t1", d(1))
     idx.add_verdict("a/b", "drop (noise)", "p1", "t1", d(2))
     idx.add_verdict("a/b", "→ Study (x)", "p2", "t2", d(3))

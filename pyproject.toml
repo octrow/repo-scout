@@ -14,7 +14,11 @@ dependencies = [
 repo-scout = "repo_scout.cli:main"
 
 [dependency-groups]
-dev = ["pytest", "pytest-asyncio"]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "ruff>=0.17.0",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -31,3 +35,9 @@ asyncio_mode = "auto"
 [tool.hatch.build.targets.sdist]
 # frozen GitHub responses for offline eval (~30 MB); they live in git, not in the package
 exclude = ["eval/snapshots", "eval/snapshots-llm", "eval/fake-stars/snapshots"]
+
+[tool.ruff]
+extend-exclude = [".agents", ".claude", "external_examples"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]  # ruff's long-standing defaults; newer ruff versions widen the default set

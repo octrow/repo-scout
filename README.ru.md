@@ -5,6 +5,7 @@
 <p align="center">
   <a href="https://github.com/octrow/repo-scout/actions/workflows/test.yml"><img src="https://github.com/octrow/repo-scout/actions/workflows/test.yml/badge.svg" alt="test"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://github.com/octrow/repo-scout/releases/latest"><img src="https://img.shields.io/github/v/release/octrow/repo-scout" alt="Последний релиз"></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+">
 </p>
 
@@ -133,10 +134,10 @@ repo-scout eval --fake-stars [--all-grid]                # точность/по
 ## Разработка
 
 ```bash
-uv sync && uv run pytest -q
+uv sync && uv run ruff check . && uv run pytest -q
 ```
 
-Глоссарий предметной области лежит в [`CONTEXT.ru.md`](CONTEXT.ru.md), архитектурные решения - в [`docs/adr/`](docs/adr/).
+Глоссарий предметной области лежит в [`CONTEXT.ru.md`](CONTEXT.ru.md), архитектурные решения - в [`docs/adr/`](docs/adr/). Перед pull request прочитайте [CONTRIBUTING.ru.md](CONTRIBUTING.ru.md), об уязвимостях сообщайте по [SECURITY.ru.md](SECURITY.ru.md).
 
 ## Лицензия
 
