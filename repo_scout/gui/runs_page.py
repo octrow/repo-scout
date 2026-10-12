@@ -10,10 +10,10 @@ from .runs_logic import resolve_run
 
 COLUMNS = [
     {"name": "date", "label": "Date", "field": "date", "align": "left", "sortable": True,
-     "classes": "rs-nowrap"},
+     "classes": "ic-nowrap"},
     {"name": "task", "label": "Task", "field": "task", "align": "left"},
     {"name": "project", "label": "Project", "field": "project", "align": "left", "sortable": True},
-    {"name": "count", "label": "Kept / total", "field": "count", "align": "right", "classes": "rs-nowrap"},
+    {"name": "count", "label": "Kept / total", "field": "count", "align": "right", "classes": "ic-nowrap"},
     {"name": "actions", "label": "", "field": "id", "align": "right"},
 ]
 TASK_SLOT = """<q-td :props="props">
@@ -22,8 +22,7 @@ TASK_SLOT = """<q-td :props="props">
 DELETE_SLOT = """<q-td :props="props"><q-btn flat round dense icon="delete" class="rs-delete" aria-label="Delete"
 @click.stop="() => $parent.$emit('delete', props.row)"><q-tooltip>Delete</q-tooltip></q-btn></q-td>"""
 # Delete is on every row: quiet until hovered, so the tasks stay the focus (it still asks to confirm)
-RUNS_CSS = (".rs-delete { color: var(--ic-text-muted); } .rs-delete:hover { color: var(--ic-err); }"
-            " .q-table td.rs-nowrap { white-space: nowrap; }")
+RUNS_CSS = ".rs-delete { color: var(--ic-text-muted); } .rs-delete:hover { color: var(--ic-err); }"
 
 
 def summary_row(s: runs.Summary) -> dict:

@@ -253,6 +253,7 @@ body.body--dark .q-table { color: var(--ic-text); }
 .q-table tbody td { font-size: var(--ic-fs-ui); font-variant-numeric: tabular-nums; }
 .q-table tbody tr:hover td { background: var(--ic-surface-sunken); }
 .q-table--no-wrap td { white-space: normal; }
+.q-table td.ic-nowrap { white-space: nowrap; }  /* a column that must not wrap: dates, counts */
 /* wide tables fit the window (table.py): the table is the size container its
    priority columns hide in; a second line under a value; the first column stays
    pinned when a manual column choice makes the table scroll sideways */

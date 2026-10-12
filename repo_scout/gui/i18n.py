@@ -100,7 +100,7 @@ RU = {
     "Round 2:": "Второй круг:",
     "README closeness to the task, 0-1": "Близость README к задаче, 0-1",
     "Score: f = freshness, p = popularity": "Балл: f = свежесть, p = популярность",
-    "Days since the last push; below: created": "Дней с последнего пуша; ниже: дата создания",
+    "Days since the last push": "Дней с последнего пуша",
     "No rows match these filters.": "Под эти фильтры ничего не подходит.",
     "Run not found or unreadable": "Прогон не найден или не читается",
     "Back to runs": "К прогонам",

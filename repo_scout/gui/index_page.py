@@ -15,12 +15,14 @@ ALL_PROJECTS = "All projects"
 README_SLOT = """<q-td :props="props"><q-icon v-if="props.value" name="description" size="xs" class="t-muted"
 :aria-label="props.col.yes" /><span v-else>—</span></q-td>"""
 COLUMNS = [
-    {"name": "name", "label": "Repo", "field": "name", "align": "left", "sortable": True, "sub": "desc"},
+    {"name": "name", "label": "Repo", "field": "name", "align": "left", "sortable": True},
+    {"name": "desc", "label": "Description", "field": "desc", "align": "left"},
     {"name": "stars", "label": "★", "field": "stars", "align": "right", "sortable": True},
-    {"name": "seen", "label": "Verdicts", "field": "seen", "align": "left", "priority": 2},
-    {"name": "date", "label": "Added", "field": "date", "align": "left", "sortable": True, "priority": 2},
     {"name": "lang", "label": "Language", "field": "lang", "align": "left", "priority": 3},
+    {"name": "date", "label": "Added", "field": "date", "align": "left", "sortable": True, "priority": 2,
+     "classes": "ic-nowrap"},
     {"name": "readme", "label": "README", "field": "readme", "align": "center", "priority": 3},
+    {"name": "seen", "label": "Verdicts", "field": "seen", "align": "left", "priority": 2},
 ]
 
 

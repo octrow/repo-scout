@@ -9,29 +9,32 @@ from .i18n import t
 from .kit import layout, table
 from .verdict_dialog import DB_ERRORS, VerdictDialog, notify_db_error, open_index, readme_view
 
-# Fits the window, no sideways scroll: related fields share a column (second line), and
-# priority 2/3 columns hide as the table narrows; the repo panel shows every field
+# One value per column, one line per row. On a narrow window priority 2/3 columns hide
+# (kit table), and the repo panel still shows every field
 COLUMNS = [
-    {"name": "repo", "label": "Repo", "field": "repo", "align": "left", "sortable": True, "sub": "desc"},
+    {"name": "repo", "label": "Repo", "field": "repo", "align": "left", "sortable": True},
     {"name": "close", "label": "Closeness", "field": "close", "align": "right", "sortable": True,
      "hint": "README closeness to the task, 0-1"},
     {"name": "fit", "label": "Fit", "field": "fit", "align": "right", "sortable": True},  # advanced mode only
+    {"name": "source", "label": "Source", "field": "source", "align": "left", "sortable": True, "priority": 2},
     {"name": "score", "label": "Score", "field": "score_n", "align": "right", "sortable": True,
-     "hint": "Score: f = freshness, p = popularity", "priority": 2},
-    {"name": "stars", "label": "★", "field": "stars", "align": "right", "sortable": True, "sub": "activity"},
+     "hint": "Score: f = freshness, p = popularity"},
+    {"name": "stars", "label": "★", "field": "stars", "align": "right", "sortable": True},
+    {"name": "forks", "label": "Forks", "field": "forks", "align": "right", "sortable": True, "priority": 3},
+    {"name": "commits", "label": "Commits", "field": "commits", "align": "right", "sortable": True, "priority": 3},
     {"name": "pushed", "label": "Pushed, d", "field": "pushed", "align": "right", "sortable": True,
-     "hint": "Days since the last push; below: created", "sub": "created", "priority": 2},
+     "hint": "Days since the last push"},
+    {"name": "created", "label": "Created", "field": "created", "align": "left", "sortable": True, "priority": 3},
+    {"name": "lang", "label": "Language", "field": "lang", "align": "left", "priority": 3},
     {"name": "flags", "label": "Flags / drop", "field": "flags", "align": "left", "priority": 2},
     {"name": "seen", "label": "Seen", "field": "seen", "align": "left", "priority": 2},
-    {"name": "source", "label": "Source", "field": "source", "align": "left", "sortable": True, "priority": 3},
-    {"name": "lang", "label": "Language", "field": "lang", "align": "left", "priority": 3},
+    {"name": "desc", "label": "Description", "field": "desc", "align": "left", "priority": 3},
 ]
 # Kit theme lets every cell wrap; here every row is short, free text is cut with
 # an ellipsis (full text in the tooltip and the detail panel)
 TABLE_CSS = """
 .rs-run-table .q-table td { white-space: nowrap; }
-.rs-clamp, .rs-repo { display: block; max-width: min(var(--ic-cell-max), var(--ic-cell-share));
-  overflow: hidden; text-overflow: ellipsis; }
+.rs-clamp { max-width: min(var(--ic-cell-max), var(--ic-cell-share)); overflow: hidden; text-overflow: ellipsis; }
 .rs-run-table tbody tr { cursor: pointer; }
 .rs-repo { font-weight: var(--ic-fw-semibold); color: var(--ic-accent-700); }
 tr:hover .rs-repo { text-decoration: underline; }
@@ -45,8 +48,7 @@ FLAGS_SLOT = ('<q-td :props="props"><span v-for="f in props.row.flag_list" :key=
               'class="ic-chip ic-chip--neutral q-mr-xs">{{ f }}</span>'
               '<span v-if="!props.row.flag_list.length">—</span></q-td>')
 CLAMP_SLOT = '<q-td :props="props"><div class="rs-clamp" :title="props.value">{{ props.value }}</div></q-td>'
-REPO_SLOT = ('<q-td :props="props"><span class="rs-repo">{{ props.value }}</span>'
-             '<div class="ic-cell-sub" :title="props.row.desc">{{ props.row.desc }}</div></q-td>')
+REPO_SLOT = '<q-td :props="props"><span class="rs-repo">{{ props.value }}</span></q-td>'
 METRICS = (("Closeness", "close"), ("Source", "source"), ("Score", "score"), ("★", "stars"), ("Forks", "forks"),
            ("Commits", "commits"), ("Pushed, days ago", "pushed"), ("Created", "created"), ("Language", "lang"))
 
@@ -164,7 +166,8 @@ class RunView:
         self.table.table.add_slot("body-cell-score", SCORE_SLOT)
         self.table.table.add_slot("body-cell-repo", REPO_SLOT)
         self.table.table.add_slot("body-cell-flags", FLAGS_SLOT)
-        self.table.table.add_slot("body-cell-seen", CLAMP_SLOT)
+        for name in ("seen", "desc"):
+            self.table.table.add_slot(f"body-cell-{name}", CLAMP_SLOT)
         with self.bar:
             self.table.column_picker("repo-scout-run-columns")
         self.table.table.on("rowClick", lambda e: self.open_panel(e.args[1]["repo"]))
