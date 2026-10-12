@@ -83,3 +83,13 @@ def test_embed_docs_reuses_vectors_within_process(monkeypatch):
     again = semantic.embed_docs(["bb", "ccc", "a"])
     assert seen == [["a", "bb"], ["ccc"]] and again.shape == (3, 384)
     assert (again[0] == first[1]).all()
+
+
+def test_model_cache_is_persistent_not_temp(monkeypatch, tmp_path):
+    import tempfile
+
+    from repo_scout import semantic
+    monkeypatch.delenv("FASTEMBED_CACHE_PATH", raising=False)
+    assert not semantic.cache_dir().startswith(tempfile.gettempdir())
+    monkeypatch.setenv("FASTEMBED_CACHE_PATH", str(tmp_path))
+    assert semantic.cache_dir() == str(tmp_path)

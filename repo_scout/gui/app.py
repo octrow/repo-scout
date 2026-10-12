@@ -27,6 +27,7 @@ def register_pages() -> None:
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(prog="repo-scout gui")
     ap.add_argument("--port", type=int, default=DEFAULT_PORT)
+    ap.add_argument("--open", action="store_true", help="open the GUI in the default browser")
     a = ap.parse_args(argv)
     try:
         port = portmod.choose(a.port)
@@ -40,7 +41,7 @@ def main(argv: list[str] | None = None) -> None:
     app.on_shutdown(_stop)
     # reload=False: pages are registered in this process, so NiceGUI literal-guard
     # (`__name__ in {"__main__", "__mp_main__"}`) is not needed: main() is called from CLI command
-    ui.run(host=portmod.HOST, port=port, reload=False, language="en", show=False, title="repo-scout")
+    ui.run(host=portmod.HOST, port=port, reload=False, language="en", show=a.open, title="repo-scout")
 
 
 if __name__ in {"__main__", "__mp_main__"}:  # python -m repo_scout.gui.app

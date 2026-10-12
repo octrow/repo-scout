@@ -1,5 +1,7 @@
 """Closeness: fastembed embeddings (BAAI/bge-small-en-v1.5) and README cleaning."""
+import os
 import re
+from pathlib import Path
 
 import numpy as np
 
@@ -9,6 +11,11 @@ QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
 MAX_CHARS = 2000  # ~512 tokens ≈ 2000 chars without tokenizer
 EMBED_BATCH = 32  # fastembed default 256: same speed, ~1.5x memory and arena growth on long runs
 _model = None
+
+
+def cache_dir() -> str:
+    """fastembed defaults to the temp dir, which reboots and cleaners wipe; keep the model next to our data."""
+    return os.environ.get("FASTEMBED_CACHE_PATH") or str(Path.home() / ".cache/repo-scout/fastembed")
 _doc_cache: dict[str, np.ndarray] = {}  # ponytail: per-process, unbounded; eval variants embed the same READMEs
 
 
@@ -16,7 +23,7 @@ def _get():
     global _model
     if _model is None:
         from fastembed import TextEmbedding  # lazy import: model loading is heavy
-        _model = TextEmbedding(MODEL)
+        _model = TextEmbedding(MODEL, cache_dir=cache_dir())
     return _model
 
 

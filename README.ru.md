@@ -20,9 +20,27 @@
 
 repo-scout выполняет серию поисковых запросов к GitHub, объединяет результаты и проводит автоматический первичный отбор по правилам [`docs/repo-triage.ru.md`](docs/repo-triage.ru.md). Отбор включает стоп-правила (мёртвый, игрушка, шум, нет кода, не по теме), флаги (форк, звёзды ≫ коммиты, архивный, новый, шаблон, только косметика, всплеск звёзд), а также баллы свежести и популярности. Результаты сортируются по смысловой близости к описанию задачи с помощью локальной CPU-модели эмбеддингов. Ранжирование никогда не вызывает LLM.
 
+## Установка
+
+Одна команда. Она ставит [uv](https://docs.astral.sh/uv/) (он сам скачает Python) и [GitHub CLI](https://cli.github.com/), если их нет, устанавливает последний [релиз](https://github.com/octrow/repo-scout/releases), один раз проводит через `gh auth login`, скачивает локальную модель эмбеддингов и предлагает открыть GUI.
+
+```bash
+# macOS / Linux
+curl -LsSf https://raw.githubusercontent.com/octrow/repo-scout/main/install.sh | sh
+```
+
+```powershell
+# Windows (PowerShell)
+powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/octrow/repo-scout/main/install.ps1 | iex"
+```
+
+Повторный запуск той же команды обновляет приложение. Опции: `sh -s -- --version 0.1.0`, `--main` (текущая ветка main вместо релиза), `--no-launch`, `--uninstall` (прогоны и индекс остаются). В Windows перед запуском задайте `$env:REPO_SCOUT_VERSION`, `$env:REPO_SCOUT_MAIN=1`, `$env:REPO_SCOUT_NO_LAUNCH=1` или `$env:REPO_SCOUT_UNINSTALL=1`.
+
+Что-то не работает? `repo-scout doctor` проверяет gh, вход в GitHub и модель и подсказывает, как исправить каждый пункт.
+
 ## Быстрый старт
 
-Требуются Python 3.11+, [uv](https://docs.astral.sh/uv/) и авторизованный CLI [`gh`](https://cli.github.com/).
+Из клона, при наличии Python 3.11+, uv и авторизованного `gh`:
 
 ```bash
 uv sync && uv tool install --editable .   # добавляет repo-scout в PATH

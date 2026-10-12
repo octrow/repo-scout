@@ -304,6 +304,9 @@ def main() -> None:
         return verdict_main(sys.argv[2:])
     if sys.argv[1:2] == ["draft"]:
         return draft_main(sys.argv[2:])
+    if sys.argv[1:2] == ["doctor"]:
+        from repo_scout import doctor
+        return doctor.main(sys.argv[2:])
     a = _parser().parse_args()
     logmod.setup(quiet=a.quiet)
     _main(a)

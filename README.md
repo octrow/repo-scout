@@ -20,9 +20,27 @@ Search GitHub for something you can reuse before you write it yourself. Small ne
 
 repo-scout runs several GitHub searches, merges the results, and does the mechanical first pass of [`docs/repo-triage.md`](docs/repo-triage.md). That pass covers stop rules (dead, toy, noise, no code, off-topic), flags (fork, stars ≫ commits, archived, new, template, cosmetic-only commits, star burst), and freshness and popularity scores. Results are sorted by semantic closeness to your task description, computed by a local CPU embedding model. Ranking never calls an LLM.
 
+## Install
+
+One command. It installs [uv](https://docs.astral.sh/uv/) (which brings its own Python) and the [GitHub CLI](https://cli.github.com/) if they are missing, installs the latest [release](https://github.com/octrow/repo-scout/releases), walks you through `gh auth login` once, downloads the local embedding model, and offers to open the GUI.
+
+```bash
+# macOS / Linux
+curl -LsSf https://raw.githubusercontent.com/octrow/repo-scout/main/install.sh | sh
+```
+
+```powershell
+# Windows (PowerShell)
+powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/octrow/repo-scout/main/install.ps1 | iex"
+```
+
+Run the same command again to update. Options: `sh -s -- --version 0.1.0`, `--main` (current main branch instead of a release), `--no-launch`, `--uninstall` (keeps your runs and index). On Windows set `$env:REPO_SCOUT_VERSION`, `$env:REPO_SCOUT_MAIN=1`, `$env:REPO_SCOUT_NO_LAUNCH=1` or `$env:REPO_SCOUT_UNINSTALL=1` first.
+
+Something not working? `repo-scout doctor` checks gh, the GitHub login and the model, and says how to fix each one.
+
 ## Quick start
 
-Needs Python 3.11+, [uv](https://docs.astral.sh/uv/), and an authenticated [`gh`](https://cli.github.com/).
+From a clone, with Python 3.11+, uv and an authenticated `gh`:
 
 ```bash
 uv sync && uv tool install --editable .   # puts `repo-scout` on PATH
