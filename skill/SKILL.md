@@ -1,9 +1,12 @@
-**English** | **[Русский](SKILL.ru.md)**
-
 ---
 name: repo-scout
-description: Search for existing GitHub solutions before building your own: recent low-star projects count too. Use whenever the user wants to implement something and needs to check if there is an existing or close repository to build upon; on "find on github", "is there something ready-made", "search for analogs", "repo-scout".
+description: >
+  Search for existing GitHub solutions before building your own: recent low-star projects count too. Use
+  whenever the user wants to implement something and needs to check if there is an existing or close repository
+  to build upon; on "find on github", "is there something ready-made", "search for analogs", "repo-scout".
 ---
+
+**English** | **[Русский](SKILL.ru.md)**
 
 # repo-scout
 
