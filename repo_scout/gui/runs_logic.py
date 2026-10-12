@@ -94,6 +94,7 @@ def table_row(r: dict) -> dict:
             "source": g("source", ""), "score": f"{g('score', 0)} (fresh {g('fresh', 0)}, pop {g('pop', 0)})",
             "score_n": g("score", 0), "score_parts": f"f{g('fresh', 0)} p{g('pop', 0)}",
             "stars": g("stars", 0), "forks": g("forks", 0), "commits": g("commits", 0),
+            "activity": f"{t('Forks')} {g('forks', 0)} · {t('Commits')} {g('commits', 0)}",
             "pushed": g("pushed_days", ""), "created": g("created", ""), "lang": g("lang", ""),
             "flags": flags_text(r), "flag_list": flag_list(r), "seen": g("seen") or "—", "desc": plain_desc(g("desc"))}
 

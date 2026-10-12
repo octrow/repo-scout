@@ -6,7 +6,7 @@ from nicegui import ui
 from ..index import Index
 from . import runs_logic as rl
 from . import shell
-from .i18n import localize_table, t
+from .i18n import t
 from .kit import layout, table
 from .verdict_dialog import DB_ERRORS, VerdictDialog, notify_db_error, open_index, readme_view
 
@@ -15,13 +15,12 @@ ALL_PROJECTS = "All projects"
 README_SLOT = """<q-td :props="props"><q-icon v-if="props.value" name="description" size="xs" class="t-muted"
 :aria-label="props.col.yes" /><span v-else>—</span></q-td>"""
 COLUMNS = [
-    {"name": "name", "label": "Repo", "field": "name", "align": "left", "sortable": True},
-    {"name": "desc", "label": "Description", "field": "desc", "align": "left"},
+    {"name": "name", "label": "Repo", "field": "name", "align": "left", "sortable": True, "sub": "desc"},
     {"name": "stars", "label": "★", "field": "stars", "align": "right", "sortable": True},
-    {"name": "lang", "label": "Language", "field": "lang", "align": "left"},
-    {"name": "date", "label": "Added", "field": "date", "align": "left", "sortable": True},
-    {"name": "readme", "label": "README", "field": "readme", "align": "center"},
-    {"name": "seen", "label": "Verdicts", "field": "seen", "align": "left"},
+    {"name": "seen", "label": "Verdicts", "field": "seen", "align": "left", "priority": 2},
+    {"name": "date", "label": "Added", "field": "date", "align": "left", "sortable": True, "priority": 2},
+    {"name": "lang", "label": "Language", "field": "lang", "align": "left", "priority": 3},
+    {"name": "readme", "label": "README", "field": "readme", "align": "center", "priority": 3},
 ]
 
 
@@ -75,8 +74,8 @@ class IndexPage:
         self.rows = {r["key"]: r for r in rows}
         # Verdicts column only once some shown repo has one
         has_seen = any(r["seen"] != "—" for r in rows)
-        self.table.table.columns = [{**c, "label": t(c["label"]), "yes": t("yes")}  # type: ignore[union-attr]
-                                    for c in COLUMNS if c["name"] != "seen" or has_seen]
+        self.table.set_columns([{**c, "label": t(c["label"]), "yes": t("yes")}  # type: ignore[union-attr]
+                                for c in COLUMNS if c["name"] != "seen" or has_seen])
         self.table.set_rows(rows)  # type: ignore[union-attr]
         self.count.set_text(t("Showing {shown} of {total}").format(shown=len(rows), total=total))  # type: ignore[union-attr]
 
@@ -89,7 +88,7 @@ class IndexPage:
     def filters(self) -> None:
         with open_index() as idx:
             projects = list(dict.fromkeys(v[0] for v in idx.verdicts()))
-        with layout.filter_bar():
+        with layout.filter_bar() as self.bar:
             layout.search_field(t("Search by repo and description"), on_change=lambda e: self.set_filter("text", e.value))
             ui.select({ALL_PROJECTS: t(ALL_PROJECTS), **{p: p for p in projects}}, value=ALL_PROJECTS,
                       on_change=lambda e: self.set_filter("project", e.value)) \
@@ -177,7 +176,8 @@ class IndexPage:
         self.table = table.empty_aware_table(columns, row_key="key", pagination={"rowsPerPage": 25},
                                              empty_text=t("No repos in the Index yet. Run a search to add them."))
         self.table.table.add_slot("body-cell-readme", README_SLOT)
-        localize_table(self.table.table)
+        with self.bar:
+            self.table.column_picker("repo-scout-index-columns")
         self.table.table.on("rowClick", lambda e: self.open_panel(e.args[1]["key"]))
         self.refresh()
 

@@ -1,7 +1,7 @@
 """Navigation header shared across all pages (patterned after `_shell` from showcase nicegui-kit)."""
 from nicegui import ui
 
-from .i18n import LANGS, current, set_lang, t
+from .i18n import LANGS, current, set_lang, sync_kit, t
 from .kit import theme
 
 PAGES = {"/": "Search", "/runs": "Runs", "/index": "Index", "/eval": "Eval"}
@@ -16,6 +16,7 @@ PANEL_STYLE = "width: min(64rem, 94vw); max-width: min(64rem, 94vw)"
 
 def shell(here: str) -> None:
     """Header: brand, navigation, theme toggle. `here` highlights current section."""
+    sync_kit()
     header = ui.header().style("flex-direction: column; align-items: stretch;"
                                " gap: var(--ic-s3); padding: var(--ic-s3) 0 0")
     with header, ui.row().classes(f"ic-split w-full {PAGE_WIDTH} mx-auto items-center justify-between") \

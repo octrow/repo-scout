@@ -3,7 +3,7 @@ from nicegui import ui
 
 from .. import runs
 from . import shell
-from .i18n import localize_table, t
+from .i18n import t
 from .kit import layout, table
 from .run_view import run_page
 from .runs_logic import resolve_run
@@ -68,7 +68,6 @@ class RunsList:
         self.table = table.empty_aware_table(columns, row_key="id", pagination={"rowsPerPage": 25},
                                              empty_text=t("No runs yet. Start one on the Search page."))
         self.table.table.add_slot("body-cell-task", TASK_SLOT)
-        localize_table(self.table.table)
         ui.add_css(RUNS_CSS)
         self.table.table.add_slot("body-cell-actions", DELETE_SLOT.replace(">Delete<", f">{t('Delete')}<")
                                   .replace('aria-label="Delete"', f'aria-label="{t("Delete")}"'))

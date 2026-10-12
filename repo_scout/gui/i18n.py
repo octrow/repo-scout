@@ -7,6 +7,7 @@ Domain values (verdicts, stop reasons, flags), repo names and commands are never
 import os
 
 from .. import config, llm
+from .kit import texts
 
 LANG_VAR = "REPO_SCOUT_LANG"
 LANGS = ("en", "ru")
@@ -64,7 +65,6 @@ RU = {
     "Launch": "Запустить",
     "Agent prompt": "Промпт для агента",
     "Copy": "Копировать",
-    "Copied — paste into chat": "Скопировано, вставьте в чат",
     "No runs yet": "Запусков пока нет",
     "Add a task description": "Добавьте описание задачи",
     "Add at least one query": "Добавьте хотя бы один запрос",
@@ -100,7 +100,7 @@ RU = {
     "Round 2:": "Второй круг:",
     "README closeness to the task, 0-1": "Близость README к задаче, 0-1",
     "Score: f = freshness, p = popularity": "Балл: f = свежесть, p = популярность",
-    "Days since the last push": "Дней с последнего пуша",
+    "Days since the last push; below: created": "Дней с последнего пуша; ниже: дата создания",
     "No rows match these filters.": "Под эти фильтры ничего не подходит.",
     "Run not found or unreadable": "Прогон не найден или не читается",
     "Back to runs": "К прогонам",
@@ -173,8 +173,6 @@ RU = {
     "Export": "Выгрузить",
     "No eval sets found (eval/*.toml)": "Наборы eval не найдены (eval/*.toml)",
     "Select at least one set": "Выберите хотя бы один набор",
-    "Rows per page:": "Строк на странице:",
-    "of": "из",
 }
 
 
@@ -187,10 +185,9 @@ def t(text: str) -> str:
     return RU.get(text, text) if current() == "ru" else text
 
 
-def localize_table(table) -> None:
-    """Pagination texts in the current language: Quasar's own follow the language set at startup only."""
-    table.props["rows-per-page-label"] = t("Rows per page:")
-    table.props[":pagination-label"] = f"(first, last, total) => `${{first}}-${{last}} {t('of')} ${{total}}`"
+def sync_kit() -> None:
+    """Kit strings (statuses, buttons, pagination) in the current language; call on every page build."""
+    texts.TEXTS.update(texts.RU if current() == "ru" else texts.EN)
 
 
 def set_lang(lang: str) -> None:

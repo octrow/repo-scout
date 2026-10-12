@@ -10,6 +10,8 @@ from collections.abc import Callable
 
 from nicegui import ui
 
+from .texts import tr
+
 HEADING_CLASSES = {
     1: "t-title-page",
     2: "t-title-section",
@@ -26,7 +28,6 @@ BUTTON_KINDS = {
     "quiet": "flat color=primary",
     "danger": "outline color=negative",
 }
-COPIED_TEXT = "Copied — paste into chat"
 
 # Field kind -> native input attributes: the right mobile keyboard (inputmode),
 # browser/password-manager autofill (autocomplete) and the Enter key label
@@ -47,7 +48,6 @@ FIELD_KINDS: dict[str, dict[str, str]] = {
     "password": {"autocomplete": "current-password"},
     "new-password": {"autocomplete": "new-password"},
 }
-REQUIRED_TEXT = "Please fill in '{label}'"
 
 
 def heading(text: str, *, level: int = 2) -> ui.element:
@@ -66,7 +66,7 @@ def page_container(*, max_width: str = PAGE_MAX_WIDTH_FORM) -> ui.column:
 def section_card(*, recessive: bool = False) -> ui.card:
     """Card with the project spacing rhythm; recessive=True for secondary content
     (sunken, borderless: it sits back from the regular cards)."""
-    card = ui.card().classes("ic-card w-full p-4 items-stretch")
+    card = ui.card().classes("ic-card w-full items-stretch")
     if recessive:
         card.props("flat").classes("ic-card--recessive")
     return card
@@ -125,7 +125,7 @@ def field(
     the moment the value is fixed. `required` adds the rule, a visible `*` and
     aria-required. `suggestions` -> inline autocomplete; `enter` -> enterkeyhint
     ("next", "done", "send", ...)."""
-    rules = {REQUIRED_TEXT.format(label=label): lambda v: bool(str(v or "").strip())} if required else {}
+    rules = {tr("required", label=label): lambda v: bool(str(v or "").strip())} if required else {}
     rules.update(validation or {})
     password = kind in ("password", "new-password")
     el = ui.input(label, value=value, password=password, password_toggle_button=password,
@@ -170,11 +170,11 @@ def empty(text: str, action: tuple[str, Callable] | None = None) -> ui.row:
     return row
 
 
-def waiting(text: str = "Loading") -> ui.row:
+def waiting(text: str | None = None) -> ui.row:
     """A spinner with words, for anything slower than a blink."""
     with ui.row().classes("ic-state items-center") as row:
-        ui.spinner(size="1.25rem", color="primary")
-        ui.label(text).classes("t-meta")
+        ui.spinner(size="var(--ic-icon)", color="primary")
+        ui.label(text or tr("loading")).classes("t-meta")
     return row
 
 
@@ -184,7 +184,7 @@ def failed(text: str, retry: Callable | None = None) -> ui.row:
         ui.icon("error_outline").classes("ic-status--error").props('aria-hidden="true"')
         ui.label(text).classes("ic-status--error")
         if retry:
-            button("Retry", size="row", on_click=retry)
+            button(tr("retry"), size="row", on_click=retry)
     return row
 
 
@@ -208,6 +208,6 @@ def copy_for_chat_button(text: str) -> ui.button:
 
     def _copy() -> None:
         ui.clipboard.write(text)
-        ui.notify(COPIED_TEXT, type="positive")
+        ui.notify(tr("copied"), type="positive")
 
-    return button("Copy for chat", icon="content_copy", on_click=_copy)
+    return button(tr("copy_for_chat"), icon="content_copy", on_click=_copy)

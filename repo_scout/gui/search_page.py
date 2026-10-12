@@ -14,6 +14,7 @@ from . import search_form as sf
 from . import shell
 from .i18n import t
 from .kit import layout, run_monitor, run_pool
+from .kit.texts import tr
 
 NOTIFY_PERIOD = 1.0
 COMMAND_HINT = "Fill in the task and queries to see the command"
@@ -197,7 +198,7 @@ def _buttons(form: SearchForm, started: dict[str, str]) -> None:
 
         def copy_prompt() -> None:
             ui.clipboard.write(sf.agent_prompt(form.state()["task"]))
-            ui.notify(t(layout.COPIED_TEXT), type="positive")
+            ui.notify(tr("copied"), type="positive")
 
         layout.button(t("Agent prompt"), icon="content_copy", on_click=copy_prompt)
         layout.button(t("Paste command"), kind="quiet", icon="content_paste", on_click=paste.open)
@@ -217,7 +218,7 @@ def search(draft: str | None = None) -> None:
                 with ui.row().classes("ic-split w-full items-start justify-between no-wrap"):
                     form.command = ui.label().classes("t-mono").style("min-width: 0; overflow-wrap: anywhere")
                     ui.button(icon="content_copy", on_click=lambda: (
-                        ui.clipboard.write((sf.command_text(form.state()) or "")), ui.notify(t(layout.COPIED_TEXT)))) \
+                        ui.clipboard.write((sf.command_text(form.state()) or "")), ui.notify(tr("copied")))) \
                         .props(f'flat round dense aria-label="{t("Copy")}"').classes("shrink-0") \
                         .tooltip(t("Copy"))
                 _buttons(form, started)

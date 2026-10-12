@@ -198,3 +198,9 @@ async def test_eval_page_cards_and_run(user: User, monkeypatch) -> None:
     await user.should_see("Report")
     await user.should_see("buy-smarter")
     run_pool.RUNS.clear()
+
+
+def test_page_css_uses_only_kit_tokens():
+    from repo_scout.gui import run_view, runs_page
+    from repo_scout.gui.kit import theme
+    assert theme.raw_values(run_view.TABLE_CSS + runs_page.RUNS_CSS) == []

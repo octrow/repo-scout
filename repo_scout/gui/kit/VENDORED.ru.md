@@ -2,16 +2,14 @@
 
 # Vendored nicegui-kit
 
-Копия из `~/dev/pylibs/nicegui-kit/src/nicegui_kit/`, коммит `adf21c1`, дата копирования 2026-10-11.
-Модули: `theme`, `layout`, `table`, `run_pool`, `run_monitor`, `assets/fonts` (Inter, OFL, `LICENSE.txt`). `hotkeys` не копировался.
+Копия из `~/dev/pylibs/nicegui-kit/src/nicegui_kit/`, коммит `7d6c180` (ветка `feat/nicegui-kit-texts-tokens-wide-tables`;
+`texts`, токены дизайн-системы, широкие таблицы), дата копирования 2026-10-12.
+Модули: `theme`, `layout`, `table`, `texts`, `run_pool`, `run_monitor`, `assets/fonts` (Inter, OFL, `LICENSE.txt`). `hotkeys` не копировался.
 
-Каждая правка кода помечена `# repo-scout:`. Общие улучшения отправлять в кит через `docs/proposals/`.
+Модули побайтно совпадают с kit; общие улучшения отправлять в kit через его `docs/proposals/`.
 
 ## Правки
 
-- `run_monitor.py`: абсолютные импорты `nicegui_kit` заменены на относительные.
-- `theme.py`: `.md-body` удерживает картинки README в колонке (ширина `.nicegui-markdown`, max-width у `img`, без float от `align`); стоит предложить в kit.
-- `__init__.py`: докстринг заменён на ссылку на этот файл (помечено `# repo-scout:`).
-- Остальное без изменений (строки `nicegui-kit` в константах — ключ localStorage и имя таска — оставлены как есть).
-- Файлы длиннее 400 строк (`theme.py`) не правим: это копия.
-- Python: копия работает на 3.12; ограничение `requires-python >=3.11` сохранено, если тесты проходят.
+- `__init__.py`: докстринг заменён на ссылку на этот файл.
+- Больше ничего. Строки kit переключаются вместе с языком GUI через `i18n.sync_kit()` (вызывается в `shell.shell()`),
+  а не правкой копии.
