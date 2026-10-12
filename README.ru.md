@@ -113,10 +113,6 @@ GUI по умолчанию на английском. Переключите н
 
 <img src="./assets/readme/gui/index-card.png" width="60%" alt="Карточка репозитория в Индексе с README и кнопками Forget, Rename и Set verdict.">
 
-Наборы eval:
-
-<img src="./assets/readme/gui/eval.png" width="100%" alt="Страница Eval с восемью эталонными наборами и опциями офлайн-прогона по снапшотам.">
-
 </details>
 
 Ход работы пишется в stderr и в `~/.local/state/repo-scout/run.log` (`$REPO_SCOUT_LOG`), так что его можно смотреть через `tail -f` из другого терминала. С `-q` он пишется только в файл лога.

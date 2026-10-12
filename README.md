@@ -113,10 +113,6 @@ Index of past candidates:
 
 <img src="./assets/readme/gui/index-card.png" width="60%" alt="Index card of a repo with its README and Forget, Rename and Set verdict buttons.">
 
-Eval sets:
-
-<img src="./assets/readme/gui/eval.png" width="100%" alt="Eval page with eight golden sets and options for offline snapshot runs.">
-
 </details>
 
 Progress goes to stderr and to `~/.local/state/repo-scout/run.log` (`$REPO_SCOUT_LOG`), so you can `tail -f` it from another terminal. Use `-q` to send it only to the log file.
