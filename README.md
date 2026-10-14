@@ -16,6 +16,10 @@
 Search GitHub for something you can reuse before you write it yourself. Small new projects count too, because results rank by how close they are to your task.
 
 <p align="center">
+  <img src="./assets/readme/demo.gif" width="100%" alt="A real search in the GUI: a task and three queries are typed in, the live log runs (sped up), the run opens with 63 of 100 repos ranked by closeness, and the top repo's card shows its README and verdict buttons.">
+</p>
+
+<p align="center">
   <img src="./assets/readme/triage.svg" width="100%" alt="Rows from a real run looking for README-audit tools. A 22-star repo ranks first at closeness 0.84. Flags mark a new repo, a 100% early star burst and cosmetic-only commits without dropping them. Stop rules drop github-readme-stats (79,824 stars, 309 days idle), awesome-go (an awesome list), a 2-commit toy, and an off-topic repo at closeness 0.63.">
 </p>
 
@@ -74,6 +78,18 @@ repo-scout                                # no arguments: opens the GUI in your 
 5. Star burst. The top 10 with ≥50★ get a star-history check (`--stars-k`, `--no-stars-check`). The flag shows what share of the first ~1000★ came on burst days. Bought stars and a viral launch look the same, so read the flag as a number and decide yourself.
 
 Hard conditions: `--lang python`, `--must REGEX` (a required word group, repeatable), `--exclude REGEX` (forbidden words). Other options: `--months 6`, `--new-days 60`, `--limit 50`, `--json`. Run `repo-scout --help` for the full list.
+
+## How it differs from GitHub search and similar tools
+
+| Tool | What it does well | Where repo-scout differs |
+|---|---|---|
+| GitHub search | One query, sorted by best match or stars | Runs several queries and merges them, drops dead, toy and off-topic repos, and ranks by closeness to your task rather than by stars |
+| Asking a chat model | Fast suggestions in plain language | Every candidate comes from a live GitHub search, so new repos are included and every name exists |
+| [DeepGit](https://github.com/zamalali/DeepGit) | An LLM writes the search plan and ranks the shortlist | Ranking needs no LLM and no API key; stop rules and flags are deterministic, so the same candidates always get the same marks |
+| [repohunt](https://github.com/danielrltan/repohunt) | MCP server that searches and ranks hits for a coding agent | Adds a local embedding model for closeness, stop rules, a star-burst check and a local Index with your verdicts |
+| [github-hidden-gems](https://github.com/JoanAbad82/github-hidden-gems) | Scores how good a little-known repo is (0–100) | Scores how close a repo is to *your* task, then lets you record a verdict per project |
+
+The notes on these tools are in [`docs/analogs/`](docs/analogs/README.md); some of their ideas are borrowed here.
 
 ## Runs, verdicts and the GUI
 
