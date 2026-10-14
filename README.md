@@ -176,6 +176,10 @@ repo-scout eval --fake-stars [--all-grid]                # precision/recall/FPR 
 
 [`skill/SKILL.md`](skill/SKILL.md) teaches a coding agent the workflow from search to inspection and verdicts. Install it with `ln -s "$PWD/skill" ~/.agents/skills/repo-scout`.
 
+This repo was prepared for publishing with [repo-publish](https://github.com/octrow/octrow-skills), a skill that
+checks history and secrets, then sets up installers, CI and releases. Its install and release templates are
+filled in here as the worked example.
+
 ## Development
 
 ```bash

@@ -176,6 +176,10 @@ repo-scout eval --fake-stars [--all-grid]                # точность/по
 
 [`skill/SKILL.ru.md`](skill/SKILL.ru.md) учит AI-агента рабочему процессу от поиска до осмотра и вердиктов. Установка: `ln -s "$PWD/skill" ~/.agents/skills/repo-scout`.
 
+Репозиторий подготовлен к публикации скиллом [repo-publish](https://github.com/octrow/octrow-skills): он проверяет
+историю и секреты, потом настраивает установщики, CI и релизы. Здесь его шаблоны установки и релиза заполнены
+как рабочий пример.
+
 ## Разработка
 
 ```bash
