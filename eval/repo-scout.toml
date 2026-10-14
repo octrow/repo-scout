@@ -1,5 +1,5 @@
 name = "repo-scout"
-source = "~/dev/repo-scout/docs/analogs/README.md"
+source = "repo-scout/docs/analogs/README.md"
 need = "Хочу инструмент для поиска на GitHub готовых решений перед тем, как писать своё: чтобы находил не только популярные, но и свежие проекты с малым числом звёзд. Ищу существующие наработки по поиску и ранжированию репозиториев, фильтрации мусора и похожести проектов."
 analysis_date = "2026-10-11"
 task = "Find GitHub repo-discovery tools to reuse: semantic/vector search over GitHub repositories, hidden-gems finders for low-star projects, ranking by recent activity, noise filtering and README cleaning, without relying on an LLM."

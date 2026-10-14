@@ -2,7 +2,7 @@
 
 # Vendored nicegui-kit
 
-Копия из `~/dev/pylibs/nicegui-kit/src/nicegui_kit/`, коммит `34dd42a` (ветка `feat/nicegui-kit-texts-tokens-wide-tables`;
+Копия из [nicegui-kit](https://github.com/octrow/nicegui-kit) `src/nicegui_kit/`, коммит `34dd42a` (ветка `feat/nicegui-kit-texts-tokens-wide-tables`;
 `texts`, токены дизайн-системы, широкие таблицы), дата копирования 2026-10-12.
 Модули: `theme`, `layout`, `table`, `texts`, `run_pool`, `run_monitor`, `assets/fonts` (Inter, OFL, `LICENSE.txt`). `hotkeys` не копировался.
 
