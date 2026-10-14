@@ -3,9 +3,11 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: {interval: weekly}
+    cooldown: {default-days: 7}  # skip releases younger than a week (hijacked-release window)
   - package-ecosystem: uv
     directory: /
     schedule: {interval: weekly}
+    cooldown: {default-days: 7}  # skip releases younger than a week (hijacked-release window)
     groups:
       python:  # one PR per week instead of one per package
         patterns: ["*"]

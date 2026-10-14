@@ -6,6 +6,8 @@ on:
   pull_request:
     paths: [install.sh, install.ps1, pyproject.toml, uv.lock, "repo_scout/**", .github/workflows/install.yml]
   workflow_dispatch:
+permissions:
+  contents: read
 jobs:
   install:
     strategy:
@@ -18,7 +20,9 @@ jobs:
       REPO_SCOUT_NO_LAUNCH: "1"
       GH_TOKEN: ${{ github.token }}  # so `gh auth status` and doctor pass
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - if: runner.os != 'Windows'
         run: |
           sh install.sh --no-launch
