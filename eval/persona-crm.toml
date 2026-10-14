@@ -1,5 +1,5 @@
 name = "persona-crm"
-source = "~/dev/persona-crm/docs/INIT_DATA.md, ~/dev/persona-crm/CLAUDE.md, ~/dev/persona-crm/README.md"
+source = "persona-crm/docs/INIT_DATA.md, persona-crm/CLAUDE.md, persona-crm/README.md"
 need = "Хочу бесплатный self-hosted инструмент, который помогает не терять связь с близкими друзьями и семьёй: отслеживает переписку в WhatsApp, Telegram и Instagram и напоминает, кому пора написать. Ещё нужна возможность читать личные сообщения Instagram."
 analysis_date = ""
 task = "Find self-hosted open-source personal CRM tools that track communication with friends and family across WhatsApp, Telegram and Instagram and remind who to contact next (usable by an ADHD user), plus libraries for reading Instagram DMs."

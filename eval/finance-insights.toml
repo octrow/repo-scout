@@ -1,5 +1,5 @@
 name = "finance-insights"
-source = "~/dev/finance-insights/external_examples (клоны без письменного разбора; docs/INIT_DATA.md — устаревшая заметка)"
+source = "finance-insights/external_examples (клоны без письменного разбора; docs/INIT_DATA.md — устаревшая заметка)"
 need = "Хочу локальный персональный финансовый помощник по выпискам из банков: учёт доходов и расходов, бюджеты, отчёты и аналитика, желательно ещё и учёт инвестиций. Ищу self-hosted open-source инструменты, которые можно взять за основу."
 analysis_date = ""
 task = "Find self-hosted open-source personal finance tools: budgeting and double-entry ledgers (Beancount/Fava, Firefly III, Actual) and investment portfolio trackers, to use as a base for a local-first personal CFO over bank statements."
