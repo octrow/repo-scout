@@ -6,7 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-10-14
+
 ### Added
+- Demo GIF of a real search and a comparison with similar tools in the README.
 - GUI tables fit the window; columns hide by priority only on narrow windows, one value per column.
 - Kit strings in the GUI follow the language switch.
 
@@ -50,7 +53,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 ## [0.1.0] - 2026-10-12
 First public release.
 
-[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.7...HEAD
+[0.1.7]: https://github.com/octrow/repo-scout/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/octrow/repo-scout/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/octrow/repo-scout/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/octrow/repo-scout/compare/v0.1.3...v0.1.4
