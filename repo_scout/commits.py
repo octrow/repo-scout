@@ -36,7 +36,7 @@ def is_substantive(commit: dict) -> bool:
 def last_substantive(commits: list[dict], now: datetime) -> tuple[str, bool] | None:
     """(date, is_only_cosmetic): latest substantive commit or oldest in the list.
     Commits from the future (recorded snapshots after `now`) are ignored. None if no commits."""
-    commits = [c for c in commits if datetime.fromisoformat(c["committedDate"]) <= now]
+    commits = [c for c in commits if c and datetime.fromisoformat(c["committedDate"]) <= now]
     if not commits:
         return None
     for c in sorted(commits, key=lambda c: c["committedDate"], reverse=True):
