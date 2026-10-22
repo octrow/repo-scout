@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 
 ## [Unreleased]
 
+### Fixed
+- Search no longer crashes when GitHub returns an empty (null) commit in a repo's history.
+- `eval --fake-stars` closes the labels file it reads.
+
 ## [0.1.7] - 2026-10-14
 
 ### Added

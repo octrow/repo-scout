@@ -16,7 +16,8 @@ MAX_FPR = 0.15  # gate: higher on test means flag only via --stars-check
 
 
 def load(path: Path = DIR / "labels.csv") -> list[tuple[str, int]]:
-    return [(r["repo"], int(r["label"])) for r in csv.DictReader(open(path))]
+    with path.open(newline="") as f:
+        return [(r["repo"], int(r["label"])) for r in csv.DictReader(f)]
 
 
 def collect(labels: list[tuple[str, int]], now, forks: bool) -> dict[str, stars.History]:

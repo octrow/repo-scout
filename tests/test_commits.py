@@ -83,3 +83,9 @@ def test_future_commits_ignored_and_pushed_days_clamped():
         "2026-09-01T00:00:00Z", False)
     assert last_substantive([c(date="2026-12-01T00:00:00Z")], now) is None
     assert triage(repo(), NOW, 60, last_push="2027-01-01T00:00:00Z")["pushed_days"] == 0
+
+
+def test_null_commit_nodes_skipped():
+    """GraphQL history can return null nodes (also in cached details snapshots)."""
+    assert last_substantive([None, c(date="2026-09-01T00:00:00Z")], NOW) == ("2026-09-01T00:00:00Z", False)
+    assert last_substantive([None], NOW) is None
