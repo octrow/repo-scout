@@ -24,6 +24,7 @@ uv run pytest -q
 
 - Add a test for new behavior. Tests never call GitHub or external models: they use snapshots and monkeypatch.
 - Keep README.md and README.ru.md in sync when you change behavior or options.
+- Changed a search step (what it drops, flags, skips or how it fails)? Update [docs/logic-map.md](docs/logic-map.md) in the same commit.
 - Use the words from [CONTEXT.md](CONTEXT.md) (Candidate, Triage, Closeness, Fit...). A larger design decision gets an ADR in [docs/adr/](docs/adr/).
 - Ranking stays deterministic. External models may add information, never drop or reorder rows ([ADR 0002](docs/adr/0002-advanced-mode-external-models.md)).
 - Commit messages: `<type>: <description>`, where type is feat, fix, refactor, docs, test, chore, perf or ci.
