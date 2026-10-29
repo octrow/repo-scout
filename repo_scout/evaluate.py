@@ -106,6 +106,7 @@ def index_check(path: Path, mode: str, from_index: int = FROM_INDEX) -> str:
         idx = Index(Path(tmp) / "index.db")
         spec, first = eval_set(path, mode, index=idx, round2=False)
         if not spec.get("alt_task"):
+            idx.db.close()  # an open db keeps the temp dir from being removed on Windows
             return ""
         _, rows = eval_set(path, mode, spec["alt_task"], spec["queries"][:2], idx, from_index, round2=False)
         idx.db.close()
