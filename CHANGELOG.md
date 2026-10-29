@@ -6,6 +6,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-10-30
+
+### Added
+- `docs/logic-map.md`: how a search run flows through the code, step by step, kept in sync by a test.
+- Russian code of conduct (official Contributor Covenant 2.1 translation).
+
 ### Fixed
 - Search no longer crashes when GitHub returns an empty (null) commit in a repo's history.
 - `eval --fake-stars` closes the labels file it reads.
@@ -18,6 +24,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 - LLM draft reads a JSON reply followed by prose with braces, and reports a non-text reply as an error instead of crashing.
 - Saving settings no longer leaves an older duplicate key in `.env` that overrode the new value; the file is created readable by the owner only.
 - `eval` names the missing keys of a broken set file instead of failing with a traceback.
+
+### Security
+- Dependencies with known vulnerabilities updated: certifi 2026.10.19, filelock 4.2.1, fastembed 0.9.1, pillow 13.0.0.
 
 ## [0.1.7] - 2026-10-14
 
@@ -66,7 +75,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 ## [0.1.0] - 2026-10-12
 First public release.
 
-[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/octrow/repo-scout/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/octrow/repo-scout/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/octrow/repo-scout/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/octrow/repo-scout/compare/v0.1.4...v0.1.5
