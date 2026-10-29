@@ -232,3 +232,17 @@ def test_generic_name_wins_over_older_alias(monkeypatch):
     assert llm.setting(llm.KEY_VAR) == "new"
     monkeypatch.delenv("LLM_API_KEY")
     assert llm.setting(llm.KEY_VAR) == "old"
+
+
+@pytest.mark.parametrize("text", [
+    '{"task":"a","queries":["q"]}\n\nLet me know {if}',
+    'Sure! {"task":"a }","queries":["q"]} Hope {this} helps',
+])
+def test_json_object_followed_by_prose(text):
+    assert llm._json_object(text)["queries"] == ["q"]
+
+
+def test_non_string_content_is_llm_error(monkeypatch):
+    monkeypatch.setattr(llm, "_post", lambda messages: reply([{"type": "text", "text": "{}"}]))
+    with pytest.raises(llm.LLMError, match="unexpected format"):
+        llm._chat([])

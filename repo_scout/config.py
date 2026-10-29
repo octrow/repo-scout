@@ -38,19 +38,22 @@ def update_env(path: Path, values: dict[str, str]) -> None:
     except OSError:
         lines = []
     todo = dict(values)
+    seen = set()
     out = []
     for line in lines:
         key = line.strip().removeprefix("export ").partition("=")[0].strip()
-        if key in todo:
-            value = todo.pop(key)
-            if value:
-                out.append(f"{key}={value}")
-        else:
+        if key not in values:
             out.append(line)
+        elif key not in seen:  # first occurrence gets the value, later duplicates are dropped
+            seen.add(key)
+            if todo.pop(key):
+                out.append(f"{key}={values[key]}")
     out += [f"{k}={v}" for k, v in todo.items() if v]
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(out) + "\n", encoding="utf-8")
-    os.chmod(path, 0o600)  # holds API keys
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)  # holds API keys: never world-readable
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write("\n".join(out) + "\n")
+    os.chmod(path, 0o600)  # tighten a pre-existing file
 
 
 def _shown(value: str, secret: bool) -> str:

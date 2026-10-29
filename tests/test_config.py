@@ -1,4 +1,5 @@
 """`repo-scout config`: optional advanced-mode settings, filled interactively."""
+import os
 import stat
 
 from repo_scout import config, llm, systemone
@@ -43,3 +44,20 @@ def test_main_writes_user_env_and_both_modes_read_it(monkeypatch, capsys):
     assert llm.available() and llm.model() == llm.DEFAULT_MODEL
     assert systemone.available()
     assert "OmniRoute" in capsys.readouterr().out
+
+
+def test_update_env_drops_duplicate_keys(tmp_path):
+    path = tmp_path / ".env"
+    path.write_text("A=1\nB=x\nA=2\nC=3\nA=4\n")
+    config.update_env(path, {"A": "new", "C": ""})
+    assert path.read_text() == "A=new\nB=x\n"
+
+
+def test_update_env_never_world_readable(tmp_path, monkeypatch):
+    monkeypatch.setattr(os, "chmod", lambda *a: None)  # mode must be right without the later chmod
+    old = os.umask(0)
+    try:
+        config.update_env(tmp_path / ".env", {"A": "1"})
+    finally:
+        os.umask(old)
+    assert stat.S_IMODE((tmp_path / ".env").stat().st_mode) == 0o600

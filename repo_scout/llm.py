@@ -189,6 +189,8 @@ def _chat(messages: list[dict], pending: list | None = None) -> str:
     try:
         response, seconds = rec["response"], float(rec["seconds"])
         text = response["choices"][0]["message"]["content"] or ""
+        if not isinstance(text, str):
+            raise TypeError
         tokens = _tokens(response)
     except (KeyError, IndexError, TypeError, ValueError, AttributeError):
         raise LLMError("The LLM reply has an unexpected format") from None
@@ -200,13 +202,15 @@ def _chat(messages: list[dict], pending: list | None = None) -> str:
 def _json_object(text: str) -> dict:
     """Extract JSON object from text, including markdown fences or surrounding chatter."""
     fenced = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
-    for chunk in ([fenced.group(1)] if fenced else []) + [text, text[text.find("{"):text.rfind("}") + 1]]:
-        try:
-            data = json.loads(chunk)
-        except ValueError:
-            continue
-        if isinstance(data, dict):
-            return data
+    decoder = json.JSONDecoder()
+    for chunk in ([fenced.group(1)] if fenced else []) + [text]:
+        for i in (m.start() for m in re.finditer(r"\{", chunk)):
+            try:
+                data, _ = decoder.raw_decode(chunk, i)
+            except ValueError:
+                continue
+            if isinstance(data, dict):
+                return data
     raise ValueError("response does not contain a JSON object")
 
 

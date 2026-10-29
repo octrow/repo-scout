@@ -15,6 +15,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 - A never-pushed repo (`pushedAt` null) no longer crashes triage; its age counts from creation.
 - `eval --fake-stars` survives a deleted repo or an empty fork entry, and a label file with only one class.
 - GUI: opening a draft whose run file was deleted shows a notice and an empty form instead of an error.
+- LLM draft reads a JSON reply followed by prose with braces, and reports a non-text reply as an error instead of crashing.
+- Saving settings no longer leaves an older duplicate key in `.env` that overrode the new value; the file is created readable by the owner only.
 
 ## [0.1.7] - 2026-10-14
 
