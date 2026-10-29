@@ -112,3 +112,20 @@ def test_skipped_repo_is_recorded_so_replay_repeats_the_skip(monkeypatch, tmp_pa
         assert set(github.details(["a/one", "a/bad"])) == {"a/one"}
     finally:
         github.configure(None, None)
+
+
+def test_retry_on_null_data(monkeypatch):
+    calls, _ = run_with(monkeypatch, [(0, json.dumps({"data": None}), ""), (0, OK, "")])
+    assert github.search("q", 5)
+    assert len(calls) == 2
+
+
+def test_alias_error_other_than_not_found_is_a_failure_not_a_deletion(monkeypatch):
+    github.last_failed.clear()
+    monkeypatch.setattr(github, "_graphql_live", lambda q, v, **_: {
+        "data": {"r0": None, "r1": None, "r2": {"m0": {"text": "ok"}}},
+        "errors": [{"type": "NOT_FOUND", "path": ["r0"]}, {"type": "TIMEOUT", "path": ["r1"]}]})
+    got = github._batch(["a/gone", "a/slow", "a/ok"], github._alias)
+    assert got == {"a/gone": None, "a/ok": {"m0": {"text": "ok"}}}
+    assert github.last_failed == {"a/slow"}
+    github.last_failed.clear()

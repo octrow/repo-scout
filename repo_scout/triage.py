@@ -19,7 +19,7 @@ def triage(r: dict, now: datetime, new_days: int, last_push: str | None = None) 
     """Return the row dict with score, flags, and stop reason (None = passes).
 
     last_push: date of the latest substantive commit instead of pushedAt."""
-    stars, pushed = r["stargazerCount"], days_since(last_push or r["pushedAt"], now)
+    stars, pushed = r["stargazerCount"], days_since(last_push or r.get("pushedAt") or r["createdAt"], now)  # pushedAt is null on never-pushed repos
     target = (r.get("defaultBranchRef") or {}).get("target") or {}
     commits = (target.get("history") or {}).get("totalCount", 0)
 

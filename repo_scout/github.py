@@ -69,6 +69,8 @@ def _attempt(query: str, variables: dict) -> tuple[dict | None, str | None]:
         raise GitHubError(f"gh failed: {err or out.stdout.strip()}")
     if data is None:
         return None, "response without JSON"
+    if data.get("data") is None and not errors:
+        return None, "response without data"
     if errors:
         raise GitHubError(f"GraphQL: {errors[0].get('message', errors)}")
     return data, None
@@ -178,7 +180,7 @@ def _batch(chunk: list[str], alias) -> dict[str, dict | None]:
     Single failing repo is retried; on persistent failure, it is skipped with a warning and tracked in last_failed."""
     q = "query{rateLimit{cost remaining resetAt} " + " ".join(alias(i, n) for i, n in enumerate(chunk)) + "}"
     try:
-        data = _cap_text(_graphql_live(q, {}, retries=(EVAL_SINGLE_RETRIES if _mode == "record" and _details_dir else MAX_RETRIES) if len(chunk) == 1 else 0))["data"]
+        resp = _cap_text(_graphql_live(q, {}, retries=(EVAL_SINGLE_RETRIES if _mode == "record" and _details_dir else MAX_RETRIES) if len(chunk) == 1 else 0))
     except GitHubError as e:
         if len(chunk) > 1:
             log.info("batch of %d failed (%s), splitting in half", len(chunk), e)
@@ -188,7 +190,17 @@ def _batch(chunk: list[str], alias) -> dict[str, dict | None]:
             return {}
         mid = len(chunk) // 2
         return _batch(chunk[:mid], alias) | _batch(chunk[mid:], alias)
-    return {name: data.get(f"r{i}") for i, name in enumerate(chunk)}
+    data = resp.get("data") or {}
+    # an alias that errored for any reason but NOT_FOUND is a failure, not a deleted repo
+    failed = {e["path"][0] for e in resp.get("errors") or [] if e.get("path") and e.get("type") != "NOT_FOUND"}
+    out = {}
+    for i, name in enumerate(chunk):
+        if f"r{i}" in failed and not data.get(f"r{i}"):
+            log.warning("warning: %s skipped: GraphQL error", name)
+            last_failed.add(name)
+        else:
+            out[name] = data.get(f"r{i}")
+    return out
 
 
 def search(query: str, limit: int) -> list[dict]:

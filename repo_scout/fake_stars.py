@@ -52,7 +52,7 @@ def score(labels: list[tuple[str, int]], hist: dict[str, stars.History], thr: fl
     pos = sum(y for _, y in labels)
     neg = len(labels) - pos
     return {"thr": thr, "min_burst": mb, "tp": tp, "fp": fp, "precision": tp / (tp + fp) if tp + fp else 0.0,
-            "recall": tp / pos, "fpr": fp / neg}
+            "recall": tp / pos if pos else 0.0, "fpr": fp / neg if neg else 0.0}
 
 
 def grid(labels: list[tuple[str, int]], hist: dict[str, stars.History]) -> list[dict]:

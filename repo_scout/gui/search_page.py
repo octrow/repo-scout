@@ -72,14 +72,15 @@ class SearchForm:
         return self.text(key, label, check, **kw).props("type=textarea autogrow rows=2")
 
 
-def _load_draft(form: SearchForm, key: str) -> None:
+def _load_draft(form: SearchForm, key: str) -> bool:
     try:
         state = sf.load_draft(form.drafts[key])
     except (ValueError, OSError, tomllib.TOMLDecodeError):
         log.warning("Draft not loaded: %s", key, exc_info=True)
         ui.notify(t("Could not load the draft: the file is damaged or unreadable"), type="negative")
-        return
+        return False
     form.fill(state)
+    return True
 
 
 LLM_FAILED = "Draft failed: the model did not answer or sent an invalid answer. See the log."
@@ -225,9 +226,7 @@ def search(draft: str | None = None) -> None:
             layout.heading(t("Runs"), level=2)
             run_monitor.attach_run_monitor(idle_text=t("No runs yet"))
             ui.timer(NOTIFY_PERIOD, lambda: _watch_done(started))
-    if draft in form.drafts:
-        form.fill(sf.load_draft(form.drafts[draft]))
-    else:
+    if not (draft in form.drafts and _load_draft(form, draft)):  # the run may be gone since the list was built
         form.fill(sf.default_state(), validate=False)
 
 

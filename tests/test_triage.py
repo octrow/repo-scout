@@ -25,3 +25,9 @@ def test_triage():
     assert (r["fresh"], r["pop"], r["score"]) == (4, 2, 6)
     assert r["flags"] == ["fork o/b", "stars≫commits", "new"]
     assert triage(repo(pushed=91), NOW, 60)["fresh"] == 0
+
+
+def test_never_pushed_repo_ages_from_creation():
+    from tests.test_conditions import NOW, node
+    row = triage({**node("a/b"), "pushedAt": None, "createdAt": "2026-10-01T00:00:00Z"}, NOW, 60)
+    assert row["pushed_days"] == (NOW - datetime.fromisoformat("2026-10-01T00:00:00Z")).days

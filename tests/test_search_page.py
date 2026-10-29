@@ -33,6 +33,19 @@ async def test_form_fills_from_draft(user: User) -> None:
     await user.should_see("--lang=go")
 
 
+async def test_draft_gone_after_listing_opens_an_empty_form(user: User, monkeypatch) -> None:
+    from repo_scout.gui import search_form as sf
+    params = cli.search_params(cli._parser().parse_args(["--task", "Gone task", "qa"]))
+    path = runs.save(params, [], [], datetime(2026, 1, 1))
+
+    def gone(_):
+        raise OSError("deleted")
+    monkeypatch.setattr(sf, "load_draft", gone)
+    await user.open(f"/?draft=run:{path.stem}")
+    assert _values(user)["Task (English)"] == ""
+    await user.should_see("Could not load the draft")
+
+
 async def test_draft_by_path_is_ignored(user: User) -> None:
     params = cli.search_params(cli._parser().parse_args(["--task", "Secret task", "qa"]))
     path = runs.save(params, [], [], datetime(2026, 1, 1))

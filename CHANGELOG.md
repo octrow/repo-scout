@@ -10,6 +10,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 - Search no longer crashes when GitHub returns an empty (null) commit in a repo's history.
 - `eval --fake-stars` closes the labels file it reads.
 - Search no longer crashes when GitHub fails to refresh a repo pulled from the Index; the repo stays in the Index.
+- A repo GitHub fails to return because of an error (not because it is gone) is no longer deleted from the Index.
+- A GitHub reply with empty data is retried instead of crashing the search.
+- A never-pushed repo (`pushedAt` null) no longer crashes triage; its age counts from creation.
+- `eval --fake-stars` survives a deleted repo or an empty fork entry, and a label file with only one class.
+- GUI: opening a draft whose run file was deleted shows a notice and an empty form instead of an error.
 
 ## [0.1.7] - 2026-10-14
 

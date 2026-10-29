@@ -149,8 +149,8 @@ def fork_dates(name: str) -> list[datetime]:
     owner, repo = name.split("/")
     q = ("query($o:String!,$n:String!){repository(owner:$o,name:$n){forks(first:100,orderBy:{field:CREATED_AT,direction:DESC})"
          "{nodes{createdAt}}}}")
-    nodes = github.graphql(q, {"o": owner, "n": repo})["data"]["repository"]["forks"]["nodes"]
-    return [datetime.fromisoformat(n["createdAt"]) for n in nodes]
+    found = github.graphql(q, {"o": owner, "n": repo})["data"]["repository"]  # null: renamed, deleted, DMCA
+    return [datetime.fromisoformat(n["createdAt"]) for n in (found or {}).get("forks", {}).get("nodes") or [] if n]
 
 
 def burst_forks(h: History, forks: list[datetime], min_count: int = MIN_BURST) -> tuple[int, int]:
