@@ -157,10 +157,11 @@ def _from_index(index: Index, task: str, nodes: dict, n: int) -> dict[str, dict]
     wanted = [m for m in index.top(task, n) if m.lower() not in live]
     fresh = github.refresh(wanted)
     for name in wanted:
-        if name not in fresh and name not in github.last_failed:
+        if name in fresh:
+            if (new := fresh[name]["node"]["nameWithOwner"]).lower() != name.lower():
+                index.rename(name, new)
+        elif name not in github.last_failed:
             index.forget(name)  # deleted on GitHub
-        elif (new := fresh[name]["node"]["nameWithOwner"]).lower() != name.lower():
-            index.rename(name, new)
     for d in fresh.values():
         nodes.setdefault(d["node"]["nameWithOwner"], d["node"])
     return {d["node"]["nameWithOwner"]: d["details"] for d in fresh.values()}

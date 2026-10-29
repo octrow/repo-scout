@@ -133,6 +133,14 @@ def test_gone_and_renamed_index_rows(tmp_path, fake_embed, monkeypatch):
     assert "new/name" in idx.seen(["new/name"])
 
 
+def test_index_row_github_failed_to_refresh_is_kept(tmp_path, fake_embed, monkeypatch):
+    idx = Index(tmp_path / "i.db")
+    idx.upsert({**ROW, "repo": "flaky/repo"}, "match", np.array([1, 0]))
+    monkeypatch.setattr(github, "last_failed", {"flaky/repo"})
+    _pipeline(monkeypatch, idx, lambda names: {})
+    assert "flaky/repo" in {r[0] for r in idx.db.execute("SELECT name FROM repos")}
+
+
 def test_empty_readme_not_indexed(tmp_path, fake_embed, monkeypatch):
     idx = Index(tmp_path / "i.db")
     _pipeline(monkeypatch, idx, lambda names: {}, readme=None)
