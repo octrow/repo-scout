@@ -2,6 +2,7 @@
 name = "repo-scout"
 version = "0.1.7"
 description = "Find GitHub repos you can build on before writing your own: search, triage, local semantic ranking. LLM optional"
+readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
