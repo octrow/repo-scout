@@ -17,6 +17,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 - GUI: opening a draft whose run file was deleted shows a notice and an empty form instead of an error.
 - LLM draft reads a JSON reply followed by prose with braces, and reports a non-text reply as an error instead of crashing.
 - Saving settings no longer leaves an older duplicate key in `.env` that overrode the new value; the file is created readable by the owner only.
+- `eval` names the missing keys of a broken set file instead of failing with a traceback.
 
 ## [0.1.7] - 2026-10-14
 

@@ -84,6 +84,10 @@ def eval_set(path: Path, mode: str, task: str | None = None, queries: list[str] 
              snap_dir: Path | None = None, details_dir: Path | None = None) -> tuple[dict, list[dict]]:
     """Run evaluation for a set. Uses a fresh temporary Index by default to isolate from user's index."""
     spec = {**tomllib.loads(path.read_text()), **(overrides or {})}
+    if missing := [k for k in ("name", "task", "queries", "expected") if k not in spec]:
+        raise ValueError(f"{path}: missing {', '.join(missing)}")
+    if bad := [i for i, e in enumerate(spec["expected"], 1) if not {"repo", "verdict"} <= set(e)]:
+        raise ValueError(f"{path}: [[expected]] entries {bad} need both repo and verdict")
     exclude = compile_all("--exclude", spec.get("exclude", []))
     must = compile_all("--must", spec.get("must", []))
     github.configure(mode, snap_dir or path.parent / "snapshots" / spec["name"], details_dir)

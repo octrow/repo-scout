@@ -35,3 +35,16 @@ def test_eval_out_file(tmp_path, capsys):
     out = tmp_path / "rep.txt"
     evaluate.main(["--export-verdicts", "--out", str(out)])
     assert capsys.readouterr().out == "" and out.exists()
+
+
+def test_set_without_required_keys_is_a_clean_error(tmp_path):
+    import pytest
+
+    from repo_scout.evaluate import eval_set
+    bad = tmp_path / "bad.toml"
+    bad.write_text('name = "s"\ntask = "t"\nqueries = ["q"]\n[[expected]]\nrepo = "a/b"\n')
+    with pytest.raises(ValueError, match=r"entries \[1\] need both repo and verdict"):
+        eval_set(bad, "replay")
+    bad.write_text('name = "s"\n')
+    with pytest.raises(ValueError, match="missing task, queries, expected"):
+        eval_set(bad, "replay")

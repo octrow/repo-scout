@@ -155,5 +155,4 @@ Each `eval/*.toml` set runs the main flow on recorded snapshots with a fresh tem
 
 - Hand-edited run JSON with wrong-typed fields (`score: null`, `flags: null`) breaks the GUI run page;
   files the app writes are always well-typed.
-- `eval/*.toml` without `name`, `queries` or `expected` ends with a `KeyError` traceback.
 - Shared eval details are not tied to each set's snapshot date (see `PLAN.md`, Phase 9.1).
