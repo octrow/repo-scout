@@ -83,18 +83,17 @@ def filter_rows(
 ) -> list[dict]:
     """Rows matching filters; order is preserved. Text is searched in repo, desc, and lang."""
     needle = (text or "").strip().lower()
-    out = []
-    for r in rows:
-        if r.get("stop") and not show_stopped:
-            continue
-        if source != SOURCES_ALL and r.get("source") != source:
-            continue
-        if flag != FLAGS_ALL and flag not in r.get("flags", []):
-            continue
-        if needle and needle not in f"{r.get('repo', '')} {r.get('desc', '')} {r.get('lang', '')}".lower():
-            continue
-        out.append(r)
-    return out
+    return [r for r in rows if _row_matches(r, needle, source, flag, show_stopped)]
+
+
+def _row_matches(r: dict, needle: str, source: str, flag: str, show_stopped: bool) -> bool:
+    if r.get("stop") and not show_stopped:
+        return False
+    if source != SOURCES_ALL and r.get("source") != source:
+        return False
+    if flag != FLAGS_ALL and flag not in r.get("flags", []):
+        return False
+    return not needle or needle in f"{r.get('repo', '')} {r.get('desc', '')} {r.get('lang', '')}".lower()
 
 
 def flag_list(r: dict) -> list[str]:
