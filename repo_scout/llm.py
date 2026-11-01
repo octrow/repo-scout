@@ -174,25 +174,29 @@ def _snapshot_path(messages: list[dict]) -> Path | None:
     return github.snapshot_dir() / "llm" / f"{hashlib.sha256(text.encode()).hexdigest()[:16]}.json.gz"
 
 
-def _chat(messages: list[dict], pending: list | None = None) -> str:
-    """Model response text. In record mode, responses are queued in `pending` and written after validation."""
+def _reply_record(messages: list[dict], pending: list | None) -> dict:
+    """{"response", "seconds"} from the snapshot, or live; in record mode queued in `pending` or written."""
     mode, _ = github.snapshot()
     path = _snapshot_path(messages)
-    rec: dict
     if path and path.exists():
-        rec = github._read(path)
-    elif mode == "replay":
+        return github._read(path)
+    if mode == "replay":
         assert path is not None  # a snapshot mode always yields a path
         raise LLMError(f"No LLM reply snapshot {path.name}. Record it with --record")
-    else:
-        started = time.monotonic()
-        rec = {"response": _post(messages), "seconds": round(time.monotonic() - started, 2)}
-        if mode == "record":
-            assert path is not None  # a snapshot mode always yields a path
-            if pending is None:
-                github._write(path, rec)
-            else:
-                pending.append((path, rec))
+    started = time.monotonic()
+    rec = {"response": _post(messages), "seconds": round(time.monotonic() - started, 2)}
+    if mode == "record":
+        assert path is not None  # a snapshot mode always yields a path
+        if pending is None:
+            github._write(path, rec)
+        else:
+            pending.append((path, rec))
+    return rec
+
+
+def _chat(messages: list[dict], pending: list | None = None) -> str:
+    """Model response text. In record mode, responses are queued in `pending` and written after validation."""
+    rec = _reply_record(messages, pending)
     try:
         response, seconds = rec["response"], float(rec["seconds"])
         text = response["choices"][0]["message"]["content"] or ""
