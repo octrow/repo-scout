@@ -41,6 +41,8 @@ powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/oct
 
 Чтобы обновиться, запустите ту же команду ещё раз. Опции: `sh -s -- --version 0.1.0`, `--main` (текущая ветка main вместо релиза), `--no-launch`, `--uninstall` (прогоны и индекс остаются). В Windows перед запуском задайте `$env:REPO_SCOUT_VERSION`, `$env:REPO_SCOUT_MAIN=1`, `$env:REPO_SCOUT_NO_LAUNCH=1` или `$env:REPO_SCOUT_UNINSTALL=1`.
 
+На PyPI repo-scout нет. Пакет `repo-scout` там — чужой проект, и `pip install repo-scout` поставит чужой код.
+
 Если что-то не работает, запустите `repo-scout doctor`. Он проверит gh, вход в GitHub и модель и подскажет, как исправить каждую проблему.
 
 ### Или скачайте готовую сборку
