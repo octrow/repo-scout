@@ -1,5 +1,6 @@
 """Index, Verdicts, row source, and export (without model and network)."""
 
+import re
 from datetime import UTC, datetime
 
 import numpy as np
@@ -209,3 +210,65 @@ def test_rows_and_readme(tmp_path):
     assert rows[1]["key"] == "o/zed" and rows[1]["has_readme"] and not rows[0]["has_readme"]
     assert rows[1]["meta"]["stars"] == 3 and rows[1]["fetched_at"].startswith("2026-01-02")
     assert idx.readme("O/ZED") == "text" and idx.readme("a/alpha") is None
+
+
+def _refresh_with(nodes: dict):
+    return lambda names: {
+        n: {"node": nodes[n], "details": {"readme": "match", "commits": []}} for n in names if n in nodes
+    }
+
+
+@pytest.mark.usefixtures("fake_embed")
+def test_index_rows_pass_the_query_qualifiers(tmp_path, monkeypatch):
+    """Index rows skip the search query, so `pushed:` (--months) and `language:` (--lang) are applied to them."""
+    idx = Index(tmp_path / "i.db")
+    refreshed = {
+        "old/push": {**node("old/push"), "pushedAt": "2026-07-01T00:00:00Z"},
+        "rust/repo": {**node("rust/repo"), "primaryLanguage": {"name": "Rust"}},
+        "no/lang": {**node("no/lang"), "primaryLanguage": None},
+        "fits/repo": node("fits/repo"),
+    }
+    for n in refreshed:
+        idx.upsert({**ROW, "repo": n}, "match", np.array([1, 0]))
+    monkeypatch.setattr(github, "search", lambda q, n: [node("a/live")])
+    monkeypatch.setattr(github, "details", lambda names: {n: {"readme": "match", "commits": []} for n in names})
+    monkeypatch.setattr(github, "refresh", _refresh_with(refreshed))
+    rows = cli.run(["q"], months=1, new_days=60, limit=5, lang="go", now=NOW, task="t", index=idx, from_index=5)
+    stops = {r["repo"]: r["stop"] for r in rows}
+    assert stops == {
+        "a/live": None,
+        "fits/repo": None,
+        "old/push": "pushed before 2026-09-11",
+        "rust/repo": "wrong language (Rust)",
+        "no/lang": "no language",
+    }
+    assert {r[0] for r in idx.db.execute("SELECT name FROM repos")} >= set(refreshed)
+
+
+@pytest.mark.usefixtures("fake_embed")
+def test_from_index_n_does_not_count_live_repos(tmp_path, monkeypatch):
+    idx = Index(tmp_path / "i.db")
+    idx.upsert({**ROW, "repo": "a/live"}, "match", np.array([1, 0]))
+    idx.upsert({**ROW, "repo": "old/repo"}, "match", np.array([1, 0]))
+    monkeypatch.setattr(github, "search", lambda q, n: [node("a/live")])
+    monkeypatch.setattr(github, "details", lambda names: {n: {"readme": "match", "commits": []} for n in names})
+    monkeypatch.setattr(github, "refresh", _refresh_with({"old/repo": node("old/repo")}))
+    rows = cli.run(["q"], months=6, new_days=60, limit=5, lang=None, now=NOW, task="t", index=idx, from_index=1)
+    assert "old/repo" in {r["repo"] for r in rows}
+
+
+@pytest.mark.usefixtures("fake_embed")
+def test_dead_and_noise_repos_leave_the_index(tmp_path, monkeypatch):
+    """Stop rules about the repo itself (dead, toy, no code, noise) remove it; task-specific ones keep it."""
+    idx = Index(tmp_path / "i.db")
+    refreshed = {"dead/repo": {**node("dead/repo"), "pushedAt": "2025-01-01T00:00:00Z"}, "far/repo": node("far/repo")}
+    for n in refreshed:
+        idx.upsert({**ROW, "repo": n}, "match", np.array([1, 0]))
+    idx.add_verdict("dead/repo", "→ Inspect", "p", "t")
+    monkeypatch.setattr(github, "search", lambda q, n: [node("a/live")])
+    monkeypatch.setattr(github, "details", lambda names: {n: {"readme": "match", "commits": []} for n in names})
+    monkeypatch.setattr(github, "refresh", _refresh_with(refreshed))
+    cli.run(["q"], months=6, new_days=60, limit=5, lang=None, now=NOW, task="t", index=idx, exclude=[re.compile("far")])
+    names = {r[0] for r in idx.db.execute("SELECT name FROM repos")}
+    assert "dead/repo" not in names and "far/repo" in names
+    assert "dead/repo" in idx.seen(["dead/repo"])

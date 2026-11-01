@@ -44,6 +44,7 @@ MUST_STOP = "missing required"
 MUST_STOP_RU = "\u043d\u0435\u0442 \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u043e\u0433\u043e"  # stop text of older runs
 STARS_K = 10
 FROM_INDEX = 50  # number of closest repos from Index to add to pool
+REPO_STOPS = ("dead", "toy", "no code", "noise")  # stop rules about the repo itself, not the task: it leaves the Index
 last_round2_topics: list[str] = []  # round two slugs from last run(); saved to Run
 
 
@@ -196,7 +197,7 @@ def add_closeness(rows: list[dict], readmes: dict[str, str | None], task: str) -
 def _from_index(index: Index, task: str, nodes: dict, n: int) -> dict[str, dict]:
     """Top-n from Index not in live results: fresh metadata and details via a single batch request."""
     live = {k.lower() for k in nodes}
-    wanted = [m for m in index.top(task, n) if m.lower() not in live]
+    wanted = [m for m in index.top(task, n + len(live)) if m.lower() not in live][:n]
     fresh = github.refresh(wanted)
     for name in wanted:
         if name in fresh:
@@ -207,6 +208,24 @@ def _from_index(index: Index, task: str, nodes: dict, n: int) -> dict[str, dict]
     for d in fresh.values():
         nodes.setdefault(d["node"]["nameWithOwner"], d["node"])
     return {d["node"]["nameWithOwner"]: d["details"] for d in fresh.values()}
+
+
+def qualifier_stop(node: dict, since: str, lang: str | None) -> str | None:
+    """Index rows skip the search query: what its `pushed:>=since` (empty = any age) and `language:` would drop.
+    Wrong language is lang_stop's. ponytail: `mirror:false` is not checked, the node has no isMirror field
+    (adding it changes every snapshot key)."""
+    pushed = (node.get("pushedAt") or node["createdAt"])[:10]
+    if pushed < since:
+        return f"pushed before {since}"
+    if lang and not (node.get("primaryLanguage") or {}).get("name"):
+        return "no language"
+    return None
+
+
+def _prune_index(index: Index, rows: list[dict]) -> None:
+    for r in rows:
+        if (r["stop"] or "").startswith(REPO_STOPS):
+            index.forget(r["repo"])
 
 
 def apply_closeness(rows: list[dict], min_closeness: float) -> None:
@@ -236,6 +255,7 @@ def _process(
     known: dict[str, dict],
     texts: dict[str, str] | None = None,
     dead_days: int = DEAD_DAYS,
+    since: str = "",
 ) -> list[dict]:
     """Pipeline for a set of nodes: triage, noise, conditions, details, closeness, threshold, index upsert.
     `texts` collects candidate texts of rows that passed, for the optional fit column."""
@@ -243,6 +263,8 @@ def _process(
     rows = [triage(n, now, new_days, dead_days=dead_days) for n in nodes.values()]
     for r in rows:
         r["source"] = source if r["repo"] in live else "index"
+        if r["source"] == "index":
+            _stop(r, qualifier_stop(nodes[r["repo"]], since, lang))
     _screen_meta(rows, nodes, lang, exclude)
     readmes = _screen_details(rows, nodes, now, new_days, exclude, must, known, dead_days)
     if task:
@@ -340,6 +362,7 @@ def run(
         "now": now,
         "new_days": new_days,
         "dead_days": dead_days(months),
+        "since": since if months else "",
         "lang": lang,
         "exclude": list(exclude),
         "must": list(must),
@@ -352,6 +375,7 @@ def run(
     if task and round2:
         rows += _run_round2(rows, queries, nodes, kw, k=round2_k, months=months, since=since, limit=limit)
     if index:
+        _prune_index(index, rows)
         _mark_seen(rows, index)
     rows.sort(key=sort_key)
     add_stars_flag(rows, stars_k, now)

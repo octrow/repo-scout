@@ -68,15 +68,16 @@ Results are merged into the Pool by `owner/name`.
 
 ### 3. Pull nearest repos from the Index
 
-Module: repo_scout/cli.py::_from_index, repo_scout/index.py::Index.top, repo_scout/github.py::refresh
+Module: repo_scout/cli.py::_from_index, repo_scout/index.py::Index.top, repo_scout/github.py::refresh, repo_scout/cli.py::qualifier_stop
 
 Splits on: no Index (record/replay), no task, or `--from-index 0` → step skipped.
-Takes top-N by Closeness (no floor), then removes the ones already in live results, so fewer than N join.
+Takes the N closest repos (no floor) that are not already in live results.
 They are re-fetched in sequential chunks of 10 (metadata + README + commits); rows get source `index`.
 Gone on GitHub (`NOT_FOUND`) → removed from the Index. Renamed → renamed in the Index. Failed for any other
 reason (`github.last_failed`) → kept in the Index, left out of this run.
-Index rows never pass the query qualifiers (`pushed:`, `mirror:false`, `language:`) (#5), and rows dropped
-later stay in the Index (#6).
+Index rows skip the search query, so after triage (step 4) they get its qualifiers as stop rules: pushed
+before `now − months` → `pushed before <date>`, `--lang` with no language → `no language`. `mirror:false`
+is not checked (no `isMirror` field).
 
 ### 4. Triage on metadata
 
@@ -151,7 +152,7 @@ separately and never in the table. After printing, the run, dropped rows include
 |---|---|---|
 | Log file, pruned to 1 GiB (`REPO_SCOUT_LOG`) | every search | — |
 | Index DB created; re-embeds all rows if the stored model differs (`REPO_SCOUT_INDEX`) | opened on start | record/replay |
-| Index rename / forget (step 3), upsert (step 7) | every run with an Index | record/replay; **not** `--no-save` |
+| Index rename / forget (step 3), upsert (step 7); forget of rows dropped as `dead`, `toy`, `no code`, noise (verdicts stay) | every run with an Index | record/replay; **not** `--no-save` |
 | Run JSON (step 10) | every run | `--no-save`, record, replay |
 | GitHub snapshots incl. `stars/`; existing ones are reused, `meta.json` keeps the first date (#14) | `--record` | — |
 | fastembed model (`~/.cache/repo-scout/fastembed` or `FASTEMBED_CACHE_PATH`) | first run | — |
@@ -217,7 +218,6 @@ Other modes: `--record`, `--fake-stars`, `--llm-draft`, `--index-check` (two run
 ## Known gaps
 
 Open HIGH and MEDIUM findings; details in `PLAN.md` → "Logic map findings".
-- Index rows skip `pushed:`, `mirror:false`, `language:` (#5) and are never pruned (#6).
 - `--exclude` / `--must` match the owner login: `--exclude bot` drops `botpress/…` (#7).
 - Rows without a README (or with an unlisted README name) skip `--must` (#8).
 - A rate limit during details keeps every row unscreened as `no details` (#9).
