@@ -218,11 +218,15 @@ def _json_object(text: str) -> dict:
     raise ValueError("response does not contain a JSON object")
 
 
-def _strings(data: dict, key: str, limit: int, chars: int) -> tuple[str, ...]:
+def _string_list(data: dict, key: str) -> list[str]:
     value = data.get(key) or []
     if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
         raise ValueError(f"field {key} must be a list of strings")
-    items = tuple(dict.fromkeys(v.strip() for v in value if v.strip()))
+    return value
+
+
+def _strings(data: dict, key: str, limit: int, chars: int) -> tuple[str, ...]:
+    items = tuple(dict.fromkeys(v.strip() for v in _string_list(data, key) if v.strip()))
     if len(items) > limit:
         raise ValueError(f"field {key}: {len(items)} items, maximum {limit}")
     if long := next((v for v in items if len(v) > chars), None):
