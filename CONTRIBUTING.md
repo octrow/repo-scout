@@ -19,6 +19,7 @@ uv run repo-scout                # opens the GUI
 
 ```bash
 uv run ruff check .
+uv run ruff format --check .
 uv run pytest -q
 ```
 
