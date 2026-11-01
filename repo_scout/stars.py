@@ -9,6 +9,7 @@ import json
 import subprocess
 import time
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 from statistics import median
 from typing import NamedTuple
 
@@ -100,14 +101,20 @@ def history(name: str, now: datetime) -> History | None:
     elif github._mode == "replay":
         raise GitHubError(f"missing star history snapshot for {name} (--record)")
     else:
-        log.info("star history: %s", name)
-        found = _weeks(name)
-        snap = {"weeks": found[0], "complete": found[1]} if found else None
-        if snap is None:
-            log.warning("warning: star history for %s unavailable (404/422)", name)
-        if path and github._mode == "record":
-            github._write(path, snap)
+        snap = _fetch(name, path)
     return _daily(snap["weeks"], now, snap["complete"]) if snap and snap["weeks"] else None
+
+
+def _fetch(name: str, path: Path | None) -> dict | None:
+    """Live history snapshot ({weeks, complete} or None on 404/422); written to path when recording."""
+    log.info("star history: %s", name)
+    found = _weeks(name)
+    snap = {"weeks": found[0], "complete": found[1]} if found else None
+    if snap is None:
+        log.warning("warning: star history for %s unavailable (404/422)", name)
+    if path and github._mode == "record":
+        github._write(path, snap)
+    return snap
 
 
 def bursts(counts: list[int], min_count: int = MIN_BURST, complete: bool = True) -> list[bool]:
