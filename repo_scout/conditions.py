@@ -5,8 +5,41 @@ import re
 MATCH_SHOWN = 40
 
 
+# GitHub search takes linguist aliases (`language:cpp`) but reports the display name ("C++").
+# ponytail: common aliases only; another alias still drops every row. Upgrade: linguist's languages.yml.
+LANG_ALIASES = {
+    "cpp": "c++",
+    "golang": "go",
+    "csharp": "c#",
+    "cake": "c#",
+    "js": "javascript",
+    "node": "javascript",
+    "ts": "typescript",
+    "python3": "python",
+    "rb": "ruby",
+    "rs": "rust",
+    "sh": "shell",
+    "bash": "shell",
+    "zsh": "shell",
+    "objc": "objective-c",
+    "obj-c": "objective-c",
+    "objectivec": "objective-c",
+    "fsharp": "f#",
+    "elisp": "emacs lisp",
+    "vim": "vim script",
+    "viml": "vim script",
+    "vimscript": "vim script",
+    "pwsh": "powershell",
+    "posh": "powershell",
+}
+
+
+def _canonical_lang(name: str) -> str:
+    return LANG_ALIASES.get(name.lower(), name.lower())
+
+
 def lang_stop(row: dict, lang: str | None) -> str | None:
-    if lang and row["lang"] and row["lang"].lower() != lang.lower():
+    if lang and row["lang"] and _canonical_lang(row["lang"]) != _canonical_lang(lang):
         return f"wrong language ({row['lang']})"
     return None
 

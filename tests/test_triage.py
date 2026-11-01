@@ -3,7 +3,7 @@
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from repo_scout.triage import triage
+from repo_scout.triage import dead_days, triage
 
 NOW = datetime(2026, 10, 11, tzinfo=UTC)
 
@@ -101,3 +101,11 @@ def test_full_row_shape():
         "flags": [],
         "stop": None,
     }
+
+
+def test_dead_limit_follows_months_above_six():
+    old = repo(pushed=300, commits=1_000)
+    assert triage(old, NOW, 60)["stop"] == "dead (300d)"
+    assert triage(old, NOW, 60, dead_days=dead_days(24))["stop"] is None
+    assert triage(repo(pushed=500, commits=1_000), NOW, 60, dead_days=dead_days(0))["stop"] is None
+    assert dead_days(3) == dead_days(6) == 180

@@ -83,7 +83,8 @@ later stay in the Index (#6).
 Module: repo_scout/triage.py::triage
 
 Stop rules, first match wins: `dead` (no push for 180 days, or 120 with under 500 commits), `toy` (under
-50 commits and 0★), `no code` (0 commits, so only with stars). The `dead` limits ignore `--months` (#4).
+50 commits and 0★), `no code` (0 commits, so only with stars). Above `--months 6` the `dead` limits grow to 30 × months
+(and 2/3 of that); `--months 0` turns `dead` off.
 Flags: fork, `stars≫commits` (1000★+ and over 20× commits), archived, new (`--new-days`).
 Score = freshness + popularity points. A repo with `pushedAt` null ages from `createdAt`.
 
@@ -92,8 +93,8 @@ Score = freshness + popularity points. A repo with `pushedAt` null ages from `cr
 Module: repo_scout/cli.py::_screen_meta, repo_scout/noise.py::noise_stop, repo_scout/conditions.py::lang_stop
 
 Only rows not yet dropped. Template → flag. Noise needs 2+ independent signals of one kind to drop.
-`--lang` compares `primaryLanguage` case-insensitively and exactly; an empty language passes, an alias
-like `cpp` does not match `C++` (#3). `--exclude` checks `owner/name`, description and topics (#7).
+`--lang` compares `primaryLanguage` case-insensitively after mapping common GitHub aliases (`cpp` → `C++`,
+`golang` → `Go`); an empty language passes, an alias not in the list drops every row. `--exclude` checks `owner/name`, description and topics (#7).
 
 ### 6. Details: README and the last 20 commits
 
@@ -216,8 +217,6 @@ Other modes: `--record`, `--fake-stars`, `--llm-draft`, `--index-check` (two run
 ## Known gaps
 
 Open HIGH and MEDIUM findings; details in `PLAN.md` → "Logic map findings".
-- `--lang cpp` / `golang` may drop every result: exact match against GitHub's display name (#3).
-- `--months` above 6 or `0` cannot keep anything older than the `dead` limit (#4).
 - Index rows skip `pushed:`, `mirror:false`, `language:` (#5) and are never pruned (#6).
 - `--exclude` / `--must` match the owner login: `--exclude bot` drops `botpress/…` (#7).
 - Rows without a README (or with an unlisted README name) skip `--must` (#8).

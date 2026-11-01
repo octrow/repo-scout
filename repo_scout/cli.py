@@ -34,7 +34,7 @@ from repo_scout.index import Index, default_path, validate_verdict
 from repo_scout.log import log
 from repo_scout.noise import is_template, noise_stop
 from repo_scout.round2 import ROUND2_K, pick_topics
-from repo_scout.triage import triage, verdict
+from repo_scout.triage import DEAD_DAYS, dead_days, triage, verdict
 
 MAX_TEXT_CHARS, MAX_OPERATORS = 256, 5
 TOKEN = re.compile(r'-?[\w-]+:"[^"]*"|"[^"]*"|\S+')
@@ -139,6 +139,7 @@ def _screen_details(
     exclude: list[re.Pattern],
     must: list[re.Pattern],
     known: dict[str, dict],
+    dead_days: int = DEAD_DAYS,
 ) -> dict[str, str | None]:
     """README and commits for survivors: freshness recheck, forbidden and required words. Returns READMEs."""
     readmes: dict[str, str | None] = {}
@@ -151,19 +152,21 @@ def _screen_details(
         if d is None:
             row["flags"].append("no details")
             continue
-        _recheck_fresh(row, nodes[row["repo"]], d["commits"], now, new_days)
+        _recheck_fresh(row, nodes[row["repo"]], d["commits"], now, new_days, dead_days)
         readmes[row["repo"]] = d["readme"]
         _screen_readme(row, d["readme"], exclude, must)
     return readmes
 
 
-def _recheck_fresh(row: dict, node: dict, commits: list[dict], now: datetime, new_days: int) -> None:
+def _recheck_fresh(
+    row: dict, node: dict, commits: list[dict], now: datetime, new_days: int, dead_days: int = DEAD_DAYS
+) -> None:
     """Re-triage by the last substantive commit; flag a repo whose recent commits are cosmetic only."""
     found = last_substantive(commits, now)
     if not found:
         return
     date, cosmetic_only = found
-    new = triage(node, now, new_days, last_push=date)
+    new = triage(node, now, new_days, last_push=date, dead_days=dead_days)
     row.update({k: new[k] for k in ("pushed_days", "fresh", "score", "stop")})
     if cosmetic_only:
         row["flags"].append("cosmetic only")
@@ -232,15 +235,16 @@ def _process(
     index: Index | None,
     known: dict[str, dict],
     texts: dict[str, str] | None = None,
+    dead_days: int = DEAD_DAYS,
 ) -> list[dict]:
     """Pipeline for a set of nodes: triage, noise, conditions, details, closeness, threshold, index upsert.
     `texts` collects candidate texts of rows that passed, for the optional fit column."""
     log.info("pipeline (%s): %d candidates", source, len(nodes))
-    rows = [triage(n, now, new_days) for n in nodes.values()]
+    rows = [triage(n, now, new_days, dead_days=dead_days) for n in nodes.values()]
     for r in rows:
         r["source"] = source if r["repo"] in live else "index"
     _screen_meta(rows, nodes, lang, exclude)
-    readmes = _screen_details(rows, nodes, now, new_days, exclude, must, known)
+    readmes = _screen_details(rows, nodes, now, new_days, exclude, must, known, dead_days)
     if task:
         _closeness_step(rows, readmes, task, now=now, min_closeness=min_closeness, index=index, texts=texts)
     return rows
@@ -335,6 +339,7 @@ def run(
     kw = {
         "now": now,
         "new_days": new_days,
+        "dead_days": dead_days(months),
         "lang": lang,
         "exclude": list(exclude),
         "must": list(must),
@@ -492,7 +497,12 @@ def _parser() -> _Parser:
         metavar="FLOAT",
         help="rows below this closeness are dropped as 'off-topic' (default %(default)s)",
     )
-    ap.add_argument("--months", type=int, default=6, help="only repos pushed to within N months (0 = any)")
+    ap.add_argument(
+        "--months",
+        type=int,
+        default=6,
+        help="only repos pushed to within N months (0 = any); above 6 the dead rule allows the same age, 0 turns it off",
+    )
     ap.add_argument("--new-days", type=int, default=60, help="flag repos younger than N days as 'new'")
     ap.add_argument("--limit", type=int, default=50, help="results per query (max 100)")
     ap.add_argument("--lang", help="add language:<X> to each query")

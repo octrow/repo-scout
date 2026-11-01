@@ -16,6 +16,14 @@ def test_lang():
     assert lang_stop({"lang": "Rust"}, "go") == "wrong language (Rust)"
 
 
+def test_lang_stop_accepts_github_aliases():
+    """GitHub search takes `language:cpp` and returns repos whose primaryLanguage is "C++"."""
+    assert lang_stop({"lang": "C++"}, "cpp") is None
+    assert lang_stop({"lang": "Go"}, "golang") is None
+    assert lang_stop({"lang": "C#"}, "csharp") is None
+    assert lang_stop({"lang": "Rust"}, "cpp") == "wrong language (Rust)"
+
+
 def test_exclude_and_must():
     assert exclude_stop("a WordPress plugin", compile_all("--exclude", ["wordpress"])) == "forbidden: WordPress"
     assert exclude_stop("clean", compile_all("--exclude", ["wordpress"])) is None
