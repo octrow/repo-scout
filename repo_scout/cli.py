@@ -147,19 +147,31 @@ def _screen_details(
         if d is None:
             row["flags"].append("no details")
             continue
-        if found := last_substantive(d["commits"], now):
-            date, cosmetic_only = found
-            new = triage(nodes[row["repo"]], now, new_days, last_push=date)
-            row.update({k: new[k] for k in ("pushed_days", "fresh", "score", "stop")})
-            if cosmetic_only:
-                row["flags"].append("cosmetic only")
-        readme = readmes[row["repo"]] = d["readme"]
-        if readme is None:
-            row["flags"].append("no README")
-        _stop(row, exclude_stop(readme or "", exclude))
-        if readme is not None:
-            _stop(row, must_stop(" ".join([readme, meta_text(row)]), must))
+        _recheck_fresh(row, nodes[row["repo"]], d["commits"], now, new_days)
+        readmes[row["repo"]] = d["readme"]
+        _screen_readme(row, d["readme"], exclude, must)
     return readmes
+
+
+def _recheck_fresh(row: dict, node: dict, commits: list[dict], now: datetime, new_days: int) -> None:
+    """Re-triage by the last substantive commit; flag a repo whose recent commits are cosmetic only."""
+    found = last_substantive(commits, now)
+    if not found:
+        return
+    date, cosmetic_only = found
+    new = triage(node, now, new_days, last_push=date)
+    row.update({k: new[k] for k in ("pushed_days", "fresh", "score", "stop")})
+    if cosmetic_only:
+        row["flags"].append("cosmetic only")
+
+
+def _screen_readme(row: dict, readme: str | None, exclude: list[re.Pattern], must: list[re.Pattern]) -> None:
+    """Forbidden words in the README; required words in README plus metadata (skipped without a README)."""
+    if readme is None:
+        row["flags"].append("no README")
+    _stop(row, exclude_stop(readme or "", exclude))
+    if readme is not None:
+        _stop(row, must_stop(" ".join([readme, meta_text(row)]), must))
 
 
 def add_closeness(rows: list[dict], readmes: dict[str, str | None], task: str) -> dict[str, np.ndarray]:
