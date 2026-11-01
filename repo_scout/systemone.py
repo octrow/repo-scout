@@ -73,15 +73,25 @@ def fit(task: str, texts: dict[str, str]) -> dict[str, float]:
 
 def add_fit(rows: list[dict], task: str | None, texts: dict[str, str], k: int) -> None:
     """'fit' for the top-k kept rows; any failure is a warning, the search result stays as it is."""
-    top = [r for r in rows if not r["stop"] and r["repo"] in texts][:k]
+    top = _top(rows, texts, k)
     if not (task and top and available()):
         return
     log.info("fit: asking %s about %d candidates", model(), len(top))
-    try:
-        scores = fit(task, {r["repo"]: texts[r["repo"]] for r in top})
-    except SystemOneError as e:
-        log.warning("warning: fit column skipped, %s", e)
-        return
+    scores = _scores(task, {r["repo"]: texts[r["repo"]] for r in top})
     for r in top:
         if r["repo"] in scores:
             r["fit"] = round(scores[r["repo"]], 2)
+
+
+def _top(rows: list[dict], texts: dict[str, str], k: int) -> list[dict]:
+    """First k kept rows that have a text to judge."""
+    return [r for r in rows if not r["stop"] and r["repo"] in texts][:k]
+
+
+def _scores(task: str, texts: dict[str, str]) -> dict[str, float]:
+    """fit() with a failure turned into a warning and no scores."""
+    try:
+        return fit(task, texts)
+    except SystemOneError as e:
+        log.warning("warning: fit column skipped, %s", e)
+        return {}
