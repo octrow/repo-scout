@@ -1,2 +1,6 @@
 exempt:
   complexity_cyclomatic: "radon counts each assert as a branch, so three long tests read cc 11-14 with no branching; project code is gated by ruff C90 (max-complexity 10) in CI"
+  package_name_taken: "not published to PyPI; install.sh/install.ps1 and release builds install from GitHub releases, README says the PyPI repo-scout is another project"
+  language_mirrors: "AGENTS.md, CLAUDE.md and docs/logic-map.md are read by coding agents, THIRD_PARTY_NOTICES.md is license text; all user-facing prose has a .ru.md mirror"
+  private_paths_in_history: "only ~/dev/<pet-project> paths in old commits, HEAD is clean; repo is already public and rewriting history would break forks"
+  big_files_tracked: "assets/readme/demo.gif is the README demo; /assets is excluded from the sdist and wheel, so only clones carry it"
