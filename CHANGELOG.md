@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-11-01
+
 ### Fixed
 - `--exclude` and `--must` match the repo name without the owner login: `--exclude bot` no longer drops `botpress/agent-kit`.
 - `--must` checks repos without a README against name, description and topics, as its help says; before, they skipped the check and stayed. `README.markdown`, `README.txt` and `README.org` count as a README.
@@ -94,7 +96,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 ## [0.1.0] - 2026-10-12
 First public release.
 
-[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.9...HEAD
+[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.10...HEAD
+[0.1.10]: https://github.com/octrow/repo-scout/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/octrow/repo-scout/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/octrow/repo-scout/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/octrow/repo-scout/compare/v0.1.6...v0.1.7

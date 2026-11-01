@@ -6,6 +6,8 @@
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-11-01
+
 ### Исправлено
 - `--exclude` и `--must` сравниваются с именем репо без логина владельца: `--exclude bot` больше не отсеивает `botpress/agent-kit`.
 - `--must` проверяет репо без README по имени, описанию и темам, как обещает справка; раньше они пропускали проверку и оставались. `README.markdown`, `README.txt` и `README.org` теперь считаются README.
@@ -94,7 +96,8 @@
 ## [0.1.0] - 2026-10-12
 Первый публичный релиз.
 
-[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.9...HEAD
+[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.10...HEAD
+[0.1.10]: https://github.com/octrow/repo-scout/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/octrow/repo-scout/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/octrow/repo-scout/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/octrow/repo-scout/compare/v0.1.6...v0.1.7
