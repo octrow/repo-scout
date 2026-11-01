@@ -46,6 +46,32 @@ def test_k_limits_rows(posted):
     assert set(posted[0]["questions"]) == {"r0"}
 
 
+@pytest.mark.parametrize("task", [None, ""])
+def test_without_task_nothing_is_sent(posted, task):
+    rows = _rows("a/a")
+    systemone.add_fit(rows, task, {"a/a": "A"}, 20)
+    assert posted == [] and "fit" not in rows[0]
+
+
+def test_without_kept_rows_with_text_nothing_is_sent(posted):
+    rows = _rows("a/a", stop="dead") + _rows("b/b")
+    systemone.add_fit(rows, "t", {"a/a": "A"}, 20)
+    assert posted == [] and rows == _rows("a/a", stop="dead") + _rows("b/b")
+
+
+def test_rows_without_text_do_not_count_toward_k_and_order_stays(monkeypatch):
+    monkeypatch.setenv("TYPESAFE_API_KEY", "k")
+    sent = []
+    monkeypatch.setattr(
+        systemone, "_post", lambda body: sent.append(body) or {"answers": {"r0": {"noul": 0.123456}, "r1": {"noul": 1}}}
+    )
+    rows = _rows("a/a", "b/b", "c/c", "d/d")
+    systemone.add_fit(rows, "t", {"b/b": "B", "c/c": "C", "d/d": "D"}, 2)
+    assert [q["instructions"]["repo"] for q in sent[0]["questions"].values()] == ["B", "C"]
+    assert [r.get("fit") for r in rows] == [None, 0.12, 1.0, None]
+    assert [r["repo"] for r in rows] == ["a/a", "b/b", "c/c", "d/d"]
+
+
 def test_failure_is_a_warning(monkeypatch, caplog):
     monkeypatch.setenv("TYPESAFE_API_KEY", "k")
 
