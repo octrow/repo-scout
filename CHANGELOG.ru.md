@@ -6,6 +6,8 @@
 
 ## [Unreleased]
 
+## [0.1.12] - 2026-11-01
+
 ### Исправлено
 - `--lang "Jupyter Notebook"` и другие языки из нескольких слов берутся в кавычки в запросе.
 - Отрицательные `--months`, `--new-days`, `--limit`, `--from-index`, `--round2-k` и `--stars-k` отклоняются; раньше `--stars-k -1` проверял все строки, кроме последней. Числовые поля GUI не опускаются ниже 0.
@@ -110,7 +112,8 @@
 ## [0.1.0] - 2026-10-12
 Первый публичный релиз.
 
-[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.11...HEAD
+[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.12...HEAD
+[0.1.12]: https://github.com/octrow/repo-scout/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/octrow/repo-scout/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/octrow/repo-scout/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/octrow/repo-scout/compare/v0.1.8...v0.1.9

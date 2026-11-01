@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 
 ## [Unreleased]
 
+## [0.1.12] - 2026-11-01
+
 ### Fixed
 - `--lang "Jupyter Notebook"` and other multi-word languages are quoted in the query.
 - Negative `--months`, `--new-days`, `--limit`, `--from-index`, `--round2-k` and `--stars-k` are rejected; before, `--stars-k -1` checked every row but the last. The GUI number fields stop at 0.
@@ -110,7 +112,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 ## [0.1.0] - 2026-10-12
 First public release.
 
-[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.11...HEAD
+[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.12...HEAD
+[0.1.12]: https://github.com/octrow/repo-scout/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/octrow/repo-scout/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/octrow/repo-scout/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/octrow/repo-scout/compare/v0.1.8...v0.1.9
