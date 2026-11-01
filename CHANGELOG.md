@@ -6,9 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-11-01
+
 ### Security
 - The GUI answers only `127.0.0.1` and `localhost` Host names, so a web page that rebinds its DNS name to 127.0.0.1 can no longer drive it.
 - The Fit column's request to TypeSafe no longer follows redirects, so the API key cannot be resent to another host.
+
+### Changed
+- CI and pre-commit also check ruff formatting, a complexity limit (10) and types with ty; long functions are split into small helpers, with tests pinning the behaviour first.
 
 ## [0.1.8] - 2026-10-30
 
@@ -79,7 +84,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 ## [0.1.0] - 2026-10-12
 First public release.
 
-[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.9...HEAD
+[0.1.9]: https://github.com/octrow/repo-scout/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/octrow/repo-scout/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/octrow/repo-scout/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/octrow/repo-scout/compare/v0.1.5...v0.1.6

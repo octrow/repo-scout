@@ -6,9 +6,14 @@
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-11-01
+
 ### Безопасность
 - GUI отвечает только на имена хоста `127.0.0.1` и `localhost`: страница, которая перенаправила своё DNS-имя на 127.0.0.1, больше не может им управлять.
 - Запрос колонки «Пригодность» (fit) к TypeSafe не идёт по редиректам, поэтому ключ API не уйдёт на другой хост.
+
+### Изменено
+- CI и pre-commit теперь проверяют форматирование ruff, предел сложности (10) и типы через ty; длинные функции разбиты на небольшие помощники, поведение перед этим закреплено тестами.
 
 ## [0.1.8] - 2026-10-30
 
@@ -79,7 +84,8 @@
 ## [0.1.0] - 2026-10-12
 Первый публичный релиз.
 
-[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.9...HEAD
+[0.1.9]: https://github.com/octrow/repo-scout/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/octrow/repo-scout/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/octrow/repo-scout/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/octrow/repo-scout/compare/v0.1.5...v0.1.6
