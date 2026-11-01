@@ -185,6 +185,10 @@ def eval_set(
     return spec, rows
 
 
+LIVE_SOURCES = ("query", "\u0437\u0430\u043f\u0440\u043e\u0441")
+INDEX_SOURCES = ("index", "\u0438\u043d\u0434\u0435\u043a\u0441")
+
+
 def index_check(path: Path, mode: str, from_index: int = FROM_INDEX) -> str:
     """Phase 5 criterion: alternative wording and fewer queries retrieve repos from Index not in live results."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -195,18 +199,27 @@ def index_check(path: Path, mode: str, from_index: int = FROM_INDEX) -> str:
             return ""
         _, rows = eval_set(path, mode, spec["alt_task"], spec["queries"][:2], idx, from_index, round2=False)
         idx.db.close()
-    pos = {e["repo"].lower() for e in spec["expected"] if e["verdict"].startswith(("→", "->"))}
-    live = [r for r in rows if r["source"] in ("query", "\u0437\u0430\u043f\u0440\u043e\u0441")]
-    from_idx = [r for r in rows if r["source"] in ("index", "\u0438\u043d\u0434\u0435\u043a\u0441")]
+    return _index_check_text(spec, first, rows)
 
-    def hit(rs):
-        return sorted(r["repo"] for r in rs if r["repo"].lower() in pos and not r["stop"])
 
+def _passed(rows: list[dict]) -> int:
+    return sum(not r["stop"] for r in rows)
+
+
+def _hits(rows: list[dict], pos: set[str]) -> list[str] | str:
+    """Positives among rows that passed the stop rules, or a dash when there are none."""
+    return sorted(r["repo"] for r in rows if r["repo"].lower() in pos and not r["stop"]) or "—"
+
+
+def _index_check_text(spec: dict, first: list[dict], rows: list[dict]) -> str:
+    pos = {p.lower() for p in _repos_with(spec, POSITIVE)}
+    live = [r for r in rows if r["source"] in LIVE_SOURCES]
+    from_idx = [r for r in rows if r["source"] in INDEX_SOURCES]
     return (
-        f"{spec['name']}: Index after first run {sum(not r['stop'] for r in first)} rows; second run "
+        f"{spec['name']}: Index after first run {_passed(first)} rows; second run "
         f"(2 queries, alternative task): live search {len(live)}, from Index {len(from_idx)} "
-        f"(passed stop rules {sum(not r['stop'] for r in from_idx)}); positives in live {hit(live) or '—'}, "
-        f"positives from Index {hit(from_idx) or '—'} of {len(pos)}"
+        f"(passed stop rules {_passed(from_idx)}); positives in live {_hits(live, pos)}, "
+        f"positives from Index {_hits(from_idx, pos)} of {len(pos)}"
     )
 
 
