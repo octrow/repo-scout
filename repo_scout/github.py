@@ -51,13 +51,35 @@ def _parse(stdout: str) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
-def _attempt(query: str, variables: dict) -> tuple[dict | None, str | None]:
-    """Single gh invocation: (data, None) on success, (None, reason) on retryable error, else raises GitHubError."""
+def _gh_command(query: str, variables: dict) -> list[str]:
     cmd = ["gh", "api", "graphql", "-f", f"query={query}"]
     for k, v in variables.items():
         cmd += ["-F" if isinstance(v, int) else "-f", f"{k}={v}"]
-    out = subprocess.run(cmd, check=False, capture_output=True, text=True)
+    return cmd
+
+
+def _failed_gh(out: subprocess.CompletedProcess) -> tuple[None, str]:
+    """gh exited non-zero: (None, stderr) when transient (rate limit, 5xx), else raises GitHubError."""
     err = out.stderr.strip()
+    if "429" in err or "rate limit" in err.lower() or any(f"HTTP {c}" in err for c in TRANSIENT):
+        return None, err
+    raise GitHubError(f"gh failed: {err or out.stdout.strip()}")
+
+
+def _checked_body(data: dict | None, errors: list) -> tuple[dict | None, str | None]:
+    """gh exited 0: retry on a body without JSON or data, raise on GraphQL errors."""
+    if data is None:
+        return None, "response without JSON"
+    if data.get("data") is None and not errors:
+        return None, "response without data"
+    if errors:
+        raise GitHubError(f"GraphQL: {errors[0].get('message', errors)}")
+    return data, None
+
+
+def _attempt(query: str, variables: dict) -> tuple[dict | None, str | None]:
+    """Single gh invocation: (data, None) on success, (None, reason) on retryable error, else raises GitHubError."""
+    out = subprocess.run(_gh_command(query, variables), check=False, capture_output=True, text=True)
     data = _parse(out.stdout)
     errors = (data or {}).get("errors") or []
     if any(e.get("type") == "RATE_LIMITED" for e in errors):
@@ -67,16 +89,8 @@ def _attempt(query: str, variables: dict) -> tuple[dict | None, str | None]:
         log.warning("GraphQL warning: %s", msgs)
         return data, None
     if out.returncode:
-        if "429" in err or "rate limit" in err.lower() or any(f"HTTP {c}" in err for c in TRANSIENT):
-            return None, err
-        raise GitHubError(f"gh failed: {err or out.stdout.strip()}")
-    if data is None:
-        return None, "response without JSON"
-    if data.get("data") is None and not errors:
-        return None, "response without data"
-    if errors:
-        raise GitHubError(f"GraphQL: {errors[0].get('message', errors)}")
-    return data, None
+        return _failed_gh(out)
+    return _checked_body(data, errors)
 
 
 def configure(mode: str | None, directory: Path | str | None, details_dir: Path | str | None = None) -> None:
