@@ -54,30 +54,45 @@ def pick(pool: list[str], want: int, taken: set[str]) -> list[str]:
     return got
 
 
-def main() -> None:
-    pos = pick(positives(), WANT, set())
-    rows = [(n, 1, "starscout") for n in pos]
-    toml = [
+def study_repos() -> list[tuple[str, str]]:
+    """(repo, eval file name) for every '→ Study' entry in eval/*.toml (legacy Russian wording too)."""
+    return [
         (e["repo"], t.name)
         for t in sorted((ROOT / "eval").glob("*.toml"))
         for e in tomllib.loads(t.read_text())["expected"]
         if (e["verdict"].startswith("→ Study") or e["verdict"].startswith("→ \u0420\u0430\u0437\u0431\u043e\u0440"))
         and NAME.fullmatch(e["repo"])
     ]
+
+
+def eval_negatives(toml: list[tuple[str, str]]) -> tuple[list[tuple[str, int, str]], set[str]]:
+    """Label-0 rows for live eval repos with enough stars, first occurrence only; and their lower-case names."""
     alive = {}
     for i in range(0, len(toml), CHUNK):
         alive |= stars_of([n for n, _ in toml[i : i + CHUNK]])
-    seen = set()
+    rows, seen = [], set()
     for n, t in toml:
         if alive.get(n, 0) >= MIN_STARS and n.lower() not in seen:
             seen.add(n.lower())
             rows.append((n, 0, f"eval/{t}"))
-    sample = [r["repo"] for r in csv.DictReader(open(DATA / "sample_repo_ids.csv")) if NAME.fullmatch(r["repo"])]
-    rows += [(n, 0, "starscout-sample") for n in pick(sample, WANT - len(seen), seen | {p.lower() for p in pos})]
+    return rows, seen
+
+
+def write_labels(rows: list[tuple[str, int, str]]) -> None:
     with open(Path(__file__).parent / "labels.csv", "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["repo", "label", "source"])
         w.writerows(rows)
+
+
+def main() -> None:
+    pos = pick(positives(), WANT, set())
+    rows = [(n, 1, "starscout") for n in pos]
+    negatives, seen = eval_negatives(study_repos())
+    rows += negatives
+    sample = [r["repo"] for r in csv.DictReader(open(DATA / "sample_repo_ids.csv")) if NAME.fullmatch(r["repo"])]
+    rows += [(n, 0, "starscout-sample") for n in pick(sample, WANT - len(seen), seen | {p.lower() for p in pos})]
+    write_labels(rows)
     print(len(pos), "positives;", len(rows) - len(pos), "negatives")
 
 
