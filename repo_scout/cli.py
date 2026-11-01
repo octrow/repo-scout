@@ -7,11 +7,14 @@ Other commands: repo-scout gui | doctor | config | draft | verdict | eval
 """
 
 import argparse
+import io
 import json
 import re
 import sys
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 
@@ -309,8 +312,8 @@ def run(
     limit: int,
     lang: str | None,
     now: datetime,
-    exclude: list[re.Pattern] = (),
-    must: list[re.Pattern] = (),
+    exclude: Sequence[re.Pattern] = (),
+    must: Sequence[re.Pattern] = (),
     task: str | None = None,
     min_closeness: float = semantic.MIN_CLOSENESS,
     index: Index | None = None,
@@ -325,6 +328,7 @@ def run(
     last_round2_topics = []
     since = (now - timedelta(days=30 * months)).date().isoformat()
     nodes: dict = {}
+    texts: dict[str, str] = {}
     _search_all(queries, months=months, since=since, lang=lang, limit=limit, into=nodes)
     live = set(nodes)
     known = _from_index(index, task, nodes, from_index) if index and task and from_index else {}
@@ -337,7 +341,7 @@ def run(
         "task": task,
         "min_closeness": min_closeness,
         "index": index,
-        "texts": {} if fit_k else None,
+        "texts": texts if fit_k else None,
     }
     rows = _process(nodes, live, "query", known=known, **kw)
     if task and round2:
@@ -347,7 +351,7 @@ def run(
     rows.sort(key=sort_key)
     add_stars_flag(rows, stars_k, now)
     if fit_k:
-        systemone.add_fit(rows, task, kw["texts"], fit_k)
+        systemone.add_fit(rows, task, texts, fit_k)
     return rows
 
 
@@ -437,7 +441,7 @@ def draft_main(argv: list[str]) -> None:
 @logmod.logged_exit
 def main() -> None:
     for stream in (sys.stdout, sys.stderr):  # ★/✓/→ on a legacy Windows code page (redirected output) must not crash
-        stream.reconfigure(errors="replace")
+        cast(io.TextIOWrapper, stream).reconfigure(errors="replace")  # typeshed: TextIO has no reconfigure
     if sys.argv[1:2] == ["eval"]:
         from repo_scout import evaluate
 
@@ -472,7 +476,7 @@ class _Parser(argparse.ArgumentParser):
         super().error(message)
 
 
-def _parser() -> argparse.ArgumentParser:
+def _parser() -> _Parser:
     ap = _Parser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("queries", nargs="+")
     ap.add_argument(
