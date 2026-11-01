@@ -1,6 +1,7 @@
 """Index page (`/index`): Index repositories, Verdicts, renaming, and 'forget'."""
 
 import re
+from typing import Any
 
 from nicegui import ui
 
@@ -15,7 +16,7 @@ REPO_RE = re.compile(r"[A-Za-z0-9-]+/[A-Za-z0-9._-]+", re.ASCII)
 ALL_PROJECTS = "All projects"
 README_SLOT = """<q-td :props="props"><q-icon v-if="props.value" name="description" size="xs" class="t-muted"
 :aria-label="props.col.yes" /><span v-else>—</span></q-td>"""
-COLUMNS = [
+COLUMNS: list[dict[str, Any]] = [
     {"name": "name", "label": "Repo", "field": "name", "align": "left", "sortable": True},
     {"name": "desc", "label": "Description", "field": "desc", "align": "left"},
     {"name": "stars", "label": "★", "field": "stars", "align": "right", "sortable": True},
@@ -100,15 +101,13 @@ class IndexPage:
         self.rows = {r["key"]: r for r in rows}
         # Verdicts column only once some shown repo has one
         has_seen = any(r["seen"] != "—" for r in rows)
-        self.table.set_columns(
-            [
-                {**c, "label": t(c["label"]), "yes": t("yes")}  # type: ignore[union-attr]
-                for c in COLUMNS
-                if c["name"] != "seen" or has_seen
-            ]
+        tbl, count = self.table, self.count
+        assert tbl is not None and count is not None  # build() creates both before any refresh
+        tbl.set_columns(
+            [{**c, "label": t(c["label"]), "yes": t("yes")} for c in COLUMNS if c["name"] != "seen" or has_seen]
         )
-        self.table.set_rows(rows)  # type: ignore[union-attr]
-        self.count.set_text(t("Showing {shown} of {total}").format(shown=len(rows), total=total))  # type: ignore[union-attr]
+        tbl.set_rows(rows)
+        count.set_text(t("Showing {shown} of {total}").format(shown=len(rows), total=total))
 
     def set_filter(self, key: str, value: str | None) -> None:
         self.flt[key] = value or ""

@@ -5,8 +5,10 @@ import sqlite3
 import tomllib
 from collections.abc import Callable
 from datetime import datetime
+from typing import TypeVar
 
 from nicegui import run, ui
+from nicegui.elements.mixins.value_element import ValueElement
 
 from .. import cli, llm
 from ..index import Index, default_path
@@ -28,6 +30,7 @@ NUMBER_LABELS = {
     "round2_k": "Repos for round 2 topics",
     "stars_k": "Repos to check for star bursts",
 }
+FieldT = TypeVar("FieldT", bound=ValueElement)
 FLAG_LABELS = {"no_round2": "Skip round 2", "no_stars_check": "Skip star burst check"}
 
 
@@ -43,7 +46,7 @@ class SearchForm:
     """Form fields and their connection to state; values logic lives in `search_form`."""
 
     def __init__(self) -> None:
-        self.fields: dict[str, ui.element] = {}
+        self.fields: dict[str, ValueElement] = {}
         self.command: ui.label | None = None
         self.drafts = {d.key: d for d in sf.list_drafts()}
 
@@ -63,7 +66,7 @@ class SearchForm:
         if self.command is not None:
             self.command.set_text("$ " + (sf.command_text(self.state()) or t(COMMAND_HINT)))
 
-    def add(self, key: str, el: ui.element) -> ui.element:
+    def add(self, key: str, el: FieldT) -> FieldT:
         self.fields[key] = el
         el.on_value_change(self.refresh)
         return el
@@ -72,7 +75,7 @@ class SearchForm:
         el = layout.field(label, validation={"": lambda v: True} if check else None, **kw)
         if check:
             el.validation = lambda v: check(v or "")
-        return self.add(key, el)  # type: ignore[return-value]
+        return self.add(key, el)
 
     def area(self, key: str, label: str, check: Callable[[str], str | None] | None = None, **kw) -> ui.input:
         return self.text(key, label, check, **kw).props("type=textarea autogrow rows=2")
@@ -107,6 +110,8 @@ async def _llm_draft(form: SearchForm, button: ui.button) -> None:
         return
     finally:
         button.enable()
+    if d is None:  # nicegui returns None when the app shuts down mid-call
+        return
     form.fill(sf.draft_to_state(d, need))
     ui.notify(t("Draft ready. Check it, then launch the search."), type="positive")
 

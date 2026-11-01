@@ -1,5 +1,7 @@
 """Runs pages: list `/runs` and single Run `/runs/{id}`."""
 
+from typing import Any
+
 from nicegui import ui
 
 from .. import runs
@@ -9,7 +11,7 @@ from .kit import layout, table
 from .run_view import run_page
 from .runs_logic import resolve_run
 
-COLUMNS = [
+COLUMNS: list[dict[str, Any]] = [
     {"name": "date", "label": "Date", "field": "date", "align": "left", "sortable": True, "classes": "ic-nowrap"},
     {"name": "task", "label": "Task", "field": "task", "align": "left"},
     {"name": "project", "label": "Project", "field": "project", "align": "left", "sortable": True},
@@ -51,7 +53,9 @@ class RunsList:
         self.dialog = ui.dialog()
 
     def refresh(self) -> None:
-        self.table.set_rows([summary_row(s) for s in runs.list_runs()])  # type: ignore[union-attr]
+        tbl = self.table
+        assert tbl is not None  # build() creates it before any refresh
+        tbl.set_rows([summary_row(s) for s in runs.list_runs()])
 
     def confirm_delete(self, row: dict) -> None:
         self.dialog.clear()

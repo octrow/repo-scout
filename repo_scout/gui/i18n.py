@@ -6,13 +6,17 @@ Domain values (verdicts, stop reasons, flags), repo names and commands are never
 """
 
 import os
+from typing import TYPE_CHECKING
 
 from .. import config, llm
 from .kit import texts
 
+if TYPE_CHECKING:  # nicegui stays out of the logic modules at runtime
+    from nicegui.language import Language
+
 LANG_VAR = "REPO_SCOUT_LANG"
 LANGS = ("en", "ru")
-QUASAR = {"en": "en-US", "ru": "ru"}  # Quasar's own texts (pagination etc.)
+QUASAR: "dict[str, Language]" = {"en": "en-US", "ru": "ru"}  # Quasar's own texts (pagination etc.)
 
 RU = {
     # navigation and headings

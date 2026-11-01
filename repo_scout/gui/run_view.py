@@ -1,5 +1,7 @@
 """Single Run page `/runs/{id}`: parameters, filters, table, detail panel, Verdicts."""
 
+from typing import Any
+
 from nicegui import ui
 
 from .. import runs
@@ -11,7 +13,7 @@ from .verdict_dialog import DB_ERRORS, VerdictDialog, notify_db_error, open_inde
 
 # One value per column, one line per row. On a narrow window priority 2/3 columns hide
 # (kit table), and the repo panel still shows every field
-COLUMNS = [
+COLUMNS: list[dict[str, Any]] = [
     {"name": "repo", "label": "Repo", "field": "repo", "align": "left", "sortable": True},
     {
         "name": "close",
@@ -106,7 +108,7 @@ class RunView:
         self.params = data["params"]
         self.rows = rl.sorted_rows(data["rows"])
         self.by_repo = {r.get("repo", "?"): r for r in self.rows}
-        self.flt = {"text": "", "source": rl.SOURCES_ALL, "flag": rl.FLAGS_ALL, "stopped": False}
+        self.flt: dict[str, Any] = {"text": "", "source": rl.SOURCES_ALL, "flag": rl.FLAGS_ALL, "stopped": False}
         self.verdicts = VerdictDialog(self.on_saved)
         self.panel = ui.dialog()
         self.table: table.EmptyAwareTable | None = None
@@ -132,9 +134,11 @@ class RunView:
 
     def refresh(self) -> None:
         shown = self.visible()
-        self.table.set_columns(self.columns())  # type: ignore[union-attr]
-        self.table.set_rows([rl.table_row(r) for r in shown])  # type: ignore[union-attr]
-        self.count.set_text(t("Showing {shown} of {total}").format(shown=len(shown), total=len(self.rows)))  # type: ignore[union-attr]
+        tbl, count = self.table, self.count
+        assert tbl is not None and count is not None  # build() creates both before any refresh
+        tbl.set_columns(self.columns())
+        tbl.set_rows([rl.table_row(r) for r in shown])
+        count.set_text(t("Showing {shown} of {total}").format(shown=len(shown), total=len(self.rows)))
 
     def set_filter(self, key: str, value: str | bool | None) -> None:
         self.flt[key] = value if key == "stopped" else (value or "")

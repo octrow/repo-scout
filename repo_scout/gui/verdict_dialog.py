@@ -1,7 +1,7 @@
 """Verdict dialog: shared between Run and Index views. Saves to Index and notifies caller."""
 
 import sqlite3
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 
 from nicegui import ui
@@ -23,7 +23,7 @@ def notify_db_error(context: str) -> None:
 
 
 @contextmanager
-def open_index() -> Iterator[Index]:
+def open_index() -> Generator[Index, None, None]:
     idx = Index(default_path())
     try:
         yield idx

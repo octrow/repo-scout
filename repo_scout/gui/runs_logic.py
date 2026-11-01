@@ -51,7 +51,9 @@ def resolve_run(stem: str) -> Path | None:
 
 def english(text: str | None) -> str | None:
     """A legacy Russian value in the current English wording; anything else unchanged."""
-    for pattern, repl in LEGACY_TEXT if text else ():
+    if not text:
+        return text
+    for pattern, repl in LEGACY_TEXT:
         text = pattern.sub(repl, text)
     return text
 

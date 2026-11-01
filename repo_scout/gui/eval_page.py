@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from nicegui import ui
+from nicegui.elements.mixins.value_element import ValueElement
 
 from .. import runs
 from ..log import log
@@ -45,7 +46,7 @@ class EvalPage:
     def __init__(self) -> None:
         self.sets = el.list_sets(EVAL_DIR)
         self.picked: set[Path] = set()
-        self.opts: dict[str, ui.element] = {}
+        self.opts: dict[str, ValueElement] = {}
         self.pending: dict[str, Path] = {}
         self.report: ui.column | None = None
 
@@ -84,8 +85,10 @@ class EvalPage:
             if state is None or state.status in run_pool.PENDING_STATUSES:
                 continue
             self.pending.pop(run_id)
-            self.report.clear()
-            with self.report:
+            report = self.report
+            assert report is not None  # build() sets it before starting the timer that calls watch()
+            report.clear()
+            with report:
                 if state.status == run_pool.DONE and out.is_file():
                     layout.heading(t("Report"), level=2)
                     layout.markdown_reader(out.read_text(encoding="utf-8"))
