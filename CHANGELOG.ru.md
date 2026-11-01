@@ -6,6 +6,8 @@
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-11-01
+
 ### Исправлено
 - Второй круг берёт темы из строк выше `--min-closeness`, в том числе пониженного; раньше порог не опускался ниже 0.64. В eval остаётся 0.64.
 - `--record` в папку, где уже есть снапшоты, использует дату этой записи, поэтому `--replay` даёт ту же свежесть.
@@ -104,7 +106,8 @@
 ## [0.1.0] - 2026-10-12
 Первый публичный релиз.
 
-[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.10...HEAD
+[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.11...HEAD
+[0.1.11]: https://github.com/octrow/repo-scout/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/octrow/repo-scout/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/octrow/repo-scout/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/octrow/repo-scout/compare/v0.1.7...v0.1.8
