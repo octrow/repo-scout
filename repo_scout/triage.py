@@ -16,35 +16,39 @@ def topics_of(r: dict) -> list[str]:
     return [n["topic"]["name"] for n in nodes]
 
 
+def _commits(r: dict) -> int:
+    target = (r.get("defaultBranchRef") or {}).get("target") or {}
+    return (target.get("history") or {}).get("totalCount", 0)
+
+
+def _stop(pushed: int, commits: int, stars: int) -> str | None:
+    """First matching stop rule, in order: dead, toy, no code."""
+    if pushed > 180 or (pushed > 120 and commits < 500):
+        return f"dead ({pushed}d)"
+    if commits < 50 and stars == 0:
+        return f"toy ({commits} commits, 0★)"
+    if not commits:
+        return "no code"
+    return None
+
+
+def _flags(r: dict, stars: int, commits: int, new: bool) -> list[str]:
+    parent = (r.get("parent") or {}).get("nameWithOwner", "?")
+    checks = [
+        (r["isFork"], f"fork {parent}"),
+        (stars >= HYPE_MIN_STARS and stars > HYPE_RATIO * max(commits, 1), "stars≫commits"),
+        (r["isArchived"], "archived"),
+        (new, "new"),
+    ]
+    return [flag for hit, flag in checks if hit]
+
+
 def triage(r: dict, now: datetime, new_days: int, last_push: str | None = None) -> dict:
     """Return the row dict with score, flags, and stop reason (None = passes).
 
     last_push: date of the latest substantive commit instead of pushedAt."""
-    stars, pushed = (
-        r["stargazerCount"],
-        days_since(last_push or r.get("pushedAt") or r["createdAt"], now),
-    )  # pushedAt is null on never-pushed repos
-    target = (r.get("defaultBranchRef") or {}).get("target") or {}
-    commits = (target.get("history") or {}).get("totalCount", 0)
-
-    stop = None
-    if pushed > 180 or (pushed > 120 and commits < 500):
-        stop = f"dead ({pushed}d)"
-    elif commits < 50 and stars == 0:
-        stop = f"toy ({commits} commits, 0★)"
-    elif not commits:
-        stop = "no code"
-
-    flags = []
-    if r["isFork"]:
-        flags.append(f"fork {(r.get('parent') or {}).get('nameWithOwner', '?')}")
-    if stars >= HYPE_MIN_STARS and stars > HYPE_RATIO * max(commits, 1):
-        flags.append("stars≫commits")
-    if r["isArchived"]:
-        flags.append("archived")
-    if days_since(r["createdAt"], now) <= new_days:
-        flags.append("new")
-
+    stars, commits = r["stargazerCount"], _commits(r)
+    pushed = days_since(last_push or r.get("pushedAt") or r["createdAt"], now)  # pushedAt is null on never-pushed repos
     fresh = next((p for d, p in FRESH if pushed <= d), 0)
     pop = next((p for s, p in POP if stars >= s), 0)
     return {
@@ -61,8 +65,8 @@ def triage(r: dict, now: datetime, new_days: int, last_push: str | None = None) 
         "score": fresh + pop,
         "fresh": fresh,
         "pop": pop,
-        "flags": flags,
-        "stop": stop,
+        "flags": _flags(r, stars, commits, days_since(r["createdAt"], now) <= new_days),
+        "stop": _stop(pushed, commits, stars),
     }
 
 
