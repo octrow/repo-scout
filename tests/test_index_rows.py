@@ -72,3 +72,8 @@ def test_index_rows_builds_every_column(idx):
 )
 def test_index_rows_filters(idx, filters, expected):
     assert names(index_rows(idx, **filters)) == expected
+
+
+def test_verdict_filter_finds_verdicts_saved_in_russian(idx):
+    idx.add_verdict("b/beta", "→ Разбор (зачем)", "p3", "task", NOW)
+    assert names(index_rows(idx, kind="dig")) == ["b/beta", "c/gamma"]

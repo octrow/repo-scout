@@ -26,6 +26,7 @@ from repo_scout.conditions import (
     compile_all,
     exclude_stop,
     lang_stop,
+    MUST_STOP,
     meta_text,
     must_stop,
 )
@@ -40,7 +41,6 @@ MAX_TEXT_CHARS, MAX_OPERATORS = 256, 5
 TOKEN = re.compile(r'-?[\w-]+:"[^"]*"|"[^"]*"|\S+')
 QUALIFIER = re.compile(r"-?[A-Za-z-]+:(?!//).+")
 OPERATORS = {"AND", "OR", "NOT"}
-MUST_STOP = "missing required"
 MUST_STOP_RU = "\u043d\u0435\u0442 \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u043e\u0433\u043e"  # stop text of older runs
 STARS_K = 10
 FROM_INDEX = 50  # number of closest repos from Index to add to pool
@@ -299,9 +299,10 @@ def _upsert_index(
 
 
 def _search_all(queries: list[str], *, months: int, since: str, lang: str | None, limit: int, into: dict) -> None:
-    for i, q in enumerate(queries, 1):
-        full = build_query(q, months=months, since=since, lang=lang)
-        validate_query(full)
+    full_queries = [build_query(q, months=months, since=since, lang=lang) for q in queries]
+    for full in full_queries:
+        validate_query(full)  # every query before the first request: a bad last one costs no quota
+    for i, (q, full) in enumerate(zip(queries, full_queries, strict=True), 1):
         found = github.search(full, min(limit, 100))
         for r in found:
             into.setdefault(r["nameWithOwner"], r)

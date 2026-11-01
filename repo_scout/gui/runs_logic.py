@@ -15,6 +15,8 @@ SOURCES_ALL = "All sources"
 # key -> label in form; Verdict is assembled according to index.VERDICT rules
 VERDICT_KINDS = {"watch": "→ Inspect", "dig": "→ Study", "drop": "Drop", "doubt": "Doubt"}
 VERDICT_PREFIX = {"watch": "→ Inspect", "dig": "→ Study", "drop": "drop", "doubt": "doubt"}
+# Verdicts saved before the CLI switched to English; index.VERDICT still accepts them
+LEGACY_VERDICT_PREFIX = {"watch": "→ Осмотр", "dig": "→ Разбор", "drop": "отсев", "doubt": "спорно"}
 NOTE_LABELS = {"dig": "Study goal", "drop": "Drop reason", "doubt": "What to clarify"}
 DESC_LIMIT = 120
 # Runs saved before the CLI switched to English (ad622ea) hold Russian sources, flags and drop reasons
@@ -23,7 +25,7 @@ LEGACY_TEXT = [
     for p, r in (
         (r"^запрос$", "query"),
         (r"^индекс$", "index"),
-        (r"^второй круг$", "round 2"),
+        (r"^второй круг$", "round two"),
         (r"^новый$", "new"),
         (r"^шаблон$", "template"),
         (r"^нет деталей$", "no details"),

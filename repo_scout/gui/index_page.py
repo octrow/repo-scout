@@ -55,8 +55,9 @@ def index_rows(idx: Index, *, project: str = "", kind: str = "", text: str = "")
 def _allowed_keys(idx: Index, project: str, kind: str) -> set[str] | None:
     """Keys with a Verdict in the project and of the kind; None when neither filter is set."""
     verdicts = idx.verdicts(project or None)
-    prefix = rl.VERDICT_PREFIX.get(kind, "")
-    return {v[1] for v in verdicts if v[2].startswith(prefix)} if (project or prefix) else None
+    known = kind in rl.VERDICT_PREFIX  # an unknown kind filters nothing
+    prefixes = (rl.VERDICT_PREFIX[kind], rl.LEGACY_VERDICT_PREFIX[kind]) if known else ("",)
+    return {v[1] for v in verdicts if v[2].startswith(prefixes)} if (project or known) else None
 
 
 def _index_row_matches(r: dict, allowed: set[str] | None, needle: str) -> bool:

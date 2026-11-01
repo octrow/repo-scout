@@ -150,7 +150,7 @@ def test_legacy_russian_values_shown_in_english():
         stop="шум (awesome: имя, описание, topics)",
     )
     r = rl.sorted_rows([old, row("b/dead", stop="мёртвый (200 дн)"), row("c/toy", stop="игрушка (3 комм, 0★)")])
-    assert r[0]["source"] == "round 2" and r[0]["flags"] == ["new", "burst★ 100% early"]
+    assert r[0]["source"] == "round two" and r[0]["flags"] == ["new", "burst★ 100% early"]
     assert r[0]["stop"] == "noise (awesome: name, description, topics)"
     assert [x["stop"] for x in r[1:]] == ["dead (200d)", "toy (3 commits, 0★)"]
     assert rl.sorted_rows([row("d/ok", stop="не по теме (0.41)")])[0]["stop"] == "off-topic (0.41)"

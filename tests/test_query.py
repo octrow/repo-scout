@@ -56,3 +56,17 @@ def test_operators_in_quotes_not_counted():
 def test_url_is_text():
     with pytest.raises(ValueError, match="256"):
         validate_query("https://" + "w" * 260)
+
+
+def test_all_queries_are_checked_before_the_first_request(monkeypatch):
+    from datetime import UTC, datetime
+
+    from repo_scout import cli, github
+
+    sent = []
+    monkeypatch.setattr(github, "search", lambda q, n: sent.append(q) or [])
+    with pytest.raises(ValueError):
+        cli.run(
+            ["ok query", "w" * 300], months=6, new_days=60, limit=5, lang=None, now=datetime(2026, 10, 11, tzinfo=UTC)
+        )
+    assert sent == []

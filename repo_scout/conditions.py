@@ -67,9 +67,12 @@ def exclude_stop(text: str, patterns: list[re.Pattern]) -> str | None:
     return None
 
 
+MUST_STOP = "missing required"  # cli lists rows with this stop separately
+
+
 def must_stop(text: str, groups: list[re.Pattern]) -> str | None:
     """All groups must be present in the text."""
     for g in groups:
         if not g.search(text):
-            return f"missing required: {g.pattern}"
+            return f"{MUST_STOP}: {g.pattern}"
     return None

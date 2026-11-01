@@ -62,8 +62,8 @@ Module: repo_scout/cli.py::build_query, repo_scout/cli.py::validate_query, repo_
 Each query gets `in:name,description,topics,readme` (unless it is all qualifiers or has its own `in:`),
 `mirror:false` and `language:<--lang>` (unless the query has its own), and `pushed:>=<now − months>`
 (unless `--months 0` or the query has its own `pushed:`). `--lang` is appended unquoted.
-Queries are validated one by one, just before each is sent: over 256 text chars or more than 5
-AND/OR/NOT → exit 2 after the earlier queries already ran (#11). The GUI validates all of them up front.
+All queries are validated before the first request: over 256 text chars or more than 5 AND/OR/NOT →
+exit 2, nothing sent.
 Results are merged into the Pool by `owner/name`.
 
 ### 3. Pull nearest repos from the Index
@@ -209,7 +209,7 @@ Other modes: `--record`, `--fake-stars`, `--llm-draft`, `--index-check` (two run
 | Failure | Result |
 |---|---|
 | Bad regex | exit 2 with the reason, no request sent |
-| Query over GitHub limits | exit 2; earlier queries were already sent (#11) |
+| Query over GitHub limits | exit 2, no request sent |
 | `gh` not installed | `GitHub: gh (GitHub CLI) not found…`, exit 1 |
 | `gh` not logged in, plain 403 | `GitHub: …`, exit 1 |
 | 429 / 502 / rate limit / empty reply on search | retries after 5, 10, 20 s, then exit 1 |
