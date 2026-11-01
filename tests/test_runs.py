@@ -81,3 +81,32 @@ def test_load_rejects_wrong_shapes_and_list_runs_survives(tmp_path, bad):
         runs.load(p)
     s = {x.path: x for x in runs.list_runs()}
     assert s[p].error and len(s) == 2
+
+
+GOOD = {"version": 1, "created_at": "", "params": {}, "round2_topics": ["a"], "rows": [{}]}
+
+
+@pytest.mark.parametrize(
+    ("text", "reason"),
+    [
+        ("{not json", "corrupt JSON: "),
+        ("[1]", "unsupported Run version"),
+        (json.dumps({**GOOD, "version": "1"}), "unsupported Run version"),
+        (json.dumps({"version": 1, "params": {}}), "missing keys created_at, round2_topics, rows"),
+        (json.dumps({**GOOD, "params": None}), "invalid Run structure"),
+        (json.dumps({**GOOD, "round2_topics": "ab"}), "invalid Run structure"),
+        (json.dumps({**GOOD, "rows": [{}, []]}), "invalid Run structure"),
+    ],
+)
+def test_load_error_messages(tmp_path, text, reason):
+    p = tmp_path / "x.json"
+    p.write_text(text)
+    with pytest.raises(ValueError) as e:
+        runs.load(p)
+    assert str(e.value).startswith(f"{p}: {reason}")
+
+
+def test_load_returns_valid_data_unchanged(tmp_path):
+    p = tmp_path / "x.json"
+    p.write_text(json.dumps(GOOD))
+    assert runs.load(p) == GOOD
