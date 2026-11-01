@@ -77,16 +77,31 @@ def ask_values(
     out = {}
     for title, hint, fields in SECTIONS:
         say(f"\n{title}\n{hint}")
-        for var, prompt, default, secret in fields:
-            now = current.get(var) or current.get(llm.ALIASES.get(var, "")) or default
-            answer = (ask_secret if secret else ask)(f"{prompt} [{_shown(now, secret)}]: ").strip()
-            value = "" if answer == CLEAR else answer or now
-            out[var] = "" if value == default and not secret else value  # defaults need no line in the file
-            if var in llm.ALIASES:
-                out[llm.ALIASES[var]] = ""  # the new name replaces the older alias line
-            if secret and not value:
-                break
+        out |= _ask_section(fields, current, ask, ask_secret)
     return out
+
+
+def _ask_section(
+    fields: tuple, current: dict[str, str], ask: Callable[[str], str], ask_secret: Callable[[str], str]
+) -> dict[str, str]:
+    out = {}
+    for var, prompt, default, secret in fields:
+        value = _answer(current, ask_secret if secret else ask, var, prompt, default, secret)
+        out[var] = "" if value == default and not secret else value  # defaults need no line in the file
+        if var in llm.ALIASES:
+            out[llm.ALIASES[var]] = ""  # the new name replaces the older alias line
+        if secret and not value:
+            break
+    return out
+
+
+def _answer(
+    current: dict[str, str], ask: Callable[[str], str], var: str, prompt: str, default: str, secret: bool
+) -> str:
+    """The typed value, the current one on Enter, or empty on CLEAR."""
+    now = current.get(var) or current.get(llm.ALIASES.get(var, "")) or default
+    answer = ask(f"{prompt} [{_shown(now, secret)}]: ").strip()
+    return "" if answer == CLEAR else answer or now
 
 
 def main(argv: list[str]) -> None:
