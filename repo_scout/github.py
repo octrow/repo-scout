@@ -283,24 +283,42 @@ def _fetch_details(chunk: list[str]) -> dict[str, dict | None]:
 def details(names: list[str]) -> dict[str, dict]:
     """README and latest 20 commits. Snapshot per repo (details/<hash>.json.gz), batches of DETAILS_CHUNK
     for missing entries only. {name: {"readme": str|None, "commits": list}}; deleted repos excluded."""
-    out: dict[str, dict] = {}
-    missing = []
-    calls["details"] += -(-len([n for n in names if _NAME.fullmatch(n)]) // DETAILS_CHUNK)
-    for n in (n for n in names if _NAME.fullmatch(n)):
-        path = _cache_dir("details") / f"{_key(n.lower())}.json.gz" if _mode else None
-        if path and path.exists() and not ((d := _read(path)) is None and _recheck(n)):
-            if d is not None:
-                out[n] = d
-        elif _mode == "replay":
-            raise GitHubError(f"missing details snapshot for {n} (--record)")
-        else:
-            missing.append(n)
+    valid = [n for n in names if _NAME.fullmatch(n)]
+    calls["details"] += -(-len(valid) // DETAILS_CHUNK)
+    out, missing = _split_cached(valid, "details")
     chunks = [missing[i : i + DETAILS_CHUNK] for i in range(0, len(missing), DETAILS_CHUNK)]
     with ThreadPoolExecutor(DETAILS_WORKERS) as pool:
         for k, (chunk, got) in enumerate(zip(chunks, pool.map(_fetch_details, chunks)), 1):
             log.info("details %d/%d", min(k * DETAILS_CHUNK, len(missing)), len(missing))
             _store_details(chunk, got, out)
     return out
+
+
+def _split_cached(names: list[str], kind: str) -> tuple[dict[str, dict], list[str]]:
+    """({name: snapshot data} without deleted repos, names to fetch); replay raises on a missing snapshot."""
+    out: dict[str, dict] = {}
+    missing = []
+    for n in names:
+        hit, d = _read_cached(kind, n)
+        if hit:
+            if d is not None:
+                out[n] = d
+        elif _mode == "replay":
+            raise GitHubError(f"missing {kind} snapshot for {n} (--record)")
+        else:
+            missing.append(n)
+    return out, missing
+
+
+def _read_cached(kind: str, name: str) -> tuple[bool, dict | None]:
+    """(True, data) for a usable snapshot (None = deleted or skipped repo), (False, None) when it must be fetched."""
+    path = _cache_dir(kind) / f"{_key(name.lower())}.json.gz" if _mode else None
+    if not (path and path.exists()):
+        return False, None
+    d = _read(path)
+    if d is None and _recheck(name):
+        return False, None
+    return True, d
 
 
 def _store_details(chunk: list[str], got: dict[str, dict | None], out: dict[str, dict]) -> None:
