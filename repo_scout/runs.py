@@ -65,16 +65,18 @@ def load(path: Path) -> dict:
         raise ValueError(f"{path}: unsupported Run version")
     if missing := [k for k in REQUIRED if k not in data]:
         raise ValueError(f"{path}: missing keys {', '.join(missing)}")
-    topics = data["round2_topics"]
-    if not (
-        isinstance(data["params"], dict)
-        and isinstance(data["rows"], list)
-        and all(isinstance(r, dict) for r in data["rows"])
-        and isinstance(topics, list)
-        and all(isinstance(t, str) for t in topics)
-    ):
+    if not _valid_structure(data):
         raise ValueError(f"{path}: invalid Run structure")
     return data
+
+
+def _list_of(value, kind: type) -> bool:
+    return isinstance(value, list) and all(isinstance(v, kind) for v in value)
+
+
+def _valid_structure(data: dict) -> bool:
+    """params is a dict, rows a list of dicts, round2_topics a list of strings."""
+    return isinstance(data["params"], dict) and _list_of(data["rows"], dict) and _list_of(data["round2_topics"], str)
 
 
 def list_runs() -> list[Summary]:
