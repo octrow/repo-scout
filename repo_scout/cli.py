@@ -238,15 +238,35 @@ def _process(
     _screen_meta(rows, nodes, lang, exclude)
     readmes = _screen_details(rows, nodes, now, new_days, exclude, must, known)
     if task:
-        vecs = add_closeness(rows, readmes, task)
-        if index:
-            for r in rows:
-                if r["repo"] in vecs and readmes.get(r["repo"]):
-                    index.upsert(r, readmes[r["repo"]], vecs[r["repo"]], now)
-        apply_closeness(rows, min_closeness)
-        if texts is not None:
-            texts.update({r["repo"]: semantic.candidate_text(r, readmes.get(r["repo"])) for r in rows if not r["stop"]})
+        _closeness_step(rows, readmes, task, now=now, min_closeness=min_closeness, index=index, texts=texts)
     return rows
+
+
+def _closeness_step(
+    rows: list[dict],
+    readmes: dict[str, str | None],
+    task: str,
+    *,
+    now: datetime,
+    min_closeness: float,
+    index: Index | None,
+    texts: dict[str, str] | None,
+) -> None:
+    """Closeness, Index upsert of embedded rows with a README, off-topic threshold, fit texts of kept rows."""
+    vecs = add_closeness(rows, readmes, task)
+    if index:
+        _upsert_index(index, rows, readmes, vecs, now)
+    apply_closeness(rows, min_closeness)
+    if texts is not None:
+        texts.update({r["repo"]: semantic.candidate_text(r, readmes.get(r["repo"])) for r in rows if not r["stop"]})
+
+
+def _upsert_index(
+    index: Index, rows: list[dict], readmes: dict[str, str | None], vecs: dict[str, np.ndarray], now: datetime
+) -> None:
+    for r in rows:
+        if r["repo"] in vecs and readmes.get(r["repo"]):
+            index.upsert(r, readmes[r["repo"]], vecs[r["repo"]], now)
 
 
 def _search_all(queries: list[str], *, months: int, since: str, lang: str | None, limit: int, into: dict) -> None:
