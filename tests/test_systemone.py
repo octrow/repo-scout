@@ -83,3 +83,22 @@ def test_failure_is_a_warning(monkeypatch, caplog):
     systemone.add_fit(rows, "t", {"a/a": "A"}, 20)
     assert "fit" not in rows[0]
     assert "fit column skipped" in caplog.text
+
+
+def test_post_does_not_follow_redirects_with_the_key(monkeypatch):
+    # plain urlopen would resend Authorization to a redirect target on another host
+    import io
+
+    from repo_scout import llm
+
+    used = []
+
+    class Opener:
+        def open(self, req, timeout):
+            used.append(req.full_url)
+            return io.BytesIO(b'{"answers": {}}')
+
+    monkeypatch.setenv("TYPESAFE_API_KEY", "k")
+    monkeypatch.setattr(llm, "_OPENER", Opener())
+    assert systemone._post({}) == {"answers": {}}
+    assert used

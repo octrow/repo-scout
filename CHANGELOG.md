@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 
 ## [Unreleased]
 
+### Security
+- The GUI answers only `127.0.0.1` and `localhost` Host names, so a web page that rebinds its DNS name to 127.0.0.1 can no longer drive it.
+- The Fit column's request to TypeSafe no longer follows redirects, so the API key cannot be resent to another host.
+
 ## [0.1.8] - 2026-10-30
 
 ### Added

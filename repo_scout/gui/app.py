@@ -4,7 +4,9 @@ import argparse
 import os
 import sys
 
+from fastapi import FastAPI
 from nicegui import app, ui
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import eval_page, index_page, runs_page, search_page
 from . import port as portmod
@@ -12,10 +14,16 @@ from .i18n import QUASAR, current
 from .kit import run_pool, theme
 
 DEFAULT_PORT = 8790
+LOOPBACK_NAMES = [portmod.HOST, "localhost"]
 
 
 async def _stop() -> None:
     await run_pool.terminate_all_live_processes()
+
+
+def restrict_hosts(target: FastAPI) -> None:
+    """Answer only loopback Host names, so a page rebinding its DNS name to 127.0.0.1 gets 400."""
+    target.add_middleware(TrustedHostMiddleware, allowed_hosts=LOOPBACK_NAMES)
 
 
 def register_pages() -> None:
@@ -38,6 +46,7 @@ def main(argv: list[str] | None = None) -> None:
     if port is None:
         return
     print(f"GUI: http://{portmod.HOST}:{port}/")
+    restrict_hosts(app)
     theme.apply_theme()
     register_pages()
     app.on_shutdown(_stop)

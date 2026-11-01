@@ -121,6 +121,7 @@ Module: repo_scout/gui/app.py::main, repo_scout/gui/search_page.py::search, repo
 
 The Search page builds the same argv (`cli.to_argv`) and runs `python -m repo_scout … --out PATH` as a
 subprocess with a live log. Runs pages read the saved run JSON; the Index page talks to `Index` directly.
+The server listens on 127.0.0.1 and `restrict_hosts` answers 400 to any other Host name (DNS rebinding).
 
 ### Eval
 

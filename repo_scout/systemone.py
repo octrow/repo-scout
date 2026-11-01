@@ -44,7 +44,7 @@ def _post(body: dict) -> dict:
         headers={"Authorization": f"Bearer {llm.setting(KEY_VAR)}", "Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT_S) as resp:
+        with llm._OPENER.open(req, timeout=TIMEOUT_S) as resp:  # no redirects: they would carry the key
             data = json.load(resp)
     except urllib.error.HTTPError as e:
         raise SystemOneError(f"HTTP error {e.code}. Check {KEY_VAR}") from None

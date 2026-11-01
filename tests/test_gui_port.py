@@ -64,3 +64,19 @@ def test_stop_refuses_foreign_process(monkeypatch):
 
 def test_our_pid_none_for_non_http_listener(busy_port):
     assert portmod.our_pid(busy_port) is None
+
+
+@pytest.mark.parametrize(
+    ("host", "code"), [("127.0.0.1:8790", 200), ("localhost:8790", 200), ("evil.example:8790", 400)]
+)
+def test_gui_answers_only_loopback_host_names(host, code):
+    # DNS rebinding: a page on evil.example resolved to 127.0.0.1 still sends its own Host
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from repo_scout.gui.app import restrict_hosts
+
+    target = FastAPI()
+    target.add_api_route("/ok", lambda: "ok")
+    restrict_hosts(target)
+    assert TestClient(target).get("/ok", headers={"Host": host}).status_code == code
