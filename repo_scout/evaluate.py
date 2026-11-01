@@ -100,20 +100,36 @@ def detail(m: dict) -> str:
     return "\n".join(out)
 
 
+STUDY_MARKS = ("\u0420\u0430\u0437\u0431\u043e\u0440", "Study")
+
+
+def _lost(e: dict, alive: dict, t: float) -> bool:
+    """A positive that passed the stop rules but would be dropped at threshold t."""
+    r = alive.get(e["repo"].lower())
+    return bool(e["verdict"].startswith(POSITIVE) and r and r["closeness"] < t)
+
+
+def _sweep_counts(spec: dict, rows: list[dict], t: float) -> tuple[int, int, int]:
+    """One set at threshold t: lost '→ Study' positives, lost positives, remaining rows."""
+    alive = {r["repo"].lower(): r for r in rows if not r["stop"]}
+    kept = sum(r["closeness"] >= t for r in alive.values() if r.get("closeness") is not None)
+    lost = [e["verdict"] for e in spec["expected"] if _lost(e, alive, t)]
+    study = sum(any(m in v for m in STUDY_MARKS) for v in lost)
+    return study, len(lost), kept
+
+
+def _sweep_line(sets: list[tuple[dict, list[dict]]], t: float) -> str:
+    study = pos = kept = 0
+    for spec, rows in sets:
+        set_study, set_pos, set_kept = _sweep_counts(spec, rows, t)
+        study, pos, kept = study + set_study, pos + set_pos, kept + set_kept
+    return f"| {t:.2f} | {study} | {pos} | {kept} |"
+
+
 def sweep(sets: list[tuple[dict, list[dict]]]) -> str:
     """Threshold 0.50..0.90: count how many positives and total rows would be dropped."""
     lines = ["| threshold | lost → Study | lost all → | remaining rows |", "|---|---|---|---|"]
-    for t in SWEEP:
-        razbor = pos = kept = 0
-        for spec, rows in sets:
-            alive = {r["repo"].lower(): r for r in rows if not r["stop"]}
-            kept += sum(r["closeness"] >= t for r in alive.values() if r.get("closeness") is not None)
-            for e in spec["expected"]:
-                r = alive.get(e["repo"].lower())
-                if (e["verdict"].startswith("→") or e["verdict"].startswith("->")) and r and r["closeness"] < t:
-                    pos += 1
-                    razbor += "\u0420\u0430\u0437\u0431\u043e\u0440" in e["verdict"] or "Study" in e["verdict"]
-        lines.append(f"| {t:.2f} | {razbor} | {pos} | {kept} |")
+    lines += [_sweep_line(sets, t) for t in SWEEP]
     return "\n".join(lines)
 
 
