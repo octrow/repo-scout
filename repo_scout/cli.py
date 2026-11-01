@@ -174,12 +174,11 @@ def _recheck_fresh(
 
 
 def _screen_readme(row: dict, readme: str | None, exclude: list[re.Pattern], must: list[re.Pattern]) -> None:
-    """Forbidden words in the README; required words in README plus metadata (skipped without a README)."""
+    """Forbidden words in the README; required words in README plus metadata (metadata only without a README)."""
     if readme is None:
         row["flags"].append("no README")
     _stop(row, exclude_stop(readme or "", exclude))
-    if readme is not None:
-        _stop(row, must_stop(" ".join([readme, meta_text(row)]), must))
+    _stop(row, must_stop(" ".join([readme or "", meta_text(row)]), must))
 
 
 def add_closeness(rows: list[dict], readmes: dict[str, str | None], task: str) -> dict[str, np.ndarray]:

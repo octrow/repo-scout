@@ -45,7 +45,8 @@ def lang_stop(row: dict, lang: str | None) -> str | None:
 
 
 def meta_text(row: dict) -> str:
-    return " ".join([row["repo"], row["desc"], *row["topics"]])
+    """Repo name (without the owner login), description and topics."""
+    return " ".join([row["repo"].split("/")[-1], row["desc"], *row["topics"]])
 
 
 def compile_all(flag: str, patterns: list[str]) -> list[re.Pattern]:

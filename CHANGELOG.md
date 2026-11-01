@@ -7,6 +7,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 ## [Unreleased]
 
 ### Fixed
+- `--exclude` and `--must` match the repo name without the owner login: `--exclude bot` no longer drops `botpress/agent-kit`.
+- `--must` checks repos without a README against name, description and topics, as its help says; before, they skipped the check and stayed. `README.markdown`, `README.txt` and `README.org` count as a README.
 - Repos pulled from the Index follow `--months` and `--lang` like search results: older ones are dropped as `pushed before <date>`, and with `--lang` a repo with no language is dropped as `no language`.
 - Repos dropped as dead, toy, no code or noise leave the Index (their verdicts stay), so they no longer take `--from-index` slots in every run. `--from-index N` now adds N repos that are not already in the search results.
 - `--lang cpp`, `--lang golang` and other common GitHub aliases no longer drop every result: GitHub reports `C++` and `Go`, and the language check now maps the alias first.

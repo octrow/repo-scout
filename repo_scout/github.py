@@ -257,7 +257,17 @@ def search(query: str, limit: int) -> list[dict]:
     return [n for n in data["search"]["nodes"] if n]
 
 
-README_NAMES = ["README.md", "readme.md", "README.rst", "README", "Readme.md"]
+# ponytail: names are case-sensitive GraphQL lookups, each one an alias per repo; a rarer name reads as no README.
+README_NAMES = [
+    "README.md",
+    "readme.md",
+    "README.rst",
+    "README",
+    "Readme.md",
+    "README.markdown",
+    "README.txt",
+    "README.org",
+]
 DETAILS_WORKERS = 3  # parallel batches; higher risks secondary rate limits
 DETAILS_CHUNK = 10  # 25 aliases with README and commit history hit HTTP 502 timeout
 _NAME = re.compile(r"[\w.-]+/[\w.-]+")

@@ -95,20 +95,21 @@ Module: repo_scout/cli.py::_screen_meta, repo_scout/noise.py::noise_stop, repo_s
 
 Only rows not yet dropped. Template → flag. Noise needs 2+ independent signals of one kind to drop.
 `--lang` compares `primaryLanguage` case-insensitively after mapping common GitHub aliases (`cpp` → `C++`,
-`golang` → `Go`); an empty language passes, an alias not in the list drops every row. `--exclude` checks `owner/name`, description and topics (#7).
+`golang` → `Go`); an empty language passes, an alias not in the list drops every row. `--exclude` checks the repo name (no owner login), description and topics.
 
 ### 6. Details: README and the last 20 commits
 
 Module: repo_scout/cli.py::_screen_details, repo_scout/github.py::details, repo_scout/commits.py::last_substantive
 
 Batches of 10 aliases, 3 in parallel. A failing batch is split in half without retries; a single failing
-repo is retried, then skipped with the `no details` flag (#9). A README is one of 5 names at HEAD
-(`README.md`, `readme.md`, `README.rst`, `README`, `Readme.md`), cut to 100 000 chars (#8).
+repo is retried, then skipped with the `no details` flag (#9). A README is one of 8 case-sensitive names at
+HEAD (`README.md`, `readme.md`, `README.rst`, `README`, `Readme.md`, `README.markdown`, `README.txt`,
+`README.org`), cut to 100 000 chars.
 Freshness and `dead` are recomputed from the last substantive commit (bots, cosmetic and `Merge…` commits
 ignored; commits dated after `now` ignored). None of the 20 substantive → `cosmetic only` flag and
 freshness from the oldest of the 20, which can make the row `dead`.
-`--exclude` runs on the README too. `--must` needs a README: without one the row gets `no README`
-and is not checked (#8). `no details` rows skip both README checks.
+`--exclude` runs on the README too. `--must` runs on README + name + description + topics; without a
+README the row gets `no README` and `--must` checks the metadata only. `no details` rows skip both.
 
 ### 7. Closeness
 
@@ -218,8 +219,6 @@ Other modes: `--record`, `--fake-stars`, `--llm-draft`, `--index-check` (two run
 ## Known gaps
 
 Open HIGH and MEDIUM findings; details in `PLAN.md` → "Logic map findings".
-- `--exclude` / `--must` match the owner login: `--exclude bot` drops `botpress/…` (#7).
-- Rows without a README (or with an unlisted README name) skip `--must` (#8).
 - A rate limit during details keeps every row unscreened as `no details` (#9).
 - No `gh` on PATH → traceback (#10).
 - Hand-edited run JSON with wrong-typed fields (`score: null`, `flags: null`) breaks the GUI run page.

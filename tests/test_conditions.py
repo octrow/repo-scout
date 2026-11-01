@@ -79,6 +79,7 @@ def test_pipeline_must_exclude_readme_and_cosmetic(monkeypatch):
         "a/nomust": {"readme": "something else", "commits": fresh},
         "a/banned": {"readme": "kaspi wordpress", "commits": fresh},
         "a/noreadme": {"readme": None, "commits": fresh},
+        "a/kaspi-noreadme": {"readme": None, "commits": fresh},
         "a/cosmetic": {"readme": "kaspi", "commits": [commit("docs: x", "2025-01-01T00:00:00Z")]},
         "a/stale": {"readme": "kaspi", "commits": [commit("feat: x", "2026-01-01T00:00:00Z")]},
     }
@@ -88,10 +89,20 @@ def test_pipeline_must_exclude_readme_and_cosmetic(monkeypatch):
     assert rows["a/ok"]["stop"] is None
     assert rows["a/nomust"]["stop"] == "missing required: kaspi"
     assert rows["a/banned"]["stop"] == "forbidden: wordpress"
-    assert rows["a/noreadme"]["stop"] is None and "no README" in rows["a/noreadme"]["flags"]
+    assert rows["a/noreadme"]["stop"] == "missing required: kaspi" and "no README" in rows["a/noreadme"]["flags"]
+    assert rows["a/kaspi-noreadme"]["stop"] is None  # without a README --must checks name, description, topics
     assert "cosmetic only" in rows["a/cosmetic"]["flags"]
     assert rows["a/cosmetic"]["stop"].startswith("dead")
     assert rows["a/stale"]["stop"].startswith("dead")
+
+
+def test_conditions_ignore_the_owner_login(monkeypatch):
+    """`--exclude bot` is about the repo, not its owner: botpress/agent-kit stays, x/botkit goes."""
+    fresh = [commit("feat: x", "2026-10-09T00:00:00Z")]
+    details = {n: {"readme": "agent kit", "commits": fresh} for n in ("botpress/agent-kit", "x/botkit")}
+    rows = run_pipeline(monkeypatch, details, exclude=compile_all("--exclude", ["bot"]))
+    assert rows["botpress/agent-kit"]["stop"] is None
+    assert rows["x/botkit"]["stop"] == "forbidden: bot"
 
 
 def test_pipeline_missing_details_flag(monkeypatch):
