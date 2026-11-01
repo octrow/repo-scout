@@ -20,6 +20,7 @@ dev = [
     "pytest",
     "pytest-asyncio",
     "ruff>=0.17.1",
+    "ty==0.0.95",
 ]
 
 [build-system]
@@ -48,6 +49,9 @@ select = ["E4", "E7", "E9", "F", "C90"]  # ruff's long-standing defaults (newer 
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10  # every function was brought under it in Nov 2026; keep it there
+
+[tool.ty.src]
+exclude = [".agents", ".claude", "external_examples", "repo_scout/gui/kit"]  # same as ruff; kit: vendored (VENDORED.md)
 
 [project.urls]
 Homepage = "https://github.com/octrow/repo-scout"
