@@ -48,14 +48,23 @@ def _rest(path: str) -> list | None:
             return json.loads(out.stdout)
         if "HTTP 404" in err or "HTTP 422" in err:
             return None
-        limited = "HTTP 429" in err or ("HTTP 403" in err and "rate limit" in err.lower())
-        if not (limited or any(f"HTTP {c}" in err for c in github.TRANSIENT)):
+        if not _retryable(err):
             raise GitHubError(f"gh failed: {err.strip()}")
         if attempt < github.MAX_RETRIES:
-            wait = min(2**attempt * 5, 60)
-            log.info("star history: %s — retry %d in %d s", err.strip()[:80], attempt + 1, wait)
-            time.sleep(wait)
+            _back_off(attempt, err)
     raise GitHubError(f"star history {path}: GitHub did not respond")
+
+
+def _retryable(err: str) -> bool:
+    """Rate limit (429, or 403 saying so) or a transient 5xx."""
+    limited = "HTTP 429" in err or ("HTTP 403" in err and "rate limit" in err.lower())
+    return limited or any(f"HTTP {c}" in err for c in github.TRANSIENT)
+
+
+def _back_off(attempt: int, err: str) -> None:
+    wait = min(2**attempt * 5, 60)
+    log.info("star history: %s — retry %d in %d s", err.strip()[:80], attempt + 1, wait)
+    time.sleep(wait)
 
 
 def _weeks(name: str) -> tuple[list[dict], bool] | None:
