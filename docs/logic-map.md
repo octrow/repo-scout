@@ -53,7 +53,8 @@ Module: repo_scout/cli.py::_main, repo_scout/conditions.py::compile_all
 
 `--exclude` / `--must` are compiled as regexes. A bad regex → `ValueError` → message on stderr, exit 2.
 Any later `ValueError` inside the run also exits 2, with no table and no save.
-In replay, `now` is the recording date (`github.recorded_at`), so freshness matches the snapshot.
+In record and replay, `now` is the snapshot date (`github.recorded_at`, kept from the first recording
+into that dir), so a replay computes the same freshness as its recording.
 
 ### 2. Build queries and search
 
@@ -126,7 +127,7 @@ off-topic rows are stored too. Below `--min-closeness` → `off-topic` stop rule
 Module: repo_scout/cli.py::_round2, repo_scout/round2.py::pick_topics
 
 Splits on: no task or `--no-round2` → skipped. Up to 5 `topic:` queries from topics seen in 2+ of the
-top-K rows with Closeness ≥ max(`--min-closeness`, 0.64) (#13), not generic, not in the user's queries.
+top-K rows with Closeness ≥ `--min-closeness` (eval pins 0.64), not generic, not in the user's queries.
 New repos go through steps 4–7 with source `round two`; no Index pull in this round.
 
 ### 9. Sort, mark seen, flags, fit
@@ -156,7 +157,7 @@ separately and never in the table. After printing, the run, dropped rows include
 | Index DB created; re-embeds all rows if the stored model differs (`REPO_SCOUT_INDEX`) | opened on start | record/replay |
 | Index rename / forget (step 3), upsert (step 7); forget of rows dropped as `dead`, `toy`, `no code`, noise (verdicts stay) | every run with an Index | record/replay; **not** `--no-save` |
 | Run JSON (step 10) | every run | `--no-save`, record, replay |
-| GitHub snapshots incl. `stars/`; existing ones are reused, `meta.json` keeps the first date (#14) | `--record` | — |
+| GitHub snapshots incl. `stars/`; existing ones are reused, `meta.json` keeps the first date | `--record` | — |
 | fastembed model (`~/.cache/repo-scout/fastembed` or `FASTEMBED_CACHE_PATH`) | first run | — |
 | LLM reply cache | only `eval --llm-draft` with a snapshot dir | — |
 

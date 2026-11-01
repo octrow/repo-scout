@@ -113,3 +113,13 @@ def test_no_fit_call_without_fit_k(monkeypatch):
     monkeypatch.setattr(cli.systemone, "add_fit", lambda *a: calls.append(a))
     _run()
     assert calls == []
+
+
+def test_round2_floor_follows_min_closeness(monkeypatch):
+    """Topics come from rows above --min-closeness, even a lowered one; eval pins its own floor."""
+    _setup(monkeypatch)
+    floors = []
+    monkeypatch.setattr(cli, "_round2", lambda *a, **kw: floors.append(kw["floor"]) or ({}, []))
+    _run(min_closeness=0.5)
+    _run(min_closeness=0, round2_floor=0.64)
+    assert floors == [0.5, 0.64]

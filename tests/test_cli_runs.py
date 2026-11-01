@@ -256,5 +256,5 @@ def test_main_record_replay_turn_off_index_and_fit(monkeypatch, mode):
     [(_, kw)] = calls
     assert configured == [(mode, "/snap")]
     assert kw["index"] is None and kw["fit_k"] == 0
-    assert (kw["now"] == "REC") is (mode == "replay")
+    assert kw["now"] == "REC"  # record and replay share the snapshot date, so a replay repeats the recording
     assert runs.list_runs() == []

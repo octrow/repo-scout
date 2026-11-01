@@ -7,6 +7,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 ## [Unreleased]
 
 ### Fixed
+- Round two picks topics from rows above `--min-closeness`, also a lowered one; before, the floor never went under 0.64. Eval keeps 0.64.
+- `--record` into a folder that already holds snapshots uses the folder's recording date, so `--replay` of it gives the same freshness.
 - All queries are checked against GitHub's limits before the first request, so a bad last query no longer spends quota on the ones before it.
 - GUI: runs saved in Russian show their round two rows under `round two` (not a separate `round 2`), and the Index verdict filter also finds verdicts saved in Russian.
 - A GitHub rate limit while fetching READMEs and commits stops the run with `GitHub: …` (exit 1) after the usual retries. Before, every repo was skipped one by one and kept unscreened as `no details`, and the run was saved.

@@ -348,8 +348,10 @@ def run(
     round2_k: int = ROUND2_K,
     stars_k: int = 0,
     fit_k: int = 0,
+    round2_floor: float | None = None,
 ) -> list[dict]:
-    """All triage rows (including dropped), sorted by closeness, then score."""
+    """All triage rows (including dropped), sorted by closeness, then score.
+    round2_floor: closeness the round two topic rows need (default: min_closeness; eval runs at 0 and pins it)."""
     global last_round2_topics
     last_round2_topics = []
     since = (now - timedelta(days=30 * months)).date().isoformat()
@@ -373,7 +375,8 @@ def run(
     }
     rows = _process(nodes, live, "query", known=known, **kw)
     if task and round2:
-        rows += _run_round2(rows, queries, nodes, kw, k=round2_k, months=months, since=since, limit=limit)
+        floor = min_closeness if round2_floor is None else round2_floor
+        rows += _run_round2(rows, queries, nodes, kw, k=round2_k, floor=floor, months=months, since=since, limit=limit)
     if index:
         _prune_index(index, rows)
         _mark_seen(rows, index)
@@ -385,7 +388,16 @@ def run(
 
 
 def _run_round2(
-    rows: list[dict], queries: list[str], nodes: dict, kw: dict, *, k: int, months: int, since: str, limit: int
+    rows: list[dict],
+    queries: list[str],
+    nodes: dict,
+    kw: dict,
+    *,
+    k: int,
+    floor: float,
+    months: int,
+    since: str,
+    limit: int,
 ) -> list[dict]:
     """Round two search and pipeline; `kw` are the `_process` arguments of round one. Sets last_round2_topics."""
     global last_round2_topics
@@ -394,7 +406,7 @@ def _run_round2(
         queries,
         nodes,
         k=k,
-        floor=max(kw["min_closeness"], semantic.MIN_CLOSENESS),
+        floor=floor,
         lang=kw["lang"],
         months=months,
         since=since,
@@ -619,7 +631,7 @@ def _search(a: argparse.Namespace) -> tuple[list[dict], datetime]:
     exclude, must = compile_all("--exclude", a.exclude), compile_all("--must", a.must)
     snapshot = a.record or a.replay
     github.configure("record" if a.record else "replay" if a.replay else None, snapshot)
-    now = github.recorded_at() if a.replay else datetime.now(UTC)
+    now = github.recorded_at() if snapshot else datetime.now(UTC)  # record into an old dir keeps its date
     rows = run(
         a.queries,
         months=a.months,

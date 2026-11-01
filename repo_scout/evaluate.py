@@ -175,6 +175,7 @@ def eval_set(
             must=must,
             task=task or spec["task"],
             min_closeness=0,
+            round2_floor=MIN_CLOSENESS,  # threshold is applied afterwards; round two keeps the default
             index=idx,
             from_index=from_index,
             round2=round2,
