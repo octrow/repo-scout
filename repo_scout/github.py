@@ -271,12 +271,7 @@ def _fetch_details(chunk: list[str]) -> dict[str, dict | None]:
         if not repo:
             out[name] = None
             continue
-        texts = (repo.get(f"m{k}") for k in range(len(README_NAMES)))
-        target = (repo.get("defaultBranchRef") or {}).get("target") or {}
-        out[name] = {
-            "readme": next((t["text"] for t in texts if t), None),
-            "commits": (target.get("history") or {}).get("nodes") or [],
-        }
+        out[name] = _readme_and_commits(repo, "defaultBranchRef")
     return out
 
 
@@ -290,7 +285,7 @@ def details(names: list[str]) -> dict[str, dict]:
     with ThreadPoolExecutor(DETAILS_WORKERS) as pool:
         for k, (chunk, got) in enumerate(zip(chunks, pool.map(_fetch_details, chunks)), 1):
             log.info("details %d/%d", min(k * DETAILS_CHUNK, len(missing)), len(missing))
-            _store_details(chunk, got, out)
+            _store("details", chunk, got, out)
     return out
 
 
@@ -321,13 +316,14 @@ def _read_cached(kind: str, name: str) -> tuple[bool, dict | None]:
     return True, d
 
 
-def _store_details(chunk: list[str], got: dict[str, dict | None], out: dict[str, dict]) -> None:
+def _store(kind: str, chunk: list[str], got: dict[str, dict | None], out: dict[str, dict]) -> None:
+    """Snapshot fetched entries under `kind` when recording and add the live ones to out."""
     for name, d in got.items():
         if _mode == "record":
-            _write(_cache_dir("details") / f"{_key(name.lower())}.json.gz", d)
+            _write(_cache_dir(kind) / f"{_key(name.lower())}.json.gz", d)
         if d is not None:
             out[name] = d
-    _record_skipped(chunk, got, "details")
+    _record_skipped(chunk, got, kind)
 
 
 def _recheck(name: str) -> bool:
@@ -360,10 +356,10 @@ def _alias_full(i: int, name: str) -> str:
     )
 
 
-def _recent_details(repo: dict) -> dict:
-    """{"readme", "commits"} from the README aliases and the "recent" branch alias of _alias_full."""
+def _readme_and_commits(repo: dict, branch: str) -> dict:
+    """{"readme", "commits"} from the README aliases and the commit history under the `branch` alias."""
     texts = (repo.get(f"m{k}") for k in range(len(README_NAMES)))
-    target = (repo.get("recent") or {}).get("target") or {}
+    target = (repo.get(branch) or {}).get("target") or {}
     return {
         "readme": next((t["text"] for t in texts if t), None),
         "commits": (target.get("history") or {}).get("nodes") or [],
@@ -372,7 +368,7 @@ def _recent_details(repo: dict) -> dict:
 
 def _split_full(repo: dict) -> dict:
     node = {k: v for k, v in repo.items() if k != "recent" and not re.fullmatch(r"m\d+", k)}
-    return {"node": node, "details": _recent_details(repo)}
+    return {"node": node, "details": _readme_and_commits(repo, "recent")}
 
 
 def refresh(names: list[str]) -> dict[str, dict]:
@@ -384,16 +380,6 @@ def refresh(names: list[str]) -> dict[str, dict]:
     for start in range(0, len(missing), DETAILS_CHUNK):
         log.info("refresh from Index: %d–%d of %d", start + 1, min(start + DETAILS_CHUNK, len(missing)), len(missing))
         chunk = missing[start : start + DETAILS_CHUNK]
-        _store_refreshed(chunk, _batch(chunk, _alias_full), out)
+        got = {n: _split_full(r) if r else None for n, r in _batch(chunk, _alias_full).items()}
+        _store("refresh", chunk, got, out)
     return out
-
-
-def _store_refreshed(chunk: list[str], got: dict[str, dict | None], out: dict[str, dict]) -> None:
-    """Split fetched repos into node + details, snapshot them when recording and add the live ones to out."""
-    for name, repo in got.items():
-        d = _split_full(repo) if repo else None
-        if _mode == "record":
-            _write(_cache_dir("refresh") / f"{_key(name.lower())}.json.gz", d)
-        if d is not None:
-            out[name] = d
-    _record_skipped(chunk, got, "refresh")
