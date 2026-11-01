@@ -35,6 +35,7 @@ def test_ok_and_args(monkeypatch):
     calls, _ = run_with(monkeypatch, [(0, OK, "")])
     assert github.search("q", 5) == [{"nameWithOwner": "a/b"}]
     assert "-F" in calls[0] and "n=5" in calls[0] and "q=q" in calls[0]
+    assert github.last_rate_limit is not None
     assert github.last_rate_limit["remaining"] == 9
 
 

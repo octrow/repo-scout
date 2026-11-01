@@ -24,8 +24,10 @@ def test_topics_count_as_signal():
 
 
 def test_homework_and_spam():
-    assert noise_stop(node("o/os-homework", "university assignment")).startswith("noise (homework")
-    assert noise_stop(node("o/keygen-pro", "guaranteed passive income")).startswith("noise (spam")
+    homework = noise_stop(node("o/os-homework", "university assignment"))
+    spam = noise_stop(node("o/keygen-pro", "guaranteed passive income"))
+    assert homework is not None and homework.startswith("noise (homework")
+    assert spam is not None and spam.startswith("noise (spam")
 
 
 def test_poc_is_a_word_not_substring():
@@ -34,7 +36,8 @@ def test_poc_is_a_word_not_substring():
 
 def test_template_is_flag_and_still_noise_if_noisy():
     n = node("o/awesome-boilerplates", "A curated list of boilerplates", ["awesome-list"])
-    assert is_template(n) and noise_stop(n).startswith("noise (awesome")
+    stop = noise_stop(n)
+    assert is_template(n) and stop is not None and stop.startswith("noise (awesome")
     assert is_template(node(template=True))
     assert not is_template(node("o/tool", "does things"))
     assert noise_stop(node("o/starter-app", "a starter kit")) is None

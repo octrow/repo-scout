@@ -3,6 +3,7 @@ import random
 import re
 import subprocess
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 
@@ -75,7 +76,8 @@ def test_share_early_window_is_first_1000_stars():
 
 def test_flag_text_and_threshold():
     h = History(NOW.date(), [2, 3] * 30 + [200] + [2, 3] * 5, True)
-    assert re.fullmatch(r"burst★ \d+% early", flag(h, 0.5))
+    text = flag(h, 0.5)
+    assert text is not None and re.fullmatch(r"burst★ \d+% early", text)
     assert flag(h, 0.99) is None and flag(None) is None
 
 
@@ -86,6 +88,7 @@ def test_history_daily_counts_and_snapshot_roundtrip(monkeypatch, tmp_path):
     github.configure("record", tmp_path)
     now = datetime.fromtimestamp(end + 86400 * 2, UTC)
     h = stars.history("A/b", now)
+    assert h is not None
     assert h.complete and h.counts == [1] * 7 + [2] * 7 + [3] * 3  # days after today dropped
     assert len(calls) == 1 and "X-GitHub-Api-Version: 2026-03-10" in calls[0]
     assert (tmp_path / "stars").is_dir()
@@ -97,10 +100,12 @@ def test_history_daily_counts_and_snapshot_roundtrip(monkeypatch, tmp_path):
 def test_history_pages_until_short_page_and_max_pages(monkeypatch):
     full = json.dumps(weeks_json([[1] * 7] * 30, WEEK0 + 604800 * 100))
     calls = fake_gh(monkeypatch, {1: full, 2: full, 3: "[]"})
-    assert stars._weeks("a/b")[1] is True and len(calls) == 3
+    found = stars._weeks("a/b")
+    assert found is not None and found[1] is True and len(calls) == 3
     monkeypatch.setattr(stars, "MAX_PAGES", 2)
     calls.clear()
-    assert stars._weeks("a/b")[1] is False and len(calls) == 2
+    found = stars._weeks("a/b")
+    assert found is not None and found[1] is False and len(calls) == 2
 
 
 def test_history_404_and_error(monkeypatch):
@@ -136,7 +141,7 @@ def test_add_stars_flag_top_k_only_with_min_stars(monkeypatch):
     h = History(NOW.date(), [2, 3] * 30 + [900] + [2, 3] * 5, True)
     asked = []
     monkeypatch.setattr(stars, "history", lambda name, now: asked.append(name) or h)
-    rows = [
+    rows: list[dict[str, Any]] = [
         {"repo": n, "stars": s, "stop": st, "flags": []}
         for n, s, st in [("a/a", 10, None), ("b/b", 500, "x"), ("c/c", 500, None), ("d/d", 500, None)]
     ]
@@ -215,7 +220,9 @@ def test_rest_404_and_hard_error_do_not_retry(monkeypatch):
 def test_weeks_404_on_later_page_keeps_earlier_pages(monkeypatch):
     full = json.dumps(weeks_json([[1] * 7] * 30, WEEK0 + 604800 * 100))
     fake_gh(monkeypatch, {1: full, 2: (1, "gh: (HTTP 422)")})
-    got, complete = stars._weeks("a/b")
+    found = stars._weeks("a/b")
+    assert found is not None
+    got, complete = found
     assert len(got) == 30 and complete is False
     fake_gh(monkeypatch, {1: (1, "gh: (HTTP 404)")})
     assert stars._weeks("a/b") is None

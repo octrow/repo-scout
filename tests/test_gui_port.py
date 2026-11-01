@@ -29,6 +29,7 @@ def test_foreign_program_offers_next_free_port(busy_port, monkeypatch):
     monkeypatch.setattr(portmod, "our_pid", lambda p: None)
     asked = []
     chosen = portmod.choose(busy_port, ask=lambda q, d: asked.append(d) or d)
+    assert chosen is not None
     assert asked == [True] and chosen > busy_port and portmod.is_free(chosen)
 
 

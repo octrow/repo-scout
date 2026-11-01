@@ -159,7 +159,7 @@ async def test_llm_draft_error_notifies_without_internals(user: User, monkeypatc
     await user.open("/")
     by_label = {e.props.get("label"): e for e in user.find(ui.input).elements}
     by_label["What to search for (any language)"].value = "x"
-    button = user.find(content="Draft from LLM")
+    button = user.find(kind=ui.button, content="Draft from LLM")
     button.click()
     await asyncio.sleep(0.5)
     user.notify.contains("See logs")

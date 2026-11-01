@@ -17,14 +17,17 @@ def test_default_state_matches_cli_defaults() -> None:
 def test_state_params_roundtrip_through_cli() -> None:
     state = _state(lang="python", must="foo\nbar", months=3, no_round2=True, project="p")
     params = sf.state_to_params(state)
-    again = cli.search_params(cli.parse_command(sf.command_text(state)))
+    command = sf.command_text(state)
+    assert command is not None
+    again = cli.search_params(cli.parse_command(command))
     assert again == params
     assert sf.params_to_state(params) == state
 
 
 def test_command_text_needs_task_and_queries() -> None:
     assert sf.command_text(sf.default_state()) is None
-    assert sf.command_text(_state()).startswith("repo-scout ")
+    command = sf.command_text(_state())
+    assert command is not None and command.startswith("repo-scout ")
 
 
 def test_run_argv_uses_module_and_out(tmp_path: Path) -> None:

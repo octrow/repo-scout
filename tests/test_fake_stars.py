@@ -2,6 +2,7 @@ import pytest
 
 from repo_scout import fake_stars
 from repo_scout.fake_stars import best, load, score, split, table
+from repo_scout.stars import History
 
 
 @pytest.mark.filterwarnings("error")  # an unclosed file raises ResourceWarning
@@ -23,7 +24,8 @@ def test_score_counts_flags_and_treats_missing_history_as_unflagged(monkeypatch)
     shares = {"p1": 0.9, "p2": 0.1, "p3": None, "n1": 0.8, "n2": 0.0}
     monkeypatch.setattr(fake_stars.stars, "share", lambda h, mb: shares[h])
     labels = [("p1", 1), ("p2", 1), ("p3", 1), ("p4", 1), ("n1", 0), ("n2", 0)]
-    hist = {n: n for n in shares}  # p4 has no history
+    # p4 has no history; plain names stand in for History because share() is faked
+    hist: dict[str, History] = {n: n for n in shares}  # ty: ignore[invalid-assignment]
     assert score(labels, hist, 0.5, 5) == {
         "thr": 0.5,
         "min_burst": 5,

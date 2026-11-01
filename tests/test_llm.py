@@ -1,10 +1,12 @@
 import json
+from email.message import Message
+from typing import Any
 
 import pytest
 
 from repo_scout import cli, github, llm
 
-GOOD = {
+GOOD: dict[str, Any] = {
     "task": "Find live speech transcription tools.",
     "queries": ["whisper live", "asr topic:asr language:python"],
     "lang": "python",
@@ -13,7 +15,7 @@ GOOD = {
 }
 
 
-def reply(content: str, tokens: int = 10) -> dict:
+def reply(content: object, tokens: int = 10) -> dict:  # content: any JSON value the model sends
     return {"choices": [{"message": {"content": content}}], "usage": {"total_tokens": tokens}}
 
 
@@ -103,7 +105,7 @@ def test_http_error_hides_key(monkeypatch):
     import urllib.error
 
     def boom(*a, **k):
-        raise urllib.error.HTTPError("u", 401, "no", {}, None)
+        raise urllib.error.HTTPError("u", 401, "no", Message(), None)
 
     monkeypatch.setattr(llm._OPENER, "open", boom)
     with pytest.raises(llm.LLMError) as e:

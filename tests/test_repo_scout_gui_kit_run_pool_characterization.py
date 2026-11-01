@@ -167,6 +167,7 @@ def test_submit_registers_state_and_calls_spawner():
 
 def test_submit_none_env_and_meta_become_empty():
     state = run_pool.submit(["x"], spawn=lambda coro, **kw: coro.close())
+    assert state is not None
     assert state.env == {}
     assert state.meta == {}
 
@@ -180,6 +181,7 @@ def test_submit_uses_background_tasks_create_by_default(monkeypatch):
 
     monkeypatch.setattr(run_pool.background_tasks, "create", fake_create)
     state = run_pool.submit(["x"])
+    assert state is not None
     assert seen == [{"name": f"nicegui-kit-run-{state.run_id}"}]
 
 
@@ -213,6 +215,7 @@ def test_submit_prunes_oldest_finished_but_keeps_pending():
         make_state(run_id=f"d{i:02d}", status=DONE)
     state = run_pool.submit(["x"], spawn=lambda coro, **kw: coro.close())
     finished = [s for s in run_pool.RUNS.values() if s.status == DONE]
+    assert state is not None
     assert len(finished) == FINISHED_HISTORY_LIMIT
     assert [s.run_id for s in finished][0] == "d05"
     assert "pending" in run_pool.RUNS
@@ -391,6 +394,7 @@ def test_slots_limit_parallelism_and_queue_positions(monkeypatch):
 
         s1 = run_pool.submit(["one"], spawn=spawn)
         s2 = run_pool.submit(["two"], spawn=spawn)
+        assert s1 is not None and s2 is not None
         await started.wait()
         snapshot = {
             "statuses": (s1.status, s2.status),

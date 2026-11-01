@@ -1,13 +1,14 @@
 """Checks stop rules, flags and score axes."""
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from repo_scout.triage import triage
 
 NOW = datetime(2026, 10, 11, tzinfo=UTC)
 
 
-def repo(stars=0, commits=100, pushed=1, created=400, fork=False):
+def repo(stars=0, commits=100, pushed=1, created=400, fork=False) -> dict[str, Any]:
     def iso(d):
         return (NOW - timedelta(days=d)).isoformat().replace("+00:00", "Z")
 
@@ -76,7 +77,7 @@ def test_last_push_overrides_pushed_at():
 
 
 def test_full_row_shape():
-    r = {
+    r: dict[str, Any] = {
         **repo(stars=150, commits=80, pushed=20, created=400),
         "description": "a|b\nc",
         "forkCount": 3,

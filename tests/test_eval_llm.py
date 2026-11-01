@@ -8,7 +8,9 @@ def test_variants_union_and_draft():
     spec = {"queries": ["a", "b"]}
     d = llm.Draft("T", ("b", "c"), None, ("m",), ())
     v = eval_llm.variants(spec, d)
-    assert v["agent"] is None and v["union"]["queries"] == ["a", "b", "c"]
+    union = v["union"]
+    assert union is not None
+    assert v["agent"] is None and union["queries"] == ["a", "b", "c"]
     assert v["draft"] == {"task": "T", "queries": ["b", "c"], "lang": "", "must": ["m"], "exclude": []}
 
 
@@ -47,6 +49,7 @@ def test_eval_one_end_to_end(tmp_path: Path, monkeypatch):
         r = eval_llm.eval_one(p, "replay")
     finally:
         github.configure(None, None)
+    assert r is not None
     assert r["name"] == "s" and r["stats"] == {"tokens": 5, "seconds": 1.5}
     assert [o and o.get("queries") for o in seen] == [None, ["z"], ["q", "z"]]
     assert "| s | 2 | 1/0 | 1/0 | 1/0 | 5 | 1.5 |" in eval_llm.table([r])
