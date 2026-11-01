@@ -202,24 +202,32 @@ def _batch(chunk: list[str], alias) -> dict[str, dict | None]:
     Single failing repo is retried; on persistent failure, it is skipped with a warning and tracked in last_failed."""
     q = "query{rateLimit{cost remaining resetAt} " + " ".join(alias(i, n) for i, n in enumerate(chunk)) + "}"
     try:
-        resp = _cap_text(
-            _graphql_live(
-                q,
-                {},
-                retries=(EVAL_SINGLE_RETRIES if _mode == "record" and _details_dir else MAX_RETRIES)
-                if len(chunk) == 1
-                else 0,
-            )
-        )
+        resp = _cap_text(_graphql_live(q, {}, retries=_batch_retries(len(chunk))))
     except GitHubError as e:
-        if len(chunk) > 1:
-            log.info("batch of %d failed (%s), splitting in half", len(chunk), e)
-        if len(chunk) == 1:
-            log.warning("warning: %s skipped: %s", chunk[0], e)
-            last_failed.add(chunk[0])
-            return {}
-        mid = len(chunk) // 2
-        return _batch(chunk[:mid], alias) | _batch(chunk[mid:], alias)
+        return _split_failed_batch(chunk, alias, e)
+    return _alias_results(chunk, resp)
+
+
+def _batch_retries(size: int) -> int:
+    """Only a single repo is retried, and less when recording eval details into the shared cache."""
+    if size != 1:
+        return 0
+    return EVAL_SINGLE_RETRIES if _mode == "record" and _details_dir else MAX_RETRIES
+
+
+def _split_failed_batch(chunk: list[str], alias, e: GitHubError) -> dict[str, dict | None]:
+    """A failed single repo is skipped and tracked in last_failed; a larger batch is retried in two halves."""
+    if len(chunk) == 1:
+        log.warning("warning: %s skipped: %s", chunk[0], e)
+        last_failed.add(chunk[0])
+        return {}
+    log.info("batch of %d failed (%s), splitting in half", len(chunk), e)
+    mid = len(chunk) // 2
+    return _batch(chunk[:mid], alias) | _batch(chunk[mid:], alias)
+
+
+def _alias_results(chunk: list[str], resp: dict) -> dict[str, dict | None]:
+    """{name: node | None (deleted)}; an alias that failed without data is skipped and tracked in last_failed."""
     data = resp.get("data") or {}
     # an alias that errored for any reason but NOT_FOUND is a failure, not a deleted repo
     failed = {e["path"][0] for e in resp.get("errors") or [] if e.get("path") and e.get("type") != "NOT_FOUND"}
