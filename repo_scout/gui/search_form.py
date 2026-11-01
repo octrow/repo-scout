@@ -15,7 +15,7 @@ RUN_PREFIX, EVAL_PREFIX = "run:", "eval:"
 EVAL_DIR = Path(__file__).resolve().parents[2] / "eval"
 DEV_DIR = Path.home() / "dev"
 NUMBER_KEYS = ("months", "new_days", "limit", "min_closeness", "from_index", "round2_k", "stars_k")
-FLAG_KEYS = ("no_round2", "no_stars_check")
+FLAG_KEYS = ("no_round2", "no_stars_check", "no_fit")
 
 AGENT_PROMPT = """Task (to find ready-made solutions on GitHub):
 {task}

@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 
 ## [Unreleased]
 
+### Fixed
+- `--must` and `--exclude` see the whole README: it was cut to 6000 chars, so a required word further down dropped the repo. The cap is now 100 000 chars.
+- The GUI keeps `--no-fit`: a pasted command or a re-run of a saved run no longer loses it, and the Search form has a "Skip the fit column" checkbox.
+
 ## [0.1.9] - 2026-11-01
 
 ### Security

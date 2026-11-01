@@ -24,6 +24,11 @@ def test_state_params_roundtrip_through_cli() -> None:
     assert sf.params_to_state(params) == state
 
 
+def test_pasted_no_fit_survives_the_form() -> None:
+    params = cli.search_params(cli.parse_command('repo-scout --no-fit --task T "q one"'))
+    assert "--no-fit" in sf.command_text(sf.params_to_state(params))
+
+
 def test_command_text_needs_task_and_queries() -> None:
     assert sf.command_text(sf.default_state()) is None
     command = sf.command_text(_state())

@@ -17,7 +17,9 @@ from repo_scout.log import log
 MAX_RETRIES = 3
 EVAL_SINGLE_RETRIES = 1  # when recording eval, don't wait 35s for single failing repo: skip is recorded in snapshot
 TRANSIENT = (502, 503, 504)
-README_MAX_CHARS = 6_000  # sufficient for regexes and embeddings; keeps snapshot sizes bounded
+# ponytail: --must/--exclude match the whole stored README; the cap only guards against huge READMEs
+# (snapshot and Index size). A word past 100 KB is still missed; match before the cap if that shows up.
+README_MAX_CHARS = 100_000
 
 NODE_FIELDS = """nameWithOwner url description stargazerCount forkCount pushedAt createdAt isArchived isFork isTemplate
 repositoryTopics(first:20){nodes{topic{name}}}

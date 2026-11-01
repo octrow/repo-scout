@@ -38,6 +38,7 @@ RU = {
     "Repos to check for star bursts": "Репо для проверки всплеска звёзд",
     "Skip round 2": "Без второго круга",
     "Skip star burst check": "Без проверки всплеска звёзд",
+    "Skip the fit column": "Без колонки «Пригодность»",
     "Could not load the draft: the file is damaged or unreadable": "Не удалось загрузить черновик: файл повреждён или не читается",
     "Draft failed: the model did not answer or sent an invalid answer. See the log.": "Черновик не получился: модель не ответила или ответила с ошибкой. Подробности в логе.",
     "Describe what to find": "Опишите, что найти",

@@ -31,7 +31,11 @@ NUMBER_LABELS = {
     "stars_k": "Repos to check for star bursts",
 }
 FieldT = TypeVar("FieldT", bound=ValueElement)
-FLAG_LABELS = {"no_round2": "Skip round 2", "no_stars_check": "Skip star burst check"}
+FLAG_LABELS = {
+    "no_round2": "Skip round 2",
+    "no_stars_check": "Skip star burst check",
+    "no_fit": "Skip the fit column",
+}
 
 
 def _verdict_projects() -> list[str]:

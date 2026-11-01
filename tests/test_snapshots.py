@@ -108,8 +108,15 @@ def test_details_per_repo_snapshots(monkeypatch, tmp_path):
         github.details(["x/y"])
 
 
+def test_readme_cap_keeps_words_past_6000_chars(monkeypatch):
+    """--must / --exclude run on the stored README: a word after 6 KB must survive the cap."""
+    big = json.dumps({"data": {"r0": {"m0": {"text": "x" * 20_000 + " postgres"}}}})
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, big, ""))
+    assert github.graphql("q", {})["data"]["r0"]["m0"]["text"].endswith("postgres")
+
+
 def test_readme_text_is_capped(monkeypatch):
-    big = json.dumps({"data": {"r0": {"m0": {"text": "x" * 20_000}}}})
+    big = json.dumps({"data": {"r0": {"m0": {"text": "x" * (github.README_MAX_CHARS + 1)}}}})
     monkeypatch.setattr(subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, big, ""))
     assert len(github.graphql("q", {})["data"]["r0"]["m0"]["text"]) == github.README_MAX_CHARS
 

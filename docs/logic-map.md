@@ -101,7 +101,7 @@ Module: repo_scout/cli.py::_screen_details, repo_scout/github.py::details, repo_
 
 Batches of 10 aliases, 3 in parallel. A failing batch is split in half without retries; a single failing
 repo is retried, then skipped with the `no details` flag (#9). A README is one of 5 names at HEAD
-(`README.md`, `readme.md`, `README.rst`, `README`, `Readme.md`), cut to 6000 chars (#1, #8).
+(`README.md`, `readme.md`, `README.rst`, `README`, `Readme.md`), cut to 100 000 chars (#8).
 Freshness and `dead` are recomputed from the last substantive commit (bots, cosmetic and `Merge…` commits
 ignored; commits dated after `now` ignored). None of the 20 substantive → `cosmetic only` flag and
 freshness from the oldest of the 20, which can make the row `dead`.
@@ -173,8 +173,8 @@ raise at once. Without a key: off. In the GUI the button shows only with the key
 Module: repo_scout/gui/app.py::main, repo_scout/gui/search_page.py::search, repo_scout/gui/runs_logic.py::sorted_rows
 
 The Search page builds the same argv (`cli.to_argv`) and runs `python -m repo_scout … --out PATH` (or the
-frozen binary) as a subprocess with a live log. The form has no `--no-fit`, `--json`, `--all`; a pasted or
-re-run `--no-fit` is lost (#2). It opens the Index on load for project autocomplete and lists `~/dev`.
+frozen binary) as a subprocess with a live log. The form has no `--json`, `--all`; they are
+dropped from a pasted command. It opens the Index on load for project autocomplete and lists `~/dev`.
 Runs pages read the saved run JSON. The Index page talks to `Index` directly (rename, forget).
 The Eval page runs `repo-scout eval … --out <runs>/../eval-reports/*.md`; its Record toggle uses the network.
 The server listens on 127.0.0.1 and `restrict_hosts` answers 400 to any other Host name (DNS rebinding).
@@ -216,8 +216,6 @@ Other modes: `--record`, `--fake-stars`, `--llm-draft`, `--index-check` (two run
 ## Known gaps
 
 Open HIGH and MEDIUM findings; details in `PLAN.md` → "Logic map findings".
-- `--must` / `--exclude` see only the first 6000 chars of a README: false drops and false keeps (#1).
-- GUI loses `--no-fit`, so README text goes to TypeSafe against the user's flag (#2).
 - `--lang cpp` / `golang` may drop every result: exact match against GitHub's display name (#3).
 - `--months` above 6 or `0` cannot keep anything older than the `dead` limit (#4).
 - Index rows skip `pushed:`, `mirror:false`, `language:` (#5) and are never pruned (#6).
