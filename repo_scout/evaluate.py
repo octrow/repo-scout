@@ -250,47 +250,75 @@ def _report(a: argparse.Namespace, ap: argparse.ArgumentParser) -> None:
     if a.export_verdicts:
         return print(export_verdicts(Index(default_path()), a.project))
     if a.fake_stars:
-        from repo_scout import fake_stars
-
-        try:
-            return print(fake_stars.run("record" if a.record else "replay", a.all_grid))
-        except (ValueError, GitHubError) as e:
-            sys.exit(f"eval: {e}")
+        return _fake_stars_report(a)
     if not a.sets:
         ap.error("eval/*.toml sets required")
     atexit.register(github.log_usage)
     if a.llm_draft:
-        from repo_scout import eval_llm
+        return _llm_draft_report(a)
+    if a.index_check:
+        return _index_check_report(a)
+    _sets_report(a, _run_sets(a))
 
-        try:
-            return print(eval_llm.report(a.sets, "record" if a.record else "replay"))
-        except (ValueError, GitHubError, eval_llm.LLMError) as e:
-            sys.exit(f"eval: {e}")
+
+def _mode(a: argparse.Namespace) -> str:
+    return "record" if a.record else "replay"
+
+
+def _fake_stars_report(a: argparse.Namespace) -> None:
+    from repo_scout import fake_stars
+
     try:
-        if a.index_check:
-            return print(
-                "\n".join(
-                    filter(None, (index_check(p, "record" if a.record else "replay", a.from_index) for p in a.sets))
-                )
-            )
-        sets = [eval_set(p, "record" if a.record else "replay", a.task, round2=not a.no_round2) for p in a.sets]
+        print(fake_stars.run(_mode(a), a.all_grid))
     except (ValueError, GitHubError) as e:
         sys.exit(f"eval: {e}")
+
+
+def _llm_draft_report(a: argparse.Namespace) -> None:
+    from repo_scout import eval_llm
+
+    try:
+        print(eval_llm.report(a.sets, _mode(a)))
+    except (ValueError, GitHubError, eval_llm.LLMError) as e:
+        sys.exit(f"eval: {e}")
+
+
+def _index_check_report(a: argparse.Namespace) -> None:
+    try:
+        print("\n".join(filter(None, (index_check(p, _mode(a), a.from_index) for p in a.sets))))
+    except (ValueError, GitHubError) as e:
+        sys.exit(f"eval: {e}")
+
+
+def _run_sets(a: argparse.Namespace) -> list[tuple[dict, list[dict]]]:
+    try:
+        return [eval_set(p, _mode(a), a.task, round2=not a.no_round2) for p in a.sets]
+    except (ValueError, GitHubError) as e:
+        sys.exit(f"eval: {e}")
+
+
+def _capped(sets: list[tuple[dict, list[dict]]], top: int | None) -> tuple[list[dict], list[list[str]]]:
+    """Metrics and top-N kept repos of each set after the default closeness threshold."""
     ms, tops = [], []
     for spec, rows in sets:
         capped = [dict(r) for r in rows]
         apply_closeness(capped, MIN_CLOSENESS)
         ms.append(metrics(spec, capped))
-        tops.append([r["repo"] for r in capped if not r["stop"]][: a.top or 0])
+        tops.append([r["repo"] for r in capped if not r["stop"]][: top or 0])
+    return ms, tops
+
+
+def _calls_text(sets: list[tuple[dict, list[dict]]]) -> str:
+    return "\n".join(
+        f"{s['name']}: search {s['calls'].get('search', 0)}, details {s['calls'].get('details', 0)}" for s, _ in sets
+    )
+
+
+def _sets_report(a: argparse.Namespace, sets: list[tuple[dict, list[dict]]]) -> None:
+    ms, tops = _capped(sets, a.top)
     print(summary_table(ms))
     if a.calls:
-        print(
-            "\n"
-            + "\n".join(
-                f"{s['name']}: search {s['calls'].get('search', 0)}, details {s['calls'].get('details', 0)}"
-                for s, _ in sets
-            )
-        )
+        print("\n" + _calls_text(sets))
     if a.sweep:
         print("\n" + sweep(sets))
     for m, top in zip(ms, tops):
