@@ -1,0 +1,2 @@
+exempt:
+  complexity_cyclomatic: "radon counts each assert as a branch, so three long tests read cc 11-14 with no branching; project code is gated by ruff C90 (max-complexity 10) in CI"
