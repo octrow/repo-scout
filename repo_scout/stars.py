@@ -95,7 +95,7 @@ def _daily(weeks: list[dict], now: datetime, complete: bool) -> History:
 
 def history(name: str, now: datetime) -> History | None:
     """Daily stars for repo. Snapshot at stars/<sha16(lower name)>.json.gz; None if GitHub cannot provide history."""
-    path = github._dir / "stars" / f"{github._key(name.lower())}.json.gz" if github._mode else None
+    path = github.snapshot_dir() / "stars" / f"{github._key(name.lower())}.json.gz" if github._mode else None
     if path and path.exists():
         snap = github._read(path)
     elif github._mode == "replay":

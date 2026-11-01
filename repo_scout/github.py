@@ -100,8 +100,9 @@ def configure(mode: str | None, directory: Path | str | None, details_dir: Path 
     _mode, _dir = mode, Path(directory) if directory else None
     _details_dir = Path(details_dir) if details_dir else None
     if mode == "record":
-        _dir.mkdir(parents=True, exist_ok=True)
-        meta = _dir / "meta.json"
+        root = snapshot_dir()
+        root.mkdir(parents=True, exist_ok=True)
+        meta = root / "meta.json"
         if not meta.exists():  # append recording preserves original snapshot timestamp
             meta.write_text(json.dumps({"recorded_at": datetime.now(UTC).isoformat()}))
 
@@ -111,8 +112,15 @@ def snapshot() -> tuple[str | None, Path | None]:
     return _mode, _dir
 
 
+def snapshot_dir() -> Path:
+    """Snapshot directory; configure() sets it whenever a snapshot mode is on."""
+    if _dir is None:
+        raise GitHubError("no snapshot directory: configure() was called without one")
+    return _dir
+
+
 def recorded_at() -> datetime:
-    path = _dir / "meta.json"
+    path = snapshot_dir() / "meta.json"
     if not path.exists():
         raise GitHubError(f"missing snapshot {path}: run --record first")
     return datetime.fromisoformat(json.loads(path.read_text())["recorded_at"])
@@ -123,11 +131,11 @@ def _key(text: str) -> str:
 
 
 def _snapshot_path(query: str, variables: dict) -> Path:
-    return _dir / f"{_key(json.dumps({'query': query, 'variables': variables}, sort_keys=True))}.json.gz"
+    return snapshot_dir() / f"{_key(json.dumps({'query': query, 'variables': variables}, sort_keys=True))}.json.gz"
 
 
 def _cache_dir(kind: str) -> Path:
-    return _details_dir if kind == "details" and _details_dir else _dir / kind
+    return _details_dir if kind == "details" and _details_dir else snapshot_dir() / kind
 
 
 def _write(path: Path, obj) -> None:

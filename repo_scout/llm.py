@@ -167,25 +167,28 @@ def _tokens(response: dict) -> int:
 
 
 def _snapshot_path(messages: list[dict]) -> Path | None:
-    mode, directory = github.snapshot()
+    mode, _ = github.snapshot()
     if not mode:
         return None
     text = json.dumps({"model": model(), "messages": messages}, ensure_ascii=False, sort_keys=True)
-    return directory / "llm" / f"{hashlib.sha256(text.encode()).hexdigest()[:16]}.json.gz"
+    return github.snapshot_dir() / "llm" / f"{hashlib.sha256(text.encode()).hexdigest()[:16]}.json.gz"
 
 
 def _chat(messages: list[dict], pending: list | None = None) -> str:
     """Model response text. In record mode, responses are queued in `pending` and written after validation."""
     mode, _ = github.snapshot()
     path = _snapshot_path(messages)
+    rec: dict
     if path and path.exists():
         rec = github._read(path)
     elif mode == "replay":
+        assert path is not None  # a snapshot mode always yields a path
         raise LLMError(f"No LLM reply snapshot {path.name}. Record it with --record")
     else:
         started = time.monotonic()
         rec = {"response": _post(messages), "seconds": round(time.monotonic() - started, 2)}
         if mode == "record":
+            assert path is not None  # a snapshot mode always yields a path
             if pending is None:
                 github._write(path, rec)
             else:
