@@ -5,6 +5,8 @@ switch saves it to the user settings file. Keys are the English strings themselv
 Domain values (verdicts, stop reasons, flags), repo names and commands are never translated.
 """
 
+from __future__ import annotations
+
 import os
 from typing import TYPE_CHECKING
 
@@ -16,7 +18,7 @@ if TYPE_CHECKING:  # nicegui stays out of the logic modules at runtime
 
 LANG_VAR = "REPO_SCOUT_LANG"
 LANGS = ("en", "ru")
-QUASAR: "dict[str, Language]" = {"en": "en-US", "ru": "ru"}  # Quasar's own texts (pagination etc.)
+QUASAR: dict[str, Language] = {"en": "en-US", "ru": "ru"}  # Quasar's own texts (pagination etc.)
 
 RU = {
     # navigation and headings
