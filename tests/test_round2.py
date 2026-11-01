@@ -93,3 +93,23 @@ def test_round2_topics_exposed(monkeypatch):
     assert cli.last_round2_topics == ["asr", "x"]
     _run(round2=False)
     assert cli.last_round2_topics == []
+
+
+def test_fit_gets_texts_of_kept_rows_from_both_rounds(monkeypatch):
+    _setup(monkeypatch)
+    calls = []
+    monkeypatch.setattr(cli.systemone, "add_fit", lambda rows, task, texts, k: calls.append((task, dict(texts), k)))
+    rows = _run(fit_k=3)
+    [(task, texts, k)] = calls
+    kept = {r["repo"]: r for r in rows if not r["stop"]}
+    assert task == "t" and k == 3
+    assert texts == {n: semantic.candidate_text(r, "r") for n, r in kept.items()}
+    assert set(texts) == {"a/one", "a/two", "b/new"}
+
+
+def test_no_fit_call_without_fit_k(monkeypatch):
+    _setup(monkeypatch)
+    calls = []
+    monkeypatch.setattr(cli.systemone, "add_fit", lambda *a: calls.append(a))
+    _run()
+    assert calls == []

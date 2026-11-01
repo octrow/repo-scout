@@ -146,3 +146,115 @@ def test_help_survives_legacy_code_page():
     env = {**os.environ, "PYTHONIOENCODING": "cp1252"}
     r = subprocess.run([sys.executable, "-m", "repo_scout", "--help"], capture_output=True, env=env)
     assert r.returncode == 0, r.stderr.decode(errors="replace")
+
+
+MUST = {**ROW, "repo": "e/f", "stop": "missing required: x"}
+LEGACY_MUST = {**ROW, "repo": "g/h", "stop": "нет обязательного: y"}
+
+
+def _stub_run(monkeypatch, result):
+    calls = []
+
+    def fake(*a, **k):
+        calls.append((a, k))
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    monkeypatch.setattr(cli, "run", fake)
+    monkeypatch.setattr(cli, "Index", lambda p: "IDX")
+    configured = []
+    monkeypatch.setattr(cli.github, "configure", lambda *a: configured.append(a))
+    monkeypatch.setattr(cli.github, "recorded_at", lambda: "REC")
+    return calls, configured
+
+
+def test_main_markdown_hides_dropped_and_lists_must(monkeypatch, capsys):
+    _stub_run(monkeypatch, [ROW, DROPPED, MUST, LEGACY_MUST])
+    _go(monkeypatch, _argv("--no-save"))
+    out = capsys.readouterr().out
+    assert out == (
+        cli.to_markdown([ROW])
+        + "\n\ndropped by --must: e/f, g/h\n"
+        + "\nfound 4, passed stop rules 1, dropped 3 (--all to show)\n"
+    )
+
+
+def test_main_markdown_all_without_must(monkeypatch, capsys):
+    _stub_run(monkeypatch, [ROW, DROPPED])
+    _go(monkeypatch, _argv("--no-save", "--all"))
+    out = capsys.readouterr().out
+    assert out == cli.to_markdown([ROW, DROPPED]) + "\n\nfound 2, passed stop rules 1, dropped 1\n"
+
+
+def test_main_json_all_saves_run(monkeypatch, capsys):
+    import json
+
+    _stub_run(monkeypatch, [ROW, DROPPED, MUST])
+    _go(monkeypatch, _argv("--json", "--all"))
+    out = json.loads(capsys.readouterr().out)
+    assert [r["repo"] for r in out["rows"]] == ["a/b", "c/d"]
+    assert [r["repo"] for r in out["dropped_by_must"]] == ["e/f"]
+    [s] = runs.list_runs()
+    assert len(runs.load(s.path)["rows"]) == 3
+
+
+def test_main_value_error_exits_2(monkeypatch, capsys):
+    _stub_run(monkeypatch, ValueError("bad query"))
+    with pytest.raises(SystemExit) as e:
+        _go(monkeypatch, _argv())
+    assert e.value.code == 2 and "bad query" in capsys.readouterr().err
+    assert runs.list_runs() == []
+
+
+def test_main_bad_regex_exits_2_before_run(monkeypatch, capsys):
+    calls, configured = _stub_run(monkeypatch, [])
+    with pytest.raises(SystemExit) as e:
+        _go(monkeypatch, _argv("--must", "("))
+    assert e.value.code == 2 and "--must '('" in capsys.readouterr().err
+    assert calls == [] and configured == []
+
+
+def test_main_github_error_exits_with_message(monkeypatch):
+    _stub_run(monkeypatch, cli.GitHubError("rate limit"))
+    with pytest.raises(SystemExit) as e:
+        _go(monkeypatch, _argv())
+    assert e.value.code == "GitHub: rate limit"
+
+
+def test_main_passes_defaults_to_run(monkeypatch):
+    calls, configured = _stub_run(monkeypatch, [])
+    _go(monkeypatch, _argv("--no-save", "--exclude", "a", "--must", "b"))
+    [(args, kw)] = calls
+    assert configured == [(None, None)]
+    assert args == (["q1"],) and kw["task"] == "Find X" and kw["index"] == "IDX"
+    assert [p.pattern for p in kw["exclude"]] == ["a"] and [p.pattern for p in kw["must"]] == ["b"]
+    assert kw["now"].tzinfo is cli.UTC
+    assert {k: kw[k] for k in ("months", "new_days", "limit", "lang", "from_index", "round2", "round2_k")} == {
+        "months": 6,
+        "new_days": 60,
+        "limit": 50,
+        "lang": None,
+        "from_index": cli.FROM_INDEX,
+        "round2": True,
+        "round2_k": cli.ROUND2_K,
+    }
+    assert kw["stars_k"] == cli.STARS_K and kw["fit_k"] == cli.systemone.FIT_K
+
+
+def test_main_off_switches(monkeypatch):
+    calls, _ = _stub_run(monkeypatch, [])
+    _go(monkeypatch, _argv("--no-save", "--no-fit", "--no-stars-check", "--no-round2", "--stars-k", "3"))
+    [(_, kw)] = calls
+    assert kw["fit_k"] == 0 and kw["stars_k"] == 0 and kw["round2"] is False and kw["index"] == "IDX"
+
+
+@pytest.mark.parametrize("mode", ["record", "replay"])
+def test_main_record_replay_turn_off_index_and_fit(monkeypatch, mode):
+    calls, configured = _stub_run(monkeypatch, [ROW])
+    _go(monkeypatch, _argv(f"--{mode}", "/snap"))
+    [(_, kw)] = calls
+    assert configured == [(mode, "/snap")]
+    assert kw["index"] is None and kw["fit_k"] == 0
+    assert (kw["now"] == "REC") is (mode == "replay")
+    assert runs.list_runs() == []
