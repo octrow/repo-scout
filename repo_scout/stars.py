@@ -108,20 +108,27 @@ def bursts(counts: list[int], min_count: int = MIN_BURST, complete: bool = True)
         return [False] * n  # truncated history: single viral spike without baseline
     flags, before = [], 0
     for i, today in enumerate(counts):
-        med = mad = 0.0
-        if i >= WINDOW:
-            win = counts[i - WINDOW : i]
-            med = median(win)
-            mad = median(abs(v - med) for v in win)
-        if before >= MIN_TOTAL and mad > 0.001 and i >= WINDOW:
-            hit = today > med + MAD_THRESHOLD * mad and today > med + 1
-        else:  # fallback for small repos and MAD == 0
-            hit = today > 0 and (
-                (today / max(1, before) * 100 > GROWTH_PERCENT and today > 5) or today > max(5, med * 2)
-            )
-        flags.append(hit and today >= min_count)
+        med, mad = _window(counts, i)
+        flags.append(_hit(today, before, med, mad) and today >= min_count)
         before += today
     return flags
+
+
+def _window(counts: list[int], i: int) -> tuple[float, float]:
+    """(median, MAD) of the 28 days before day i; (0, 0) while the window is not full."""
+    if i < WINDOW:
+        return 0.0, 0.0
+    win = counts[i - WINDOW : i]
+    med = median(win)
+    return med, median(abs(v - med) for v in win)
+
+
+def _hit(today: int, before: int, med: float, mad: float) -> bool:
+    """MAD rule once 30★ and a full window exist (mad is 0 without a window); growth fallback otherwise."""
+    if before >= MIN_TOTAL and mad > 0.001:
+        return today > med + MAD_THRESHOLD * mad and today > med + 1
+    # fallback for small repos and MAD == 0
+    return today > 0 and ((today / max(1, before) * 100 > GROWTH_PERCENT and today > 5) or today > max(5, med * 2))
 
 
 def share(h: History, min_count: int = MIN_BURST) -> float | None:
