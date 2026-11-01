@@ -251,28 +251,39 @@ def _quantified(pattern: str, i: int) -> bool:
     return i < len(pattern) and pattern[i] in "+*{"
 
 
+def _close_group(stack: list[bool], quantified: bool) -> bool:
+    """Pop the group closed by `)`; True when the group holds a quantifier and is itself quantified."""
+    inner = stack.pop()
+    stack[-1] = stack[-1] or inner or quantified
+    return inner and quantified
+
+
+def _has_nested_quantifier(pat: str) -> bool:
+    stack, in_class, i = [False], False, 0  # stack: track quantifier inside open group
+    while i < len(pat):
+        c = pat[i]
+        if c == "\\":
+            i += 1
+        elif in_class:
+            in_class = c != "]"
+        elif c == "[":
+            in_class = True
+        elif c == "(":
+            stack.append(False)
+        elif c == ")" and len(stack) > 1:
+            if _close_group(stack, _quantified(pat, i + 1)):
+                return True
+        elif c in "+*{":
+            stack[-1] = True
+        i += 1
+    return False
+
+
 def reject_nested_quantifiers(field: str, patterns: tuple[str, ...]) -> None:
     """Reject patterns with nested quantifiers (e.g. `(\\w+\\s?)+`) to avoid ReDoS."""
     for pat in patterns:
-        stack, in_class, i = [False], False, 0  # stack: track quantifier inside open group
-        while i < len(pat):
-            c = pat[i]
-            if c == "\\":
-                i += 1
-            elif in_class:
-                in_class = c != "]"
-            elif c == "[":
-                in_class = True
-            elif c == "(":
-                stack.append(False)
-            elif c == ")" and len(stack) > 1:
-                inner = stack.pop()
-                if inner and _quantified(pat, i + 1):
-                    raise ValueError(f"field {field}: nested quantifiers in {pat[:40]!r} (ReDoS risk)")
-                stack[-1] = stack[-1] or inner or _quantified(pat, i + 1)
-            elif c in "+*{":
-                stack[-1] = True
-            i += 1
+        if _has_nested_quantifier(pat):
+            raise ValueError(f"field {field}: nested quantifiers in {pat[:40]!r} (ReDoS risk)")
 
 
 def parse_draft(text: str) -> Draft:
