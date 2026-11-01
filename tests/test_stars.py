@@ -1,4 +1,5 @@
 import json
+import random
 import re
 import subprocess
 from datetime import UTC, datetime
@@ -7,7 +8,7 @@ import pytest
 
 from repo_scout import github, stars
 from repo_scout.github import GitHubError
-from repo_scout.stars import History, burst_forks, bursts, flag, share
+from repo_scout.stars import MIN_BURST, History, burst_forks, bursts, flag, share
 
 NOW = datetime(2026, 10, 11, tzinfo=UTC)  # Sunday
 WEEK0 = 1_790_000_000 - 1_790_000_000 % 604800  # week start
@@ -153,6 +154,90 @@ def test_add_stars_flag_survives_github_error(monkeypatch):
     rows = [{"repo": "a/a", "stars": 500, "stop": None, "flags": []}]
     add_stars_flag(rows, 5, NOW)
     assert rows[0]["flags"] == []
+
+
+def _burst_days(counts, min_count=MIN_BURST, complete=True):
+    return [i for i, f in enumerate(bursts(counts, min_count, complete)) if f]
+
+
+def test_bursts_pinned_on_mixed_series():
+    rng = random.Random(7)
+    noisy = [rng.choice([0, 0, 1, 2, 3, 5, 8, 40]) for _ in range(120)]
+    tail = [42, 43, 51, 53, 61, 68, 69, 73, 77, 82, 86, 94, 97, 114]
+    assert _burst_days(noisy, 1) == [2, 11, 12, 16, 21, 27, 30, 39, 40, *tail]
+    assert _burst_days(noisy, 5, False) == [2, 11, 12, 16, 21, 27, 39, 40, *tail]
+    assert _burst_days(noisy, 10) == [39, *tail]
+    assert _burst_days([0, 0, 6, 0, 1, 7, 0, 0, 12, 1] * 4, 5) == [2, 5, 8, 12, 15, 18, 22, 25, 28, 32, 35, 38]
+    assert _burst_days([2] * 40 + [9, 2, 2, 30] + [2] * 10) == [40, 43]
+    assert _burst_days([0, 1, 0, 0, 4, 0, 1, 6, 0, 0, 2, 9, 0, 3], 1) == [7, 11]
+    assert bursts([]) == []
+
+
+def fake_gh_seq(monkeypatch, replies: list[tuple[int, str]]):
+    """Each call pops the next (returncode, stdout-or-stderr); sleeps are recorded, not slept."""
+    calls, sleeps = [], []
+
+    def run(cmd, **kw):
+        calls.append(cmd)
+        code, text = replies.pop(0)
+        return subprocess.CompletedProcess(cmd, code, "" if code else text, text if code else "")
+
+    monkeypatch.setattr(subprocess, "run", run)
+    monkeypatch.setattr(stars.time, "sleep", sleeps.append)
+    return calls, sleeps
+
+
+@pytest.mark.parametrize(
+    "err", ["gh: Bad Gateway (HTTP 502)", "gh: (HTTP 429)", "gh: API Rate Limit exceeded (HTTP 403)"]
+)
+def test_rest_retries_transient_and_rate_limit(monkeypatch, err):
+    before = github.calls["stars"]
+    calls, sleeps = fake_gh_seq(monkeypatch, [(1, err), (1, err), (0, "[1]")])
+    assert stars._rest("p") == [1]
+    assert len(calls) == 3 and sleeps == [5, 10] and github.calls["stars"] - before == 3
+
+
+def test_rest_gives_up_after_max_retries(monkeypatch):
+    calls, sleeps = fake_gh_seq(monkeypatch, [(1, "gh: (HTTP 503)")] * (github.MAX_RETRIES + 1))
+    with pytest.raises(GitHubError, match="star history p: GitHub did not respond"):
+        stars._rest("p")
+    assert len(calls) == github.MAX_RETRIES + 1 and sleeps == [5, 10, 20]
+
+
+def test_rest_404_and_hard_error_do_not_retry(monkeypatch):
+    calls, sleeps = fake_gh_seq(monkeypatch, [(1, "gh: Not Found (HTTP 404)")])
+    assert stars._rest("p") is None and len(calls) == 1 and sleeps == []
+    fake_gh_seq(monkeypatch, [(1, "  gh: Forbidden (HTTP 403)\n")])
+    with pytest.raises(GitHubError, match=r"^gh failed: gh: Forbidden \(HTTP 403\)$"):
+        stars._rest("p")
+
+
+def test_weeks_404_on_later_page_keeps_earlier_pages(monkeypatch):
+    full = json.dumps(weeks_json([[1] * 7] * 30, WEEK0 + 604800 * 100))
+    fake_gh(monkeypatch, {1: full, 2: (1, "gh: (HTTP 422)")})
+    got, complete = stars._weeks("a/b")
+    assert len(got) == 30 and complete is False
+    fake_gh(monkeypatch, {1: (1, "gh: (HTTP 404)")})
+    assert stars._weeks("a/b") is None
+
+
+def test_history_records_unavailable_and_replays_none(monkeypatch, tmp_path):
+    fake_gh(monkeypatch, {1: (1, "gh: (HTTP 404)")})
+    github.configure("record", tmp_path)
+    assert stars.history("a/b", NOW) is None
+    snap = tmp_path / "stars" / f"{github._key('a/b')}.json.gz"
+    assert github._read(snap) is None
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: pytest.fail("network in replay"))
+    github.configure("replay", tmp_path)
+    assert stars.history("a/b", NOW) is None
+
+
+def test_history_empty_weeks_is_none_and_live_mode_writes_nothing(monkeypatch, tmp_path):
+    fake_gh(monkeypatch, {1: "[]"})
+    assert stars.history("a/b", NOW) is None
+    github.configure("record", tmp_path)
+    assert stars.history("a/b", NOW) is None
+    assert github._read(tmp_path / "stars" / f"{github._key('a/b')}.json.gz") == {"weeks": [], "complete": True}
 
 
 def test_fork_dates_of_missing_repo_or_null_fork_is_empty(monkeypatch):
