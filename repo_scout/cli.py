@@ -38,6 +38,7 @@ TOKEN = re.compile(r'-?[\w-]+:"[^"]*"|"[^"]*"|\S+')
 QUALIFIER = re.compile(r"-?[A-Za-z-]+:(?!//).+")
 OPERATORS = {"AND", "OR", "NOT"}
 MUST_STOP = "missing required"
+MUST_STOP_RU = "\u043d\u0435\u0442 \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u043e\u0433\u043e"  # stop text of older runs
 STARS_K = 10
 FROM_INDEX = 50  # number of closest repos from Index to add to pool
 last_round2_topics: list[str] = []  # round two slugs from last run(); saved to Run
@@ -564,55 +565,59 @@ def _save_run(a: argparse.Namespace, rows: list[dict], now: datetime) -> None:
 
 def _main(a: argparse.Namespace) -> None:
     try:
-        exclude, must = compile_all("--exclude", a.exclude), compile_all("--must", a.must)
-        github.configure("record" if a.record else "replay" if a.replay else None, a.record or a.replay)
-        now = github.recorded_at() if a.replay else datetime.now(UTC)
-        rows = run(
-            a.queries,
-            months=a.months,
-            new_days=a.new_days,
-            limit=a.limit,
-            lang=a.lang,
-            now=now,
-            exclude=exclude,
-            must=must,
-            task=a.task,
-            min_closeness=a.min_closeness,
-            index=None if a.record or a.replay else Index(default_path()),
-            from_index=a.from_index,
-            round2=not a.no_round2,
-            round2_k=a.round2_k,
-            stars_k=0 if a.no_stars_check else a.stars_k,
-            fit_k=0 if a.no_fit or a.record or a.replay else systemone.FIT_K,
-        )
+        rows, now = _search(a)
     except ValueError as e:
         print(e, file=sys.stderr)
         sys.exit(2)
     except GitHubError as e:
         sys.exit(f"GitHub: {e}")
     github.log_usage()
+    _report(a, rows)
+    _save_run(a, rows, now)
 
+
+def _search(a: argparse.Namespace) -> tuple[list[dict], datetime]:
+    """Compile conditions, set the snapshot mode and run the search. Raises ValueError or GitHubError."""
+    exclude, must = compile_all("--exclude", a.exclude), compile_all("--must", a.must)
+    snapshot = a.record or a.replay
+    github.configure("record" if a.record else "replay" if a.replay else None, snapshot)
+    now = github.recorded_at() if a.replay else datetime.now(UTC)
+    rows = run(
+        a.queries,
+        months=a.months,
+        new_days=a.new_days,
+        limit=a.limit,
+        lang=a.lang,
+        now=now,
+        exclude=exclude,
+        must=must,
+        task=a.task,
+        min_closeness=a.min_closeness,
+        index=None if snapshot else Index(default_path()),
+        from_index=a.from_index,
+        round2=not a.no_round2,
+        round2_k=a.round2_k,
+        stars_k=0 if a.no_stars_check else a.stars_k,
+        fit_k=0 if a.no_fit or snapshot else systemone.FIT_K,
+    )
+    return rows, now
+
+
+def _report(a: argparse.Namespace, rows: list[dict]) -> None:
+    """Print rows as JSON or a Markdown table with the --must drops and a summary line."""
     kept = [r for r in rows if not r["stop"]]
-    by_must = [
-        r
-        for r in rows
-        if (r["stop"] or "").startswith(
-            (
-                MUST_STOP,
-                "\u043d\u0435\u0442 \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u043e\u0433\u043e",
-            )
-        )
-    ]
+    by_must = [r for r in rows if (r["stop"] or "").startswith((MUST_STOP, MUST_STOP_RU))]
     shown = [r for r in (rows if a.all else kept) if r not in by_must]
     if a.json:
         print(json.dumps({"rows": shown, "dropped_by_must": by_must}, ensure_ascii=False, indent=1))
-        _save_run(a, rows, now)
         return
+    _print_markdown(shown, by_must, found=len(rows), kept=len(kept), show_all=a.all)
+
+
+def _print_markdown(shown: list[dict], by_must: list[dict], *, found: int, kept: int, show_all: bool) -> None:
     print(to_markdown(shown))
     if by_must:
         print("\ndropped by --must: " + ", ".join(r["repo"] for r in by_must))
     print(
-        f"\nfound {len(rows)}, passed stop rules {len(kept)}, dropped {len(rows) - len(kept)}"
-        + ("" if a.all else " (--all to show)")
+        f"\nfound {found}, passed stop rules {kept}, dropped {found - kept}" + ("" if show_all else " (--all to show)")
     )
-    _save_run(a, rows, now)
