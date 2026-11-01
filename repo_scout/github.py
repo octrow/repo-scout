@@ -378,27 +378,22 @@ def _split_full(repo: dict) -> dict:
 def refresh(names: list[str]) -> dict[str, dict]:
     """Fresh metadata + README + commits by name (for Index candidates): {name: {"node", "details"}}.
     Snapshot per repo (refresh/<hash>.json.gz); deleted repos excluded."""
-    out: dict[str, dict] = {}
-    missing = []
-    calls["details"] += -(-len([n for n in names if _NAME.fullmatch(n)]) // DETAILS_CHUNK)
-    for n in (n for n in names if _NAME.fullmatch(n)):
-        path = _dir / "refresh" / f"{_key(n.lower())}.json.gz" if _mode else None
-        if path and path.exists() and not ((d := _read(path)) is None and _recheck(n)):
-            if d is not None:
-                out[n] = d
-        elif _mode == "replay":
-            raise GitHubError(f"missing refresh snapshot for {n} (--record)")
-        else:
-            missing.append(n)
+    valid = [n for n in names if _NAME.fullmatch(n)]
+    calls["details"] += -(-len(valid) // DETAILS_CHUNK)
+    out, missing = _split_cached(valid, "refresh")
     for start in range(0, len(missing), DETAILS_CHUNK):
         log.info("refresh from Index: %d–%d of %d", start + 1, min(start + DETAILS_CHUNK, len(missing)), len(missing))
         chunk = missing[start : start + DETAILS_CHUNK]
-        got = _batch(chunk, _alias_full)
-        for name, repo in got.items():
-            d = _split_full(repo) if repo else None
-            if _mode == "record":
-                _write(_dir / "refresh" / f"{_key(name.lower())}.json.gz", d)
-            if d is not None:
-                out[name] = d
-        _record_skipped(chunk, got, "refresh")
+        _store_refreshed(chunk, _batch(chunk, _alias_full), out)
     return out
+
+
+def _store_refreshed(chunk: list[str], got: dict[str, dict | None], out: dict[str, dict]) -> None:
+    """Split fetched repos into node + details, snapshot them when recording and add the live ones to out."""
+    for name, repo in got.items():
+        d = _split_full(repo) if repo else None
+        if _mode == "record":
+            _write(_cache_dir("refresh") / f"{_key(name.lower())}.json.gz", d)
+        if d is not None:
+            out[name] = d
+    _record_skipped(chunk, got, "refresh")
