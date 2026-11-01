@@ -340,29 +340,41 @@ def run(
     }
     rows = _process(nodes, live, "query", known=known, **kw)
     if task and round2:
-        extra, topics = _round2(
-            rows,
-            queries,
-            nodes,
-            k=round2_k,
-            floor=max(min_closeness, semantic.MIN_CLOSENESS),
-            lang=lang,
-            months=months,
-            since=since,
-            limit=limit,
-        )
-        last_round2_topics = topics
-        log.info("round two: topics %s → %d new", ", ".join(topics) or "—", len(extra))
-        rows += _process(extra, set(extra), "round two", known={}, **kw)
+        rows += _run_round2(rows, queries, nodes, kw, k=round2_k, months=months, since=since, limit=limit)
     if index:
-        seen = index.seen([r["repo"] for r in rows])
-        for r in rows:
-            r["seen"] = seen.get(r["repo"].lower(), "")
+        _mark_seen(rows, index)
     rows.sort(key=sort_key)
     add_stars_flag(rows, stars_k, now)
     if fit_k:
         systemone.add_fit(rows, task, kw["texts"], fit_k)
     return rows
+
+
+def _run_round2(
+    rows: list[dict], queries: list[str], nodes: dict, kw: dict, *, k: int, months: int, since: str, limit: int
+) -> list[dict]:
+    """Round two search and pipeline; `kw` are the `_process` arguments of round one. Sets last_round2_topics."""
+    global last_round2_topics
+    extra, topics = _round2(
+        rows,
+        queries,
+        nodes,
+        k=k,
+        floor=max(kw["min_closeness"], semantic.MIN_CLOSENESS),
+        lang=kw["lang"],
+        months=months,
+        since=since,
+        limit=limit,
+    )
+    last_round2_topics = topics
+    log.info("round two: topics %s → %d new", ", ".join(topics) or "—", len(extra))
+    return _process(extra, set(extra), "round two", known={}, **kw)
+
+
+def _mark_seen(rows: list[dict], index: Index) -> None:
+    seen = index.seen([r["repo"] for r in rows])
+    for r in rows:
+        r["seen"] = seen.get(r["repo"].lower(), "")
 
 
 def add_stars_flag(rows: list[dict], k: int, now: datetime) -> None:
