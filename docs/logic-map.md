@@ -102,7 +102,8 @@ Only rows not yet dropped. Template → flag. Noise needs 2+ independent signals
 Module: repo_scout/cli.py::_screen_details, repo_scout/github.py::details, repo_scout/commits.py::last_substantive
 
 Batches of 10 aliases, 3 in parallel. A failing batch is split in half without retries; a single failing
-repo is retried, then skipped with the `no details` flag (#9). A README is one of 8 case-sensitive names at
+repo is retried, then skipped with the `no details` flag. A rate limit is retried after 5, 10, 20 s at
+any batch size, then stops the run (exit 1). A README is one of 8 case-sensitive names at
 HEAD (`README.md`, `readme.md`, `README.rst`, `README`, `Readme.md`, `README.markdown`, `README.txt`,
 `README.org`), cut to 100 000 chars.
 Freshness and `dead` are recomputed from the last substantive commit (bots, cosmetic and `Merge…` commits
@@ -209,17 +210,16 @@ Other modes: `--record`, `--fake-stars`, `--llm-draft`, `--index-check` (two run
 |---|---|
 | Bad regex | exit 2 with the reason, no request sent |
 | Query over GitHub limits | exit 2; earlier queries were already sent (#11) |
-| `gh` not installed | Python traceback (#10) |
+| `gh` not installed | `GitHub: gh (GitHub CLI) not found…`, exit 1 |
 | `gh` not logged in, plain 403 | `GitHub: …`, exit 1 |
 | 429 / 502 / rate limit / empty reply on search | retries after 5, 10, 20 s, then exit 1 |
-| Same on details / refresh batches | split down to single repos, skipped with a warning; no exit (#9) |
+| Rate limit on details / refresh batches | same retries, then exit 1 |
+| 502 / empty reply on details / refresh batches | split down to single repos, skipped with a warning; no exit |
 | One repo keeps failing | step 6: kept with `no details`; step 3: left out of the run, kept in the Index |
 | Star history, fit, run save errors | warning; the table is still printed |
 
 ## Known gaps
 
 Open HIGH and MEDIUM findings; details in `PLAN.md` → "Logic map findings".
-- A rate limit during details keeps every row unscreened as `no details` (#9).
-- No `gh` on PATH → traceback (#10).
 - Hand-edited run JSON with wrong-typed fields (`score: null`, `flags: null`) breaks the GUI run page.
 - Shared eval details are not tied to each set's snapshot date (`PLAN.md`, Phase 9.1).

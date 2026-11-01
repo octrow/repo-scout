@@ -219,3 +219,24 @@ def test_refresh_rechecks_deleted_marker_once_with_shared_details(monkeypatch, t
         assert fetched == ["a/one", "a/gone", "a/gone"]
     finally:
         github.configure(None, None)
+
+
+def test_rate_limit_in_details_stops_instead_of_skipping(monkeypatch):
+    """A rate-limited batch is retried with backoff, then stops the run: no rows kept unscreened as `no details`."""
+    calls, sleeps = run_with(monkeypatch, [(1, "", "HTTP 429")] * 4)
+    with pytest.raises(github.RateLimited):
+        github.details(["a/one", "a/two"])
+    assert len(calls) == 4 and sleeps == [5, 10, 20]
+
+
+def test_missing_gh_is_a_github_error(monkeypatch):
+    def no_gh(cmd, **kw):
+        raise FileNotFoundError(2, "No such file or directory", "gh")
+
+    monkeypatch.setattr(subprocess, "run", no_gh)
+    with pytest.raises(github.GitHubError, match="cli.github.com"):
+        github.search("q", 5)
+    from repo_scout import stars
+
+    with pytest.raises(github.GitHubError, match="cli.github.com"):
+        stars._rest("repos/a/b/stargazers")

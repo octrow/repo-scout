@@ -45,6 +45,23 @@ class GitHubError(Exception):
     pass
 
 
+class RateLimited(GitHubError):
+    """Still rate-limited after every retry: the run stops instead of skipping repos one by one."""
+
+
+def run_gh(cmd: list[str]) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run(cmd, check=False, capture_output=True, text=True)
+    except FileNotFoundError:
+        raise GitHubError(
+            "gh (GitHub CLI) not found: install it from https://cli.github.com, then `gh auth login`"
+        ) from None
+
+
+def _rate_limited(reason: str | None) -> bool:
+    return bool(reason) and (reason == "RATE_LIMITED" or "429" in reason or "rate limit" in reason.lower())
+
+
 def _parse(stdout: str) -> dict | None:
     try:
         data = json.loads(stdout)
@@ -81,7 +98,7 @@ def _checked_body(data: dict | None, errors: list) -> tuple[dict | None, str | N
 
 def _attempt(query: str, variables: dict) -> tuple[dict | None, str | None]:
     """Single gh invocation: (data, None) on success, (None, reason) on retryable error, else raises GitHubError."""
-    out = subprocess.run(_gh_command(query, variables), check=False, capture_output=True, text=True)
+    out = run_gh(_gh_command(query, variables))
     data = _parse(out.stdout)
     errors = (data or {}).get("errors") or []
     if any(e.get("type") == "RATE_LIMITED" for e in errors):
@@ -194,17 +211,21 @@ def log_usage() -> None:
 
 
 def _graphql_live(query: str, variables: dict, retries: int = MAX_RETRIES) -> dict:
-    reason = None
-    for attempt in range(retries + 1):
+    """`retries` covers transient errors; a rate limit always gets MAX_RETRIES, then raises RateLimited."""
+    reason, attempt = None, 0
+    for attempt in range(MAX_RETRIES + 1):
         data, reason = _attempt(query, variables)
         if data is not None:
             _note_cost(data)
             return data
-        if attempt < retries:
-            wait = min(2**attempt * 5, 60)
-            log.info("GitHub: %s — retry %d/%d in %d s", reason, attempt + 1, retries, wait)
-            time.sleep(wait)
-    raise GitHubError(f"GitHub did not respond after {retries} retries: {reason}")
+        limit = MAX_RETRIES if _rate_limited(reason) else retries
+        if attempt >= limit:
+            break
+        wait = min(2**attempt * 5, 60)
+        log.info("GitHub: %s — retry %d/%d in %d s", reason, attempt + 1, limit, wait)
+        time.sleep(wait)
+    error = RateLimited if _rate_limited(reason) else GitHubError
+    raise error(f"GitHub did not respond after {attempt} retries: {reason}")
 
 
 def _batch(chunk: list[str], alias) -> dict[str, dict | None]:
@@ -213,6 +234,8 @@ def _batch(chunk: list[str], alias) -> dict[str, dict | None]:
     q = "query{rateLimit{cost remaining resetAt} " + " ".join(alias(i, n) for i, n in enumerate(chunk)) + "}"
     try:
         resp = _cap_text(_graphql_live(q, {}, retries=_batch_retries(len(chunk))))
+    except RateLimited:
+        raise
     except GitHubError as e:
         return _split_failed_batch(chunk, alias, e)
     return _alias_results(chunk, resp)

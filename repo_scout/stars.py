@@ -6,7 +6,6 @@ The burst algorithm is ported from real-stars `src/shared/mad.ts:72-179` and `sr
 """
 
 import json
-import subprocess
 import time
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -43,7 +42,7 @@ def _rest(path: str) -> list | None:
     cmd = ["gh", "api", path, "-H", f"X-GitHub-Api-Version: {API_VERSION}"]
     for attempt in range(github.MAX_RETRIES + 1):
         github.calls["stars"] += 1
-        out = subprocess.run(cmd, check=False, capture_output=True, text=True)
+        out = github.run_gh(cmd)
         err = out.stderr
         if not out.returncode:
             return json.loads(out.stdout)

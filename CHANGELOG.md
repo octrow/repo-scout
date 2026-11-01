@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 
 ## [Unreleased]
 
+### Fixed
+- A GitHub rate limit while fetching READMEs and commits stops the run with `GitHub: …` (exit 1) after the usual retries. Before, every repo was skipped one by one and kept unscreened as `no details`, and the run was saved.
+- Without `gh` on PATH, repo-scout says where to get the GitHub CLI instead of printing a Python traceback.
+
 ## [0.1.10] - 2026-11-01
 
 ### Fixed
