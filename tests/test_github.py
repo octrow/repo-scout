@@ -146,3 +146,75 @@ def test_alias_error_other_than_not_found_is_a_failure_not_a_deletion(monkeypatc
     assert got == {"a/gone": None, "a/ok": {"m0": {"text": "ok"}}}
     assert github.last_failed == {"a/slow"}
     github.last_failed.clear()
+
+
+def test_batch_retries_only_single_repos_and_less_when_recording_shared_details(monkeypatch, tmp_path):
+    seen = []
+    monkeypatch.setattr(github, "_graphql_live", lambda q, v, retries=None: seen.append(retries) or {"data": {}})
+    github._batch(["a/one", "a/two"], github._alias)
+    github._batch(["a/one"], github._alias)
+    try:
+        github.configure("record", tmp_path, details_dir=tmp_path / "details")
+        github._batch(["a/one"], github._alias)
+        github.configure("record", tmp_path)
+        github._batch(["a/one"], github._alias)
+    finally:
+        github.configure(None, None)
+    assert seen == [0, github.MAX_RETRIES, github.EVAL_SINGLE_RETRIES, github.MAX_RETRIES]
+
+
+def test_graphql_errors_without_data_fail_fast(monkeypatch):
+    body = json.dumps({"data": None, "errors": [{"type": "FORBIDDEN", "message": "nope"}]})
+    calls, sleeps = run_with(monkeypatch, [(0, body, "")])
+    with pytest.raises(github.GitHubError, match="GraphQL: nope"):
+        github.search("q", 5)
+    assert len(calls) == 1 and not sleeps
+
+
+def test_failed_gh_without_stderr_reports_stdout(monkeypatch):
+    run_with(monkeypatch, [(1, "plain failure", "")])
+    with pytest.raises(github.GitHubError, match="gh failed: plain failure"):
+        github.search("q", 5)
+
+
+def _counting_live(fetched: list[str]):
+    """Each alias returns a full node; a/gone is deleted (null)."""
+
+    def live(query, variables, **_):
+        names = re.findall(r'r(\d+): repository\(owner: "(\w+)", name: "(\w+)"\)', query)
+        fetched.extend(f"{o}/{n}" for _, o, n in names)
+        nodes = {f"r{i}": {"nameWithOwner": f"{o}/{n}", "m1": {"text": "hi"}} for i, o, n in names}
+        return {"data": {k: None if v["nameWithOwner"] == "a/gone" else v for k, v in nodes.items()}}
+
+    return live
+
+
+def test_refresh_record_then_replay_reads_snapshots(monkeypatch, tmp_path):
+    fetched = []
+    monkeypatch.setattr(github, "_graphql_live", _counting_live(fetched))
+    want = {"a/one": {"node": {"nameWithOwner": "a/one"}, "details": {"readme": "hi", "commits": []}}}
+    try:
+        github.configure("record", tmp_path)
+        assert github.refresh(["a/one", "a/gone", "not a name"]) == want
+        written = sorted(p.name for p in (tmp_path / "refresh").iterdir())
+        assert written == sorted(f"{github._key(n)}.json.gz" for n in ("a/one", "a/gone"))
+        github.configure("replay", tmp_path)
+        assert github.refresh(["a/one", "a/gone"]) == want
+        assert fetched == ["a/one", "a/gone"]
+        with pytest.raises(github.GitHubError, match="missing refresh snapshot for a/new"):
+            github.refresh(["a/new"])
+    finally:
+        github.configure(None, None)
+
+
+def test_refresh_rechecks_deleted_marker_once_with_shared_details(monkeypatch, tmp_path):
+    fetched = []
+    monkeypatch.setattr(github, "_graphql_live", _counting_live(fetched))
+    monkeypatch.setattr(github, "_rechecked", set())
+    try:
+        github.configure("record", tmp_path / "set", details_dir=tmp_path / "details")
+        for _ in range(3):
+            assert set(github.refresh(["a/one", "a/gone"])) == {"a/one"}
+        assert fetched == ["a/one", "a/gone", "a/gone"]
+    finally:
+        github.configure(None, None)
