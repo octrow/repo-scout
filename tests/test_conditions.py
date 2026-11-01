@@ -29,7 +29,7 @@ def test_bad_regex_is_value_error_with_flag_name():
     assert isinstance(compile_all("--must", ["a"])[0], re.Pattern)
 
 
-def node(name, readme_hint=""):
+def node(name):
     return {
         "nameWithOwner": name,
         "url": "u",

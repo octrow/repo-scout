@@ -20,7 +20,8 @@ def fake_embed(monkeypatch):
     )
 
 
-def test_roundtrip_and_top(tmp_path, fake_embed):
+@pytest.mark.usefixtures("fake_embed")
+def test_roundtrip_and_top(tmp_path):
     idx = Index(tmp_path / "sub" / "i.db", model="m1")
     idx.upsert(ROW, "readme", np.array([0, 1]))
     idx.upsert({**ROW, "repo": "o/best"}, None, np.array([1, 0]))
@@ -30,7 +31,8 @@ def test_roundtrip_and_top(tmp_path, fake_embed):
     assert Index(tmp_path / "empty.db").top("t", 3) == []
 
 
-def test_model_change_recomputes_from_stored_text(tmp_path, fake_embed):
+@pytest.mark.usefixtures("fake_embed")
+def test_model_change_recomputes_from_stored_text(tmp_path):
     path = tmp_path / "i.db"
     idx = Index(path, model="old")
     idx.upsert({**ROW, "desc": "x"}, "a match here", np.array([0, 1]))
@@ -93,7 +95,8 @@ def test_seen_latest_per_project_and_export(tmp_path):
     assert "p2" not in evaluate.export_verdicts(idx, "p1")
 
 
-def test_run_writes_index_pulls_from_index_and_marks_seen(tmp_path, fake_embed, monkeypatch):
+@pytest.mark.usefixtures("fake_embed")
+def test_run_writes_index_pulls_from_index_and_marks_seen(tmp_path, monkeypatch):
     idx = Index(tmp_path / "i.db")
     idx.upsert({**ROW, "repo": "old/repo"}, "match", np.array([1, 0]))
     idx.upsert({**ROW, "repo": "a/live"}, "match", np.array([0, 1]))
@@ -143,7 +146,8 @@ def _pipeline(monkeypatch, idx, refresh, readme="match"):
     return cli.run(["q"], months=6, new_days=60, limit=5, lang=None, now=NOW, task="t", index=idx, from_index=5)
 
 
-def test_gone_and_renamed_index_rows(tmp_path, fake_embed, monkeypatch):
+@pytest.mark.usefixtures("fake_embed")
+def test_gone_and_renamed_index_rows(tmp_path, monkeypatch):
     idx = Index(tmp_path / "i.db")
     for n in ("gone/repo", "old/name"):
         idx.upsert({**ROW, "repo": n}, "match", np.array([1, 0]))
@@ -158,7 +162,8 @@ def test_gone_and_renamed_index_rows(tmp_path, fake_embed, monkeypatch):
     assert "new/name" in idx.seen(["new/name"])
 
 
-def test_index_row_github_failed_to_refresh_is_kept(tmp_path, fake_embed, monkeypatch):
+@pytest.mark.usefixtures("fake_embed")
+def test_index_row_github_failed_to_refresh_is_kept(tmp_path, monkeypatch):
     idx = Index(tmp_path / "i.db")
     idx.upsert({**ROW, "repo": "flaky/repo"}, "match", np.array([1, 0]))
     monkeypatch.setattr(github, "last_failed", {"flaky/repo"})
@@ -166,7 +171,8 @@ def test_index_row_github_failed_to_refresh_is_kept(tmp_path, fake_embed, monkey
     assert "flaky/repo" in {r[0] for r in idx.db.execute("SELECT name FROM repos")}
 
 
-def test_empty_readme_not_indexed(tmp_path, fake_embed, monkeypatch):
+@pytest.mark.usefixtures("fake_embed")
+def test_empty_readme_not_indexed(tmp_path, monkeypatch):
     idx = Index(tmp_path / "i.db")
     _pipeline(monkeypatch, idx, lambda names: {}, readme=None)
     assert idx.db.execute("SELECT COUNT(*) FROM repos").fetchone() == (0,)

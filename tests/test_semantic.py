@@ -79,7 +79,7 @@ def test_embed_docs_reuses_vectors_within_process(monkeypatch):
     seen = []
 
     class Fake:
-        def passage_embed(self, texts, batch_size):
+        def passage_embed(self, texts, **_):
             seen.append(list(texts))
             return [[float(len(t))] + [0.0] * 383 for t in texts]
 
