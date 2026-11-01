@@ -1,6 +1,7 @@
 """Substantive commit detection and freshness recalculation (CONTEXT.md)."""
 
 import re
+from collections.abc import Sequence
 from datetime import datetime
 
 SERVICE_BOTS = {
@@ -43,9 +44,9 @@ def is_substantive(commit: dict) -> bool:
     return not is_service_bot(commit) and not is_cosmetic(commit)
 
 
-def last_substantive(commits: list[dict], now: datetime) -> tuple[str, bool] | None:
+def last_substantive(commits: Sequence[dict | None], now: datetime) -> tuple[str, bool] | None:
     """(date, is_only_cosmetic): latest substantive commit or oldest in the list.
-    Commits from the future (recorded snapshots after `now`) are ignored. None if no commits."""
+    Commits from the future (recorded snapshots after `now`) and null GraphQL nodes are ignored. None if no commits."""
     commits = [c for c in commits if c and datetime.fromisoformat(c["committedDate"]) <= now]
     if not commits:
         return None
