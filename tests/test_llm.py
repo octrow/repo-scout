@@ -274,3 +274,75 @@ def test_non_string_content_is_llm_error(monkeypatch):
     monkeypatch.setattr(llm, "_post", lambda messages: reply([{"type": "text", "text": "{}"}]))
     with pytest.raises(llm.LLMError, match="unexpected format"):
         llm._chat([])
+
+
+@pytest.mark.parametrize(
+    "rx",
+    [r"a)(b+)*", r"[\]]+(a+)+", r"(a+){2}", r"((a)+)+", r"(a(b)*c)*", r"(x{2}){3}", r"(a\)+)+"],
+)
+def test_reject_nested_quantifiers_rejects_edge_cases(rx):
+    with pytest.raises(ValueError, match=r"^field must: nested quantifiers in .* \(ReDoS risk\)$"):
+        llm.reject_nested_quantifiers("must", ("ok", rx))
+
+
+@pytest.mark.parametrize(
+    "rx",
+    [
+        r")+",
+        r"\(a+\)+",
+        r"[(]a+[)]+",
+        r"(a+)?",
+        r"(?:a|b+)c+",
+        r"((a)+)",
+        r"(a+)(b)+",
+        r"(a+)\+",
+        r"(",
+        "a\\\\",
+        r"(a[+])+",
+        r"(a(b)c)*",
+        r"x{2}(y)",
+        r"(x{2})y",
+        r"[]a+](b)+",
+        r"a++",
+        r"(a)*(b)*",
+    ],
+)
+def test_reject_nested_quantifiers_accepts_edge_cases(rx):
+    assert llm.reject_nested_quantifiers("must", (rx,)) is None
+
+
+def test_reject_nested_quantifiers_names_field_and_cuts_pattern():
+    rx = "(" + "a" * 50 + "+)+"
+    with pytest.raises(ValueError) as e:
+        llm.reject_nested_quantifiers("exclude", (rx,))
+    assert str(e.value) == f"field exclude: nested quantifiers in {rx[:40]!r} (ReDoS risk)"
+
+
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        ({}, ()),
+        ({"k": None}, ()),
+        ({"k": []}, ()),
+        ({"k": [" a ", "b", "a", "  "]}, ("a", "b")),
+        ({"k": ["x" * 5]}, ("x" * 5,)),
+    ],
+)
+def test_strings_cleans_and_dedupes(data, expected):
+    assert llm._strings(data, "k", 2, 5) == expected
+
+
+@pytest.mark.parametrize(
+    ("data", "message"),
+    [
+        ({"k": "a"}, "field k must be a list of strings"),
+        ({"k": ["a", 1]}, "field k must be a list of strings"),
+        ({"k": {"a": 1}}, "field k must be a list of strings"),
+        ({"k": ["a", "b", "c"]}, "field k: 3 items, maximum 2"),
+        ({"k": ["ok", "x" * 50]}, f"field k: item longer than 5 characters: {'x' * 40!r}"),
+    ],
+)
+def test_strings_rejects(data, message):
+    with pytest.raises(ValueError) as e:
+        llm._strings(data, "k", 2, 5)
+    assert str(e.value) == message

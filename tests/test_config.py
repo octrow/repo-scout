@@ -38,6 +38,51 @@ def test_older_alias_is_read_then_replaced():
     assert values[llm.KEY_VAR] == "old-key" and values["OMNIROUTE_API_KEY"] == ""
 
 
+def test_ask_values_prompts_says_and_values():
+    prompts, said = [], []
+
+    def ask(prompt):
+        prompts.append(prompt)
+        return {"Base URL": " http://x/v1 ", "Model": "-"}.get(prompt.partition(" [")[0], "")
+
+    def ask_secret(prompt):
+        prompts.append(prompt)
+        return "-" if prompt.startswith("TypeSafe") else ""
+
+    current = {"OMNIROUTE_API_KEY": "abcdefgh", llm.MODEL_VAR: "m", systemone.KEY_VAR: "ts"}
+    values = config.ask_values(current, ask, ask_secret, said.append)
+    assert prompts == [
+        "API key […efgh]: ",
+        f"Base URL [{llm.DEFAULT_URL}]: ",
+        "Model [m]: ",
+        "Show the Draft button in the GUI? 1 = yes, 0 = no [0]: ",
+        "TypeSafe API key […ts]: ",
+    ]
+    assert said == [f"\n{title}\n{hint}" for title, hint, _ in config.SECTIONS]
+    assert values == {
+        llm.KEY_VAR: "abcdefgh",
+        llm.ALIASES[llm.KEY_VAR]: "",
+        llm.URL_VAR: "http://x/v1",
+        llm.ALIASES[llm.URL_VAR]: "",
+        llm.MODEL_VAR: "",
+        llm.ALIASES[llm.MODEL_VAR]: "",
+        llm.GUI_VAR: "",
+        systemone.KEY_VAR: "",
+    }
+
+
+def test_ask_values_empty_secret_stops_only_its_section():
+    prompts = []
+
+    def ask_secret(prompt):
+        prompts.append(prompt)
+        return "" if prompt.startswith("API key") else "new-ts"
+
+    values = config.ask_values({}, _answers(), ask_secret)
+    assert prompts == ["API key []: ", "TypeSafe API key []: "]
+    assert values == {llm.KEY_VAR: "", llm.ALIASES[llm.KEY_VAR]: "", systemone.KEY_VAR: "new-ts"}
+
+
 def test_main_writes_user_env_and_both_modes_read_it(monkeypatch, capsys):
     monkeypatch.setattr("builtins.input", _answers("", "", ""))
     monkeypatch.setattr(config.getpass, "getpass", _answers("typed-key", "ts-key"))
