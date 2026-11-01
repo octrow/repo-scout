@@ -4,8 +4,13 @@ import pytest
 
 from repo_scout import cli, github, llm
 
-GOOD = {"task": "Find live speech transcription tools.", "queries": ["whisper live", "asr topic:asr language:python"],
-        "lang": "python", "must": ["whisper"], "exclude": ["^$x"]}
+GOOD = {
+    "task": "Find live speech transcription tools.",
+    "queries": ["whisper live", "asr topic:asr language:python"],
+    "lang": "python",
+    "must": ["whisper"],
+    "exclude": ["^$x"],
+}
 
 
 def reply(content: str, tokens: int = 10) -> dict:
@@ -34,7 +39,9 @@ def test_available_follows_key(monkeypatch):
 
 def test_env_file_used_but_real_env_wins(tmp_path, monkeypatch):
     env = tmp_path / ".env"
-    env.write_text('# c\n\nOMNIROUTE_API_KEY="from-file"\nOMNIROUTE_MODEL=\'m1\'\nexport OMNIROUTE_BASE_URL=http://x/v1\n')
+    env.write_text(
+        "# c\n\nOMNIROUTE_API_KEY=\"from-file\"\nOMNIROUTE_MODEL='m1'\nexport OMNIROUTE_BASE_URL=http://x/v1\n"
+    )
     monkeypatch.setattr(llm, "ENV_FILE", env)
     assert llm._setting(llm.KEY_VAR) == "secret-key"
     assert llm._setting(llm.MODEL_VAR) == "m1" and llm.model() == "m1"
@@ -68,9 +75,19 @@ def test_twice_invalid_raises_without_key(monkeypatch):
     assert "secret-key" not in str(e.value)
 
 
-@pytest.mark.parametrize("patch", [
-    {"task": 5}, {"task": "x" * 601}, {"queries": []}, {"queries": "a"}, {"queries": [str(i) for i in range(11)]},
-    {"must": ["("]}, {"lang": 3}, {"queries": ["a OR b OR c OR d OR e OR f OR g"]}])
+@pytest.mark.parametrize(
+    "patch",
+    [
+        {"task": 5},
+        {"task": "x" * 601},
+        {"queries": []},
+        {"queries": "a"},
+        {"queries": [str(i) for i in range(11)]},
+        {"must": ["("]},
+        {"lang": 3},
+        {"queries": ["a OR b OR c OR d OR e OR f OR g"]},
+    ],
+)
 def test_parse_rejects(patch):
     with pytest.raises(ValueError):
         llm.parse_draft(json.dumps({**GOOD, **patch}))
@@ -87,6 +104,7 @@ def test_http_error_hides_key(monkeypatch):
 
     def boom(*a, **k):
         raise urllib.error.HTTPError("u", 401, "no", {}, None)
+
     monkeypatch.setattr(llm._OPENER, "open", boom)
     with pytest.raises(llm.LLMError) as e:
         llm._post([])
@@ -132,7 +150,10 @@ def test_cli_draft_without_key(monkeypatch):
 def test_need_roundtrips_through_command():
     p = cli.search_params(cli.parse_command('repo-scout --task t --need "speech recognition" -- q'))
     assert p["need"] == "speech recognition"
-    assert cli.parse_command("repo-scout " + " ".join(__import__("shlex").quote(t) for t in cli.to_argv(p))).need == p["need"]
+    assert (
+        cli.parse_command("repo-scout " + " ".join(__import__("shlex").quote(t) for t in cli.to_argv(p))).need
+        == p["need"]
+    )
 
 
 @pytest.mark.parametrize("lang", ["Python or Go", "a" * 31, "py thon"])
@@ -187,6 +208,7 @@ def test_record_persists_retry_chain_after_success(monkeypatch, tmp_path):
 @pytest.mark.parametrize("body", [[1, 2], "str", 5])
 def test_non_dict_body_is_llm_error(monkeypatch, body):
     import io
+
     monkeypatch.setattr(llm._OPENER, "open", lambda *a, **k: io.BytesIO(json.dumps(body).encode()))
     with pytest.raises(llm.LLMError) as e:
         llm._post([])
@@ -199,6 +221,7 @@ def test_http_exception_is_llm_error(monkeypatch, exc):
 
     def boom(*a, **k):
         raise getattr(http.client, exc)(b"x") if exc == "IncompleteRead" else http.client.BadStatusLine("x")
+
     monkeypatch.setattr(llm._OPENER, "open", boom)
     with pytest.raises(llm.LLMError) as e:
         llm._post([])
@@ -215,6 +238,7 @@ def test_bad_usage_counts_as_zero(monkeypatch, usage):
 
 def test_redirect_is_not_followed():
     import urllib.request
+
     req = urllib.request.Request("http://a/x", headers={"Authorization": "Bearer k"})
     assert llm._NoRedirect().redirect_request(req, None, 302, "Found", {}, "http://evil/") is None
 
@@ -222,6 +246,7 @@ def test_redirect_is_not_followed():
 def test_refused_connection_is_not_reported_as_timeout():
     import urllib.error
     from repo_scout import llm
+
     assert "refused" in llm._why(urllib.error.URLError(ConnectionRefusedError()))
     assert "no response" in llm._why(urllib.error.URLError(TimeoutError()))
 
@@ -234,10 +259,13 @@ def test_generic_name_wins_over_older_alias(monkeypatch):
     assert llm.setting(llm.KEY_VAR) == "old"
 
 
-@pytest.mark.parametrize("text", [
-    '{"task":"a","queries":["q"]}\n\nLet me know {if}',
-    'Sure! {"task":"a }","queries":["q"]} Hope {this} helps',
-])
+@pytest.mark.parametrize(
+    "text",
+    [
+        '{"task":"a","queries":["q"]}\n\nLet me know {if}',
+        'Sure! {"task":"a }","queries":["q"]} Hope {this} helps',
+    ],
+)
 def test_json_object_followed_by_prose(text):
     assert llm._json_object(text)["queries"] == ["q"]
 

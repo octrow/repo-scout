@@ -1,4 +1,5 @@
 """Runs and Index pages logic without UI: Run file lookup, row filters, verdict text."""
+
 import re
 from pathlib import Path
 
@@ -17,15 +18,27 @@ VERDICT_PREFIX = {"watch": "→ Inspect", "dig": "→ Study", "drop": "drop", "d
 NOTE_LABELS = {"dig": "Study goal", "drop": "Drop reason", "doubt": "What to clarify"}
 DESC_LIMIT = 120
 # Runs saved before the CLI switched to English (ad622ea) hold Russian sources, flags and drop reasons
-LEGACY_TEXT = [(re.compile(p), r) for p, r in (
-    (r"^запрос$", "query"), (r"^индекс$", "index"), (r"^второй круг$", "round 2"),
-    (r"^новый$", "new"), (r"^шаблон$", "template"), (r"^нет деталей$", "no details"),
-    (r"^только косметика$", "cosmetic only"), (r"^нет README$", "no README"),
-    (r"^всплеск★ (\d+%) ранних$", r"burst★ \1 early"),
-    (r"^не по теме ", "off-topic "), (r"^мёртвый \((\d+) дн\)$", r"dead (\1d)"),
-    (r"^игрушка \((\d+) комм, ", r"toy (\1 commits, "), (r"^нет обязательного:", "missing required:"),
-    (r"^шум ", "noise "), (r"\bимя\b", "name"), (r"\bописание\b", "description"),
-)]
+LEGACY_TEXT = [
+    (re.compile(p), r)
+    for p, r in (
+        (r"^запрос$", "query"),
+        (r"^индекс$", "index"),
+        (r"^второй круг$", "round 2"),
+        (r"^новый$", "new"),
+        (r"^шаблон$", "template"),
+        (r"^нет деталей$", "no details"),
+        (r"^только косметика$", "cosmetic only"),
+        (r"^нет README$", "no README"),
+        (r"^всплеск★ (\d+%) ранних$", r"burst★ \1 early"),
+        (r"^не по теме ", "off-topic "),
+        (r"^мёртвый \((\d+) дн\)$", r"dead (\1d)"),
+        (r"^игрушка \((\d+) комм, ", r"toy (\1 commits, "),
+        (r"^нет обязательного:", "missing required:"),
+        (r"^шум ", "noise "),
+        (r"\bимя\b", "name"),
+        (r"\bописание\b", "description"),
+    )
+]
 
 
 def resolve_run(stem: str) -> Path | None:
@@ -45,8 +58,15 @@ def english(text: str | None) -> str | None:
 
 def sorted_rows(rows: list[dict]) -> list[dict]:
     """Rows in CLI order, legacy values in the current English wording."""
-    rows = [{**r, "source": english(r.get("source")), "stop": english(r.get("stop")),
-             "flags": [english(f) for f in r.get("flags", [])]} for r in rows]
+    rows = [
+        {
+            **r,
+            "source": english(r.get("source")),
+            "stop": english(r.get("stop")),
+            "flags": [english(f) for f in r.get("flags", [])],
+        }
+        for r in rows
+    ]
     return sorted(rows, key=sort_key)
 
 
@@ -58,8 +78,9 @@ def flag_options(rows: list[dict]) -> list[str]:
     return [FLAGS_ALL, *sorted({f for r in rows for f in r.get("flags", [])})]
 
 
-def filter_rows(rows: list[dict], *, text: str = "", source: str = SOURCES_ALL, flag: str = FLAGS_ALL,
-                show_stopped: bool = False) -> list[dict]:
+def filter_rows(
+    rows: list[dict], *, text: str = "", source: str = SOURCES_ALL, flag: str = FLAGS_ALL, show_stopped: bool = False
+) -> list[dict]:
     """Rows matching filters; order is preserved. Text is searched in repo, desc, and lang."""
     needle = (text or "").strip().lower()
     out = []
@@ -89,13 +110,26 @@ def table_row(r: dict) -> dict:
     """Table row with CLI markdown output columns."""
     close = r.get("closeness")
     g = r.get
-    return {"repo": g("repo", "?"), "url": g("url", ""), "close": "—" if close is None else f"{close:.2f}",
-            "fit": "—" if g("fit") is None else f"{g('fit'):.2f}",
-            "source": g("source", ""), "score": f"{g('score', 0)} (fresh {g('fresh', 0)}, pop {g('pop', 0)})",
-            "score_n": g("score", 0), "score_parts": f"f{g('fresh', 0)} p{g('pop', 0)}",
-            "stars": g("stars", 0), "forks": g("forks", 0), "commits": g("commits", 0),
-            "pushed": g("pushed_days", ""), "created": g("created", ""), "lang": g("lang", ""),
-            "flags": flags_text(r), "flag_list": flag_list(r), "seen": g("seen") or "—", "desc": plain_desc(g("desc"))}
+    return {
+        "repo": g("repo", "?"),
+        "url": g("url", ""),
+        "close": "—" if close is None else f"{close:.2f}",
+        "fit": "—" if g("fit") is None else f"{g('fit'):.2f}",
+        "source": g("source", ""),
+        "score": f"{g('score', 0)} (fresh {g('fresh', 0)}, pop {g('pop', 0)})",
+        "score_n": g("score", 0),
+        "score_parts": f"f{g('fresh', 0)} p{g('pop', 0)}",
+        "stars": g("stars", 0),
+        "forks": g("forks", 0),
+        "commits": g("commits", 0),
+        "pushed": g("pushed_days", ""),
+        "created": g("created", ""),
+        "lang": g("lang", ""),
+        "flags": flags_text(r),
+        "flag_list": flag_list(r),
+        "seen": g("seen") or "—",
+        "desc": plain_desc(g("desc")),
+    }
 
 
 # Relative image paths in a README resolve against the repo on GitHub, not against this server

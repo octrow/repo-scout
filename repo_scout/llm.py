@@ -4,6 +4,7 @@ Standard library only. Called before search and does not affect ranking; without
 Model output is untrusted: JSON validation, type checks, bounds, `validate_query`, `compile_all`.
 The key is never printed or included in messages: errors mention variable names only.
 """
+
 import hashlib
 import http.client
 import json
@@ -137,8 +138,11 @@ def _post(messages: list[dict]) -> dict:
     if not key:
         raise LLMError(NO_KEY)
     body = json.dumps({"model": model(), "messages": messages}).encode()
-    req = urllib.request.Request(_setting(URL_VAR, DEFAULT_URL).rstrip("/") + "/chat/completions", data=body,
-                                 headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
+    req = urllib.request.Request(
+        _setting(URL_VAR, DEFAULT_URL).rstrip("/") + "/chat/completions",
+        data=body,
+        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+    )
     try:
         with _OPENER.open(req, timeout=TIMEOUT_S) as resp:
             data = json.load(resp)
@@ -298,8 +302,10 @@ def draft(need: str) -> Draft:
     if not need:
         raise LLMError("Describe what you are looking for")
     last_stats.clear()
-    messages = [{"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"Need:\n{need[:MAX_NEED_CHARS]}"}]
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": f"Need:\n{need[:MAX_NEED_CHARS]}"},
+    ]
     pending: list = []  # queued snapshots: written only after successful validation
     for attempt in (1, 2):
         reply = _chat(messages, pending)
@@ -312,6 +318,8 @@ def draft(need: str) -> Draft:
             log.info("LLM draft: response validation failed (attempt %d): %s", attempt, e)
             if attempt == 2:
                 raise LLMError(f"The LLM gave an invalid reply twice: {e}") from e
-            messages += [{"role": "assistant", "content": reply},
-                         {"role": "user", "content": f"Invalid: {e}. Reply with the corrected JSON object only."}]
+            messages += [
+                {"role": "assistant", "content": reply},
+                {"role": "user", "content": f"Invalid: {e}. Reply with the corrected JSON object only."},
+            ]
     raise AssertionError("unreachable")

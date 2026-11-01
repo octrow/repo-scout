@@ -2,6 +2,7 @@
 next to run.log ($REPO_SCOUT_LOG or ~/.local/state/repo-scout/run.log), while run.log symlinks to the latest:
 concurrent runs do not overwrite each other, and `tail -F run.log` follows the latest.
 Old logs are pruned until the total size is within LOG_DIR_MAX_BYTES."""
+
 import functools
 import logging
 import os
@@ -72,6 +73,7 @@ def setup(quiet: bool = False) -> Path:
 
 def logged_exit(fn: Callable[[], None]) -> Callable[[], None]:
     """Ensure fatal `sys.exit("text")` errors are logged to file as ERROR, not only stderr."""
+
     @functools.wraps(fn)
     def run() -> None:
         try:
@@ -83,4 +85,5 @@ def logged_exit(fn: Callable[[], None]) -> Callable[[], None]:
                 for h in file:
                     h.handle(record)
             raise
+
     return run

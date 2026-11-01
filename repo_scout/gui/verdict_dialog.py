@@ -1,4 +1,5 @@
 """Verdict dialog: shared between Run and Index views. Saves to Index and notifies caller."""
+
 import sqlite3
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -66,8 +67,16 @@ class VerdictDialog:
         with ui.dialog() as self.dialog, layout.section_card():
             self.title = layout.heading(t("Verdict"), level=2)
             self.name = ui.label().classes("t-mono")
-            self.kind = ui.select({k: t(v) for k, v in rl.VERDICT_KINDS.items()}, value="watch", label=t("Verdict"),
-                                  on_change=lambda: self._sync_note()).props("outlined dense stack-label").classes("w-full")
+            self.kind = (
+                ui.select(
+                    {k: t(v) for k, v in rl.VERDICT_KINDS.items()},
+                    value="watch",
+                    label=t("Verdict"),
+                    on_change=lambda: self._sync_note(),
+                )
+                .props("outlined dense stack-label")
+                .classes("w-full")
+            )
             self.note = layout.field(t("Explanation"), hint=t("One line"))
             self.project = layout.field(t("Project"), required=True)
             self.task = layout.field(t("Task"), required=True, hint=t("Which project task, in a few words"))

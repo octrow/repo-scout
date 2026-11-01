@@ -13,12 +13,18 @@ from tests.test_triage import NOW, repo
 
 
 def c(msg="feat: add x", login="alice", date="2026-10-01T00:00:00Z", size=50, name=None):
-    return {"committedDate": date, "message": msg, "additions": size, "deletions": 0,
-            "author": {"name": name or login, "user": {"login": login} if login else None}}
+    return {
+        "committedDate": date,
+        "message": msg,
+        "additions": size,
+        "deletions": 0,
+        "author": {"name": name or login, "user": {"login": login} if login else None},
+    }
 
 
-@pytest.mark.parametrize("login", ["dependabot[bot]", "renovate", "github-actions[bot]", "pre-commit-ci[bot]",
-                                   "some-new-app[bot]"])
+@pytest.mark.parametrize(
+    "login", ["dependabot[bot]", "renovate", "github-actions[bot]", "pre-commit-ci[bot]", "some-new-app[bot]"]
+)
 def test_service_bots(login):
     assert is_service_bot(c(login=login))
 
@@ -32,8 +38,18 @@ def test_bot_by_author_name_when_no_user():
     assert is_service_bot(c(login=None, name="dependabot[bot]"))
 
 
-@pytest.mark.parametrize("msg", ["docs: update", "chore(deps): bump x", "ci(github): fix", "Merge branch 'x'",
-                                 "Fix typo", "release 1.2", "Update README"])
+@pytest.mark.parametrize(
+    "msg",
+    [
+        "docs: update",
+        "chore(deps): bump x",
+        "ci(github): fix",
+        "Merge branch 'x'",
+        "Fix typo",
+        "release 1.2",
+        "Update README",
+    ],
+)
 def test_cosmetic_messages(msg):
     assert is_cosmetic(c(msg=msg))
 
@@ -45,8 +61,11 @@ def test_tiny_text_edit_is_cosmetic_but_tiny_code_fix_is_not():
 
 
 def test_last_substantive_picks_latest():
-    commits = [c(date="2026-10-05T00:00:00Z", login="dependabot[bot]"), c(date="2026-09-01T00:00:00Z"),
-               c(date="2026-08-01T00:00:00Z")]
+    commits = [
+        c(date="2026-10-05T00:00:00Z", login="dependabot[bot]"),
+        c(date="2026-09-01T00:00:00Z"),
+        c(date="2026-08-01T00:00:00Z"),
+    ]
     assert last_substantive(commits, NOW) == ("2026-09-01T00:00:00Z", False)
 
 
@@ -80,7 +99,9 @@ def test_cosmetic_words_need_boundaries():
 def test_future_commits_ignored_and_pushed_days_clamped():
     now = datetime(2026, 10, 11, tzinfo=UTC)
     assert last_substantive([c(date="2026-12-01T00:00:00Z"), c(date="2026-09-01T00:00:00Z")], now) == (
-        "2026-09-01T00:00:00Z", False)
+        "2026-09-01T00:00:00Z",
+        False,
+    )
     assert last_substantive([c(date="2026-12-01T00:00:00Z")], now) is None
     assert triage(repo(), NOW, 60, last_push="2027-01-01T00:00:00Z")["pushed_days"] == 0
 

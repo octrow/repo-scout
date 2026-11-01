@@ -9,14 +9,34 @@ from repo_scout.gui.index_page import check_repo
 
 
 def row(repo: str, **kw) -> dict:
-    base = {"repo": repo, "url": f"https://github.com/{repo}", "stars": 5, "forks": 1, "commits": 3, "pushed_days": 9,
-            "created": "2026-01-01", "lang": "Python", "desc": f"about {repo}", "score": 4, "fresh": 1, "pop": 2,
-            "flags": [], "stop": None, "closeness": 0.5, "source": "query", "seen": ""}
+    base = {
+        "repo": repo,
+        "url": f"https://github.com/{repo}",
+        "stars": 5,
+        "forks": 1,
+        "commits": 3,
+        "pushed_days": 9,
+        "created": "2026-01-01",
+        "lang": "Python",
+        "desc": f"about {repo}",
+        "score": 4,
+        "fresh": 1,
+        "pop": 2,
+        "flags": [],
+        "stop": None,
+        "closeness": 0.5,
+        "source": "query",
+        "seen": "",
+    }
     return {**base, **kw}
 
 
-ROWS = [row("a/low", closeness=0.4), row("b/top", closeness=0.9, flags=["new"]),
-        row("c/dead", stop="dead", source="index", lang="Go"), row("d/none", closeness=None)]
+ROWS = [
+    row("a/low", closeness=0.4),
+    row("b/top", closeness=0.9, flags=["new"]),
+    row("c/dead", stop="dead", source="index", lang="Go"),
+    row("d/none", closeness=None),
+]
 
 
 def test_resolve_run_only_inside_runs_dir(tmp_path):
@@ -29,8 +49,12 @@ def test_resolve_run_only_inside_runs_dir(tmp_path):
 
 
 def test_sorted_rows_by_closeness_then_score():
-    rows = [row("a/x", closeness=0.4), row("b/y", closeness=0.9), row("c/z", closeness=None),
-            row("d/w", closeness=0.4, score=9)]
+    rows = [
+        row("a/x", closeness=0.4),
+        row("b/y", closeness=0.9),
+        row("c/z", closeness=None),
+        row("d/w", closeness=0.4, score=9),
+    ]
     assert [r["repo"] for r in rl.sorted_rows(rows)] == ["b/y", "d/w", "a/x", "c/z"]
 
 
@@ -54,11 +78,18 @@ def test_options_and_table_row():
     assert rl.table_row(ROWS[3])["close"] == "—" and rl.table_row(ROWS[1])["flags"] == "new"
 
 
-@pytest.mark.parametrize(("kind", "note", "expected"), [
-    ("watch", "", "→ Inspect"), ("dig", " API port ", "→ Study (API port)"),
-    ("drop", "dead", "drop (dead)"), ("doubt", "license", "doubt (license)")])
+@pytest.mark.parametrize(
+    ("kind", "note", "expected"),
+    [
+        ("watch", "", "→ Inspect"),
+        ("dig", " API port ", "→ Study (API port)"),
+        ("drop", "dead", "drop (dead)"),
+        ("doubt", "license", "doubt (license)"),
+    ],
+)
 def test_compose_verdict(kind, note, expected):
     from repo_scout.index import validate_verdict
+
     text = rl.compose_verdict(kind, note)
     assert text == expected
     validate_verdict("o/r", text, "p", "t")
@@ -97,7 +128,10 @@ def test_eval_errors_and_list_sets(tmp_path):
     (tmp_path / "snapshots" / "b").mkdir(parents=True)
     (tmp_path / "b.toml").write_text('name = "b"\ntask = "T2"\n')
     sets = el.list_sets(tmp_path)
-    assert [(s.name, s.n_expected, s.snapshot[:4]) for s in sets] == [("a", 1, "2026"), ("b", 0, str(datetime.now().year))]
+    assert [(s.name, s.n_expected, s.snapshot[:4]) for s in sets] == [
+        ("a", 1, "2026"),
+        ("b", 0, str(datetime.now().year)),
+    ]
     assert el.list_sets(tmp_path / "missing") == []
 
 
@@ -109,8 +143,12 @@ def test_rows_missing_keys_do_not_crash():
 
 
 def test_legacy_russian_values_shown_in_english():
-    old = row("a/old", source="второй круг", flags=["новый", "всплеск★ 100% ранних"],
-              stop="шум (awesome: имя, описание, topics)")
+    old = row(
+        "a/old",
+        source="второй круг",
+        flags=["новый", "всплеск★ 100% ранних"],
+        stop="шум (awesome: имя, описание, topics)",
+    )
     r = rl.sorted_rows([old, row("b/dead", stop="мёртвый (200 дн)"), row("c/toy", stop="игрушка (3 комм, 0★)")])
     assert r[0]["source"] == "round 2" and r[0]["flags"] == ["new", "burst★ 100% early"]
     assert r[0]["stop"] == "noise (awesome: name, description, topics)"
@@ -122,6 +160,8 @@ def test_readme_images_point_to_github_and_desc_shortcodes_render():
     md = '![a](./img/a.png) <img src="logo.svg"> ![b](https://x.io/b.png) <img src="/c.png"> ![d](data:image/png;base64,x)'
     out = rl.absolute_images(md, "o/r")
     raw = "https://raw.githubusercontent.com/o/r/HEAD/"
-    assert out == (f'![a]({raw}img/a.png) <img src="{raw}logo.svg"> ![b](https://x.io/b.png) '
-                   f'<img src="{raw}c.png"> ![d](data:image/png;base64,x)')
+    assert out == (
+        f'![a]({raw}img/a.png) <img src="{raw}logo.svg"> ![b](https://x.io/b.png) '
+        f'<img src="{raw}c.png"> ![d](data:image/png;base64,x)'
+    )
     assert rl.plain_desc("fast :rocket: at 10:30:00") == "fast 🚀 at 10:30:00"

@@ -30,15 +30,31 @@ def test_bad_regex_is_value_error_with_flag_name():
 
 
 def node(name, readme_hint=""):
-    return {"nameWithOwner": name, "url": "u", "description": "tool", "stargazerCount": 10, "forkCount": 0,
-            "pushedAt": "2026-10-09T00:00:00Z", "createdAt": "2020-01-01T00:00:00Z", "isArchived": False,
-            "isFork": False, "parent": None, "primaryLanguage": {"name": "Go"}, "repositoryTopics": {"nodes": []},
-            "defaultBranchRef": {"target": {"history": {"totalCount": 100}}}}
+    return {
+        "nameWithOwner": name,
+        "url": "u",
+        "description": "tool",
+        "stargazerCount": 10,
+        "forkCount": 0,
+        "pushedAt": "2026-10-09T00:00:00Z",
+        "createdAt": "2020-01-01T00:00:00Z",
+        "isArchived": False,
+        "isFork": False,
+        "parent": None,
+        "primaryLanguage": {"name": "Go"},
+        "repositoryTopics": {"nodes": []},
+        "defaultBranchRef": {"target": {"history": {"totalCount": 100}}},
+    }
 
 
 def commit(msg, date, login="alice"):
-    return {"committedDate": date, "message": msg, "additions": 50, "deletions": 0,
-            "author": {"name": login, "user": {"login": login}}}
+    return {
+        "committedDate": date,
+        "message": msg,
+        "additions": 50,
+        "deletions": 0,
+        "author": {"name": login, "user": {"login": login}},
+    }
 
 
 def run_pipeline(monkeypatch, details, **kw):
@@ -58,7 +74,9 @@ def test_pipeline_must_exclude_readme_and_cosmetic(monkeypatch):
         "a/cosmetic": {"readme": "kaspi", "commits": [commit("docs: x", "2025-01-01T00:00:00Z")]},
         "a/stale": {"readme": "kaspi", "commits": [commit("feat: x", "2026-01-01T00:00:00Z")]},
     }
-    rows = run_pipeline(monkeypatch, details, must=compile_all("--must", ["kaspi"]), exclude=compile_all("--exclude", ["wordpress"]))
+    rows = run_pipeline(
+        monkeypatch, details, must=compile_all("--must", ["kaspi"]), exclude=compile_all("--exclude", ["wordpress"])
+    )
     assert rows["a/ok"]["stop"] is None
     assert rows["a/nomust"]["stop"] == "missing required: kaspi"
     assert rows["a/banned"]["stop"] == "forbidden: wordpress"
@@ -76,8 +94,11 @@ def test_pipeline_missing_details_flag(monkeypatch):
 def test_json_output_has_dropped_by_must(monkeypatch, capsys):
     import json
     import sys
-    rows = [{"repo": "a/ok", "stop": None, "score": 1, "pushed_days": 1},
-            {"repo": "a/no", "stop": "missing required: x", "score": 1, "pushed_days": 1}]
+
+    rows = [
+        {"repo": "a/ok", "stop": None, "score": 1, "pushed_days": 1},
+        {"repo": "a/no", "stop": "missing required: x", "score": 1, "pushed_days": 1},
+    ]
     monkeypatch.setattr(cli, "run", lambda *a, **k: rows)
     monkeypatch.setattr(sys, "argv", ["repo-scout", "q", "--task", "t", "--json"])
     cli.main()

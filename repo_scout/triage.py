@@ -1,4 +1,5 @@
 """Stop rules, flags, and Step 1 scoring from docs/repo-triage.md."""
+
 from datetime import datetime
 
 FRESH = [(7, 4), (14, 3), (30, 2), (90, 1)]  # (days since push <=, points)
@@ -19,7 +20,10 @@ def triage(r: dict, now: datetime, new_days: int, last_push: str | None = None) 
     """Return the row dict with score, flags, and stop reason (None = passes).
 
     last_push: date of the latest substantive commit instead of pushedAt."""
-    stars, pushed = r["stargazerCount"], days_since(last_push or r.get("pushedAt") or r["createdAt"], now)  # pushedAt is null on never-pushed repos
+    stars, pushed = (
+        r["stargazerCount"],
+        days_since(last_push or r.get("pushedAt") or r["createdAt"], now),
+    )  # pushedAt is null on never-pushed repos
     target = (r.get("defaultBranchRef") or {}).get("target") or {}
     commits = (target.get("history") or {}).get("totalCount", 0)
 
@@ -44,11 +48,21 @@ def triage(r: dict, now: datetime, new_days: int, last_push: str | None = None) 
     fresh = next((p for d, p in FRESH if pushed <= d), 0)
     pop = next((p for s, p in POP if stars >= s), 0)
     return {
-        "repo": r["nameWithOwner"], "url": r["url"], "stars": stars, "forks": r["forkCount"],
-        "commits": commits, "pushed_days": pushed, "created": r["createdAt"][:10],
-        "topics": topics_of(r), "lang": (r.get("primaryLanguage") or {}).get("name", ""),
+        "repo": r["nameWithOwner"],
+        "url": r["url"],
+        "stars": stars,
+        "forks": r["forkCount"],
+        "commits": commits,
+        "pushed_days": pushed,
+        "created": r["createdAt"][:10],
+        "topics": topics_of(r),
+        "lang": (r.get("primaryLanguage") or {}).get("name", ""),
         "desc": (r.get("description") or "").replace("|", "/").replace("\n", " "),
-        "score": fresh + pop, "fresh": fresh, "pop": pop, "flags": flags, "stop": stop,
+        "score": fresh + pop,
+        "fresh": fresh,
+        "pop": pop,
+        "flags": flags,
+        "stop": stop,
     }
 
 

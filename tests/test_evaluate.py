@@ -1,13 +1,16 @@
 from repo_scout.evaluate import metrics, summary_table
 
-SPEC = {"name": "s", "expected": [
-    {"repo": "A/one", "verdict": "→ Study (x)"},
-    {"repo": "a/two", "verdict": "→ Inspect"},
-    {"repo": "a/three", "verdict": "→ Inspect"},
-    {"repo": "a/four", "verdict": "→ Inspect"},
-    {"repo": "a/noise", "verdict": "drop (junk)"},
-    {"repo": "a/maybe", "verdict": "doubt (?)"},
-]}
+SPEC = {
+    "name": "s",
+    "expected": [
+        {"repo": "A/one", "verdict": "→ Study (x)"},
+        {"repo": "a/two", "verdict": "→ Inspect"},
+        {"repo": "a/three", "verdict": "→ Inspect"},
+        {"repo": "a/four", "verdict": "→ Inspect"},
+        {"repo": "a/noise", "verdict": "drop (junk)"},
+        {"repo": "a/maybe", "verdict": "doubt (?)"},
+    ],
+}
 ROWS = [
     {"repo": "x/first", "stop": None},
     {"repo": "a/ONE", "stop": None},
@@ -32,6 +35,7 @@ def test_summary_table():
 
 def test_eval_out_file(tmp_path, capsys):
     from repo_scout import evaluate
+
     out = tmp_path / "rep.txt"
     evaluate.main(["--export-verdicts", "--out", str(out)])
     assert capsys.readouterr().out == "" and out.exists()
@@ -41,6 +45,7 @@ def test_set_without_required_keys_is_a_clean_error(tmp_path):
     import pytest
 
     from repo_scout.evaluate import eval_set
+
     bad = tmp_path / "bad.toml"
     bad.write_text('name = "s"\ntask = "t"\nqueries = ["q"]\n[[expected]]\nrepo = "a/b"\n')
     with pytest.raises(ValueError, match=r"entries \[1\] need both repo and verdict"):

@@ -24,8 +24,15 @@ def test_score_counts_flags_and_treats_missing_history_as_unflagged(monkeypatch)
     monkeypatch.setattr(fake_stars.stars, "share", lambda h, mb: shares[h])
     labels = [("p1", 1), ("p2", 1), ("p3", 1), ("p4", 1), ("n1", 0), ("n2", 0)]
     hist = {n: n for n in shares}  # p4 has no history
-    assert score(labels, hist, 0.5, 5) == {"thr": 0.5, "min_burst": 5, "tp": 1, "fp": 1, "precision": 0.5,
-                                           "recall": 0.25, "fpr": 0.5}
+    assert score(labels, hist, 0.5, 5) == {
+        "thr": 0.5,
+        "min_burst": 5,
+        "tp": 1,
+        "fp": 1,
+        "precision": 0.5,
+        "recall": 0.25,
+        "fpr": 0.5,
+    }
     assert score(labels, hist, 0.95, 5)["precision"] == 0.0  # nothing flagged: no division by zero
     assert score([("p1", 1)], hist, 0.5, 5)["fpr"] == 0.0  # one class only: no division by zero
 

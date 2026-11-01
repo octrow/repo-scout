@@ -1,4 +1,5 @@
 """Search page (`/`): form, command preview, subprocess execution with live logs."""
+
 import html
 import sqlite3
 import tomllib
@@ -18,10 +19,15 @@ from .kit.texts import tr
 
 NOTIFY_PERIOD = 1.0
 COMMAND_HINT = "Fill in the task and queries to see the command"
-NUMBER_LABELS = {"months": "Months since last push (0 = any)", "new_days": "Days a repo counts as new",
-                 "limit": "Results per query", "min_closeness": "Closeness threshold",
-                 "from_index": "Closest repos from Index", "round2_k": "Repos for round 2 topics",
-                 "stars_k": "Repos to check for star bursts"}
+NUMBER_LABELS = {
+    "months": "Months since last push (0 = any)",
+    "new_days": "Days a repo counts as new",
+    "limit": "Results per query",
+    "min_closeness": "Closeness threshold",
+    "from_index": "Closest repos from Index",
+    "round2_k": "Repos for round 2 topics",
+    "stars_k": "Repos to check for star bursts",
+}
 FLAG_LABELS = {"no_round2": "Skip round 2", "no_stars_check": "Skip star burst check"}
 
 
@@ -115,18 +121,24 @@ def _fields(form: SearchForm) -> None:
     if llm.gui_enabled():
         _need_row(form)
     drafts = {k: d.label for k, d in form.drafts.items()}
-    ui.select(drafts, label=t("Draft"), with_input=True, clearable=True,
-              on_change=lambda e: e.value and _load_draft(form, e.value)) \
-        .props(f'outlined dense stack-label hint="{t("From a past Run or eval dataset")}"').classes("w-full")
+    ui.select(
+        drafts,
+        label=t("Draft"),
+        with_input=True,
+        clearable=True,
+        on_change=lambda e: e.value and _load_draft(form, e.value),
+    ).props(f'outlined dense stack-label hint="{t("From a past Run or eval dataset")}"').classes("w-full")
     form.area("task", t("Task (English)"), required=True, hint=t("1-3 sentences: what you need"))
     form.area("queries", t("Queries"), sf.check_queries, hint=t("One per line; 3-6 variants"))
     form.text("project", t("Project"), suggestions=sf.project_suggestions(_verdict_projects()))
     with layout.grid():
         form.text("lang", t("Language"), hint=t("For example python")).classes("ic-span-4")
-        form.area("must", t("Required words"), lambda v: sf.check_regexes("--must", v),
-                  hint=t("Regexes, one per line")).classes("ic-span-4")
-        form.area("exclude", t("Excluded words"), lambda v: sf.check_regexes("--exclude", v),
-                  hint=t("Regexes, one per line")).classes("ic-span-4")
+        form.area(
+            "must", t("Required words"), lambda v: sf.check_regexes("--must", v), hint=t("Regexes, one per line")
+        ).classes("ic-span-4")
+        form.area(
+            "exclude", t("Excluded words"), lambda v: sf.check_regexes("--exclude", v), hint=t("Regexes, one per line")
+        ).classes("ic-span-4")
 
 
 def _advanced(form: SearchForm) -> None:
@@ -134,8 +146,12 @@ def _advanced(form: SearchForm) -> None:
     with ui.expansion(t("Advanced")).classes("w-full"):
         with layout.grid():
             for key, label in NUMBER_LABELS.items():
-                form.add(key, ui.number(t(label), value=defaults[key]).props("outlined dense stack-label")
-                         .classes("ic-span-4 w-full"))
+                form.add(
+                    key,
+                    ui.number(t(label), value=defaults[key])
+                    .props("outlined dense stack-label")
+                    .classes("ic-span-4 w-full"),
+                )
             for key, label in FLAG_LABELS.items():
                 form.add(key, ui.checkbox(t(label), value=defaults[key]).classes("ic-span-6"))
 
@@ -188,8 +204,13 @@ def _watch_done(started: dict[str, str]) -> None:
         started.pop(run_id)
         if state.status == run_pool.DONE:
             title = html.escape(state.label)
-            ui.notify(t('Done: {title}. <a href="/runs/{stem}">Open run</a>').format(title=title, stem=stem),
-                      type="positive", html=True, close_button=t("Close"), timeout=0)
+            ui.notify(
+                t('Done: {title}. <a href="/runs/{stem}">Open run</a>').format(title=title, stem=stem),
+                type="positive",
+                html=True,
+                close_button=t("Close"),
+                timeout=0,
+            )
 
 
 def _buttons(form: SearchForm, started: dict[str, str]) -> None:
@@ -218,10 +239,13 @@ def search(draft: str | None = None) -> None:
             with layout.section_card(recessive=True):
                 with ui.row().classes("ic-split w-full items-start justify-between no-wrap"):
                     form.command = ui.label().classes("t-mono").style("min-width: 0; overflow-wrap: anywhere")
-                    ui.button(icon="content_copy", on_click=lambda: (
-                        ui.clipboard.write((sf.command_text(form.state()) or "")), ui.notify(tr("copied")))) \
-                        .props(f'flat round dense aria-label="{t("Copy")}"').classes("shrink-0") \
-                        .tooltip(t("Copy"))
+                    ui.button(
+                        icon="content_copy",
+                        on_click=lambda: (
+                            ui.clipboard.write((sf.command_text(form.state()) or "")),
+                            ui.notify(tr("copied")),
+                        ),
+                    ).props(f'flat round dense aria-label="{t("Copy")}"').classes("shrink-0").tooltip(t("Copy"))
                 _buttons(form, started)
             layout.heading(t("Runs"), level=2)
             run_monitor.attach_run_monitor(idle_text=t("No runs yet"))

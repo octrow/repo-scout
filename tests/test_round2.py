@@ -1,4 +1,5 @@
 """Round 2: topic selection, pool merge, --no-round2 (without model and network)."""
+
 import numpy as np
 
 from repo_scout import cli, github, semantic
@@ -66,6 +67,7 @@ def test_pick_topics_rejects_bad_slugs():
 
 def test_round2_stops_noise_and_indexes_good(monkeypatch, tmp_path):
     from repo_scout.index import Index
+
     queries = _setup(monkeypatch)
     base = github.search
 
@@ -77,6 +79,7 @@ def test_round2_stops_noise_and_indexes_good(monkeypatch, tmp_path):
     monkeypatch.setattr(github, "search", search)
     idx = Index(tmp_path / "i.db")
     import re
+
     out = {r["repo"]: r for r in _run(index=idx, exclude=[re.compile("wordpress")])}
     assert out["b/bad"]["stop"] and not out["b/good"]["stop"]
     assert out["b/good"]["source"] == "round two"

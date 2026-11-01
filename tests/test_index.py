@@ -1,4 +1,5 @@
 """Index, Verdicts, row source, and export (without model and network)."""
+
 from datetime import UTC, datetime
 
 import numpy as np
@@ -14,8 +15,9 @@ ROW = {"repo": "O/Name", "url": "u", "desc": "d", "topics": ["t"], "stars": 3, "
 @pytest.fixture
 def fake_embed(monkeypatch):
     monkeypatch.setattr(semantic, "embed_task", lambda t: np.array([1, 0], dtype=np.float32))
-    monkeypatch.setattr(semantic, "embed_docs",
-                        lambda ts: np.array([[1, 0] if "match" in t else [0, 1] for t in ts], dtype=np.float32))
+    monkeypatch.setattr(
+        semantic, "embed_docs", lambda ts: np.array([[1, 0] if "match" in t else [0, 1] for t in ts], dtype=np.float32)
+    )
 
 
 def test_roundtrip_and_top(tmp_path, fake_embed):
@@ -43,10 +45,14 @@ def test_verdict_validation():
     validate_verdict("a/b", "→ Study (goal)", "p", "t")
     validate_verdict("a/b.c_d", "drop (noise)", "p", "t")
     for repo, verdict, project, task, msg in [
-        ("a/b", "ok", "p", "t", "verdict"), ("a/b", "→ Study", "p", "t", "verdict"),
-        ("a/b", "drop (x)\nmore", "p", "t", "verdict"), ("ab", "→ Inspect", "p", "t", "owner/repo"),
-        ("a/..", "→ Inspect", "p", "t", "owner/repo"), ("a/b c", "→ Inspect", "p", "t", "owner/repo"),
-        ("a/b", "→ Inspect", "", "t", "project"), ("a/b", "→ Inspect", "p", "x\ny", "task"),
+        ("a/b", "ok", "p", "t", "verdict"),
+        ("a/b", "→ Study", "p", "t", "verdict"),
+        ("a/b", "drop (x)\nmore", "p", "t", "verdict"),
+        ("ab", "→ Inspect", "p", "t", "owner/repo"),
+        ("a/..", "→ Inspect", "p", "t", "owner/repo"),
+        ("a/b c", "→ Inspect", "p", "t", "owner/repo"),
+        ("a/b", "→ Inspect", "", "t", "project"),
+        ("a/b", "→ Inspect", "p", "x\ny", "task"),
     ]:
         with pytest.raises(ValueError, match=msg):
             validate_verdict(repo, verdict, project, task)
@@ -67,13 +73,17 @@ def test_forget_and_rename(tmp_path):
 def test_export_collapses_whitespace(tmp_path):
     idx = Index(tmp_path / "i.db")
     idx.add_verdict("a/b", "→ Inspect", "p  q", "t\t\u2028x")
-    assert evaluate.export_verdicts(idx, None).count("\n") == 4 and "# project: p q" in evaluate.export_verdicts(idx, None)
+    assert evaluate.export_verdicts(idx, None).count("\n") == 4 and "# project: p q" in evaluate.export_verdicts(
+        idx, None
+    )
 
 
 def test_seen_latest_per_project_and_export(tmp_path):
     idx = Index(tmp_path / "i.db")
+
     def d(day):
         return datetime(2026, 10, day, tzinfo=UTC)
+
     idx.add_verdict("A/b", "→ Inspect", "p1", "t1", d(1))
     idx.add_verdict("a/b", "drop (noise)", "p1", "t1", d(2))
     idx.add_verdict("a/b", "→ Study (x)", "p2", "t2", d(3))
@@ -91,10 +101,18 @@ def test_run_writes_index_pulls_from_index_and_marks_seen(tmp_path, fake_embed, 
     fetched = []
     monkeypatch.setattr(github, "search", lambda q, n: [node("a/live")])
     monkeypatch.setattr(github, "details", lambda names: {n: {"readme": "match", "commits": []} for n in names})
-    monkeypatch.setattr(github, "refresh", lambda names: fetched.extend(names) or
-                        {n: {"node": node(n), "details": {"readme": "match", "commits": []}} for n in names})
-    rows = {r["repo"]: r for r in cli.run(["q"], months=6, new_days=60, limit=5, lang=None, now=NOW, task="t",
-                                          index=idx, from_index=5)}
+    monkeypatch.setattr(
+        github,
+        "refresh",
+        lambda names: (
+            fetched.extend(names)
+            or {n: {"node": node(n), "details": {"readme": "match", "commits": []}} for n in names}
+        ),
+    )
+    rows = {
+        r["repo"]: r
+        for r in cli.run(["q"], months=6, new_days=60, limit=5, lang=None, now=NOW, task="t", index=idx, from_index=5)
+    }
     assert fetched == ["old/repo"]
     assert rows["old/repo"]["source"] == "index" and rows["a/live"]["source"] == "query"
     assert "proj: → Inspect" in rows["old/repo"]["seen"] and rows["a/live"]["seen"] == ""
@@ -106,8 +124,12 @@ def test_run_writes_index_pulls_from_index_and_marks_seen(tmp_path, fake_embed, 
 
 
 def test_refresh_splits_node_and_details(monkeypatch):
-    repo = {**node("a/b"), "m0": {"text": "# hi"}, "m1": None,
-            "recent": {"target": {"history": {"nodes": [{"message": "x"}]}}}}
+    repo = {
+        **node("a/b"),
+        "m0": {"text": "# hi"},
+        "m1": None,
+        "recent": {"target": {"history": {"nodes": [{"message": "x"}]}}},
+    }
     monkeypatch.setattr(github, "_graphql_live", lambda q, v, **_: {"data": {"r0": repo, "r1": None}})
     out = github.refresh(["a/b", "a/gone"])
     assert list(out) == ["a/b"] and out["a/b"]["details"] == {"readme": "# hi", "commits": [{"message": "x"}]}
@@ -126,8 +148,11 @@ def test_gone_and_renamed_index_rows(tmp_path, fake_embed, monkeypatch):
     for n in ("gone/repo", "old/name"):
         idx.upsert({**ROW, "repo": n}, "match", np.array([1, 0]))
     idx.add_verdict("old/name", "→ Inspect", "p", "t")
-    _pipeline(monkeypatch, idx, lambda names: {"old/name": {"node": node("new/name"),
-                                                           "details": {"readme": "match", "commits": []}}})
+    _pipeline(
+        monkeypatch,
+        idx,
+        lambda names: {"old/name": {"node": node("new/name"), "details": {"readme": "match", "commits": []}}},
+    )
     names = {r[0] for r in idx.db.execute("SELECT name FROM repos")}
     assert names == {"a/live", "new/name"}
     assert "new/name" in idx.seen(["new/name"])
@@ -149,11 +174,13 @@ def test_empty_readme_not_indexed(tmp_path, fake_embed, monkeypatch):
 
 def test_conftest_isolates_user_index(tmp_path):
     from repo_scout.index import default_path
+
     assert default_path() == tmp_path / "user-index.db"
 
 
 def test_record_and_replay_use_no_index(monkeypatch):
     import sys
+
     seen = []
     monkeypatch.setattr(cli, "run", lambda *a, **k: seen.append(k["index"]) or [])
     monkeypatch.setattr(github, "configure", lambda *a: None)

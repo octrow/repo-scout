@@ -35,11 +35,13 @@ async def test_form_fills_from_draft(user: User) -> None:
 
 async def test_draft_gone_after_listing_opens_an_empty_form(user: User, monkeypatch) -> None:
     from repo_scout.gui import search_form as sf
+
     params = cli.search_params(cli._parser().parse_args(["--task", "Gone task", "qa"]))
     path = runs.save(params, [], [], datetime(2026, 1, 1))
 
     def gone(_):
         raise OSError("deleted")
+
     monkeypatch.setattr(sf, "load_draft", gone)
     await user.open(f"/?draft=run:{path.stem}")
     assert _values(user)["Task (English)"] == ""
@@ -130,6 +132,7 @@ async def test_need_field_hidden_with_key_but_without_opt_in(user: User, monkeyp
 
 async def test_llm_draft_fills_form_without_search(user: User, monkeypatch) -> None:
     from repo_scout import llm
+
     monkeypatch.setenv("OMNIROUTE_API_KEY", "k")
     monkeypatch.setenv("REPO_SCOUT_GUI_DRAFT", "1")
     monkeypatch.setattr(run_pool, "submit", lambda *a, **k: pytest.fail("submit"))
@@ -149,6 +152,7 @@ async def test_llm_draft_error_notifies_without_internals(user: User, monkeypatc
 
     def boom(need):
         raise llm.LLMError("LLM unavailable")
+
     monkeypatch.setenv("OMNIROUTE_API_KEY", "k")
     monkeypatch.setenv("REPO_SCOUT_GUI_DRAFT", "1")
     monkeypatch.setattr(llm, "draft", boom)

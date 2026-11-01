@@ -1,4 +1,5 @@
 """Index (ADR-0001): stdlib sqlite3, float32 BLOB vectors, cosine search via numpy; Verdicts."""
+
 import json
 import os
 import re
@@ -21,7 +22,9 @@ def default_path() -> Path:
     return Path(os.environ.get("REPO_SCOUT_INDEX") or Path.home() / ".local/share/repo-scout/index.db")
 
 
-VERDICT = re.compile(r"→ (?:Inspect|Study \(.+\)|\u041e\u0441\u043c\u043e\u0442\u0440|\u0420\u0430\u0437\u0431\u043e\u0440 \(.+\))|(?:drop|doubt|\u043e\u0442\u0441\u0435\u0432|\u0441\u043f\u043e\u0440\u043d\u043e) \(.+\)")
+VERDICT = re.compile(
+    r"→ (?:Inspect|Study \(.+\)|\u041e\u0441\u043c\u043e\u0442\u0440|\u0420\u0430\u0437\u0431\u043e\u0440 \(.+\))|(?:drop|doubt|\u043e\u0442\u0441\u0435\u0432|\u0441\u043f\u043e\u0440\u043d\u043e) \(.+\)"
+)
 
 
 def validate_verdict(repo: str, verdict: str, project: str, task: str) -> None:
@@ -52,16 +55,26 @@ class Index:
         texts = [semantic.candidate_text(json.loads(m), r) for _, m, r in stale]
         with self.db:
             for (name, _, _), v in zip(stale, semantic.embed_docs(texts)):
-                self.db.execute("UPDATE repos SET vec = ?, model = ? WHERE name = ?",
-                                (np.asarray(v, dtype=np.float32).tobytes(), self.model, name))
+                self.db.execute(
+                    "UPDATE repos SET vec = ?, model = ? WHERE name = ?",
+                    (np.asarray(v, dtype=np.float32).tobytes(), self.model, name),
+                )
 
     def upsert(self, row: dict, readme: str | None, vec: np.ndarray, now: datetime | None = None) -> None:
         meta = {k: row[k] for k in ("repo", "url", "desc", "topics", "stars", "lang")}
         with self.db:
             self.db.execute(
                 "INSERT OR REPLACE INTO repos VALUES(?,?,?,?,?,?,?)",
-                (row["repo"].lower(), row["repo"], json.dumps(meta, ensure_ascii=False), readme or "",
-                 (now or datetime.now(UTC)).isoformat(), np.asarray(vec, dtype=np.float32).tobytes(), self.model))
+                (
+                    row["repo"].lower(),
+                    row["repo"],
+                    json.dumps(meta, ensure_ascii=False),
+                    readme or "",
+                    (now or datetime.now(UTC)).isoformat(),
+                    np.asarray(vec, dtype=np.float32).tobytes(),
+                    self.model,
+                ),
+            )
 
     def top(self, task: str, n: int) -> list[str]:
         """Top-n repo names by closeness to task; linear scan across all vectors."""
@@ -75,14 +88,18 @@ class Index:
     def add_verdict(self, repo: str, verdict: str, project: str, task: str, now: datetime | None = None) -> None:
         validate_verdict(repo, verdict, project, task)
         with self.db:
-            self.db.execute("INSERT INTO verdicts VALUES(?,?,?,?,?)",
-                            (repo.lower(), project, task, verdict, (now or datetime.now(UTC)).date().isoformat()))
+            self.db.execute(
+                "INSERT INTO verdicts VALUES(?,?,?,?,?)",
+                (repo.lower(), project, task, verdict, (now or datetime.now(UTC)).date().isoformat()),
+            )
 
     def rows(self) -> list[dict]:
         """Index repos without vectors: key, name, meta, fetched_at, has_readme; case-insensitive name order."""
         q = "SELECT name, display_name, meta, fetched_at, readme != '' FROM repos ORDER BY display_name COLLATE NOCASE"
-        return [{"key": k, "name": n, "meta": json.loads(m), "fetched_at": f, "has_readme": bool(r)}
-                for k, n, m, f, r in self.db.execute(q)]
+        return [
+            {"key": k, "name": n, "meta": json.loads(m), "fetched_at": f, "has_readme": bool(r)}
+            for k, n, m, f, r in self.db.execute(q)
+        ]
 
     def readme(self, name: str) -> str | None:
         row = self.db.execute("SELECT readme FROM repos WHERE name = ?", (name.lower(),)).fetchone()
@@ -92,7 +109,7 @@ class Index:
         """'project: verdict (date)' — latest verdict per project, newest first; lower-case key."""
         out: dict[str, list[str]] = {}
         for name in names:
-            q = ("SELECT project, verdict, date FROM verdicts WHERE name = ? ORDER BY date DESC, rowid DESC")
+            q = "SELECT project, verdict, date FROM verdicts WHERE name = ? ORDER BY date DESC, rowid DESC"
             seen_projects: set[str] = set()
             for project, verdict, date in self.db.execute(q, (name.lower(),)):
                 if project not in seen_projects:

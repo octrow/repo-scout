@@ -13,17 +13,35 @@ from .verdict_dialog import DB_ERRORS, VerdictDialog, notify_db_error, open_inde
 # (kit table), and the repo panel still shows every field
 COLUMNS = [
     {"name": "repo", "label": "Repo", "field": "repo", "align": "left", "sortable": True},
-    {"name": "close", "label": "Closeness", "field": "close", "align": "right", "sortable": True,
-     "hint": "README closeness to the task, 0-1"},
+    {
+        "name": "close",
+        "label": "Closeness",
+        "field": "close",
+        "align": "right",
+        "sortable": True,
+        "hint": "README closeness to the task, 0-1",
+    },
     {"name": "fit", "label": "Fit", "field": "fit", "align": "right", "sortable": True},  # advanced mode only
     {"name": "source", "label": "Source", "field": "source", "align": "left", "sortable": True, "priority": 2},
-    {"name": "score", "label": "Score", "field": "score_n", "align": "right", "sortable": True,
-     "hint": "Score: f = freshness, p = popularity"},
+    {
+        "name": "score",
+        "label": "Score",
+        "field": "score_n",
+        "align": "right",
+        "sortable": True,
+        "hint": "Score: f = freshness, p = popularity",
+    },
     {"name": "stars", "label": "★", "field": "stars", "align": "right", "sortable": True},
     {"name": "forks", "label": "Forks", "field": "forks", "align": "right", "sortable": True, "priority": 3},
     {"name": "commits", "label": "Commits", "field": "commits", "align": "right", "sortable": True, "priority": 3},
-    {"name": "pushed", "label": "Pushed, d", "field": "pushed", "align": "right", "sortable": True,
-     "hint": "Days since the last push"},
+    {
+        "name": "pushed",
+        "label": "Pushed, d",
+        "field": "pushed",
+        "align": "right",
+        "sortable": True,
+        "hint": "Days since the last push",
+    },
     {"name": "created", "label": "Created", "field": "created", "align": "left", "sortable": True, "priority": 3},
     {"name": "lang", "label": "Language", "field": "lang", "align": "left", "priority": 3},
     {"name": "flags", "label": "Flags / drop", "field": "flags", "align": "left", "priority": 2},
@@ -43,18 +61,32 @@ TABLE_CSS = """
 .rs-repo { font-weight: var(--ic-fw-semibold); color: var(--ic-accent-700); }
 tr:hover .rs-repo { text-decoration: underline; }
 """
-HEADER_SLOT = ('<q-th :props="props">{{ props.col.label }}'
-               '<q-tooltip v-if="props.col.hint">{{ props.col.hint }}</q-tooltip></q-th>')
-SCORE_SLOT = ('<q-td :props="props"><b>{{ props.row.score_n }}</b> '
-              '<span class="t-meta">{{ props.row.score_parts }}</span>'
-              '<q-tooltip>{{ props.row.score }}</q-tooltip></q-td>')
-FLAGS_SLOT = ('<q-td :props="props"><span v-for="f in props.row.flag_list" :key="f" '
-              'class="ic-chip ic-chip--neutral q-mr-xs">{{ f }}</span>'
-              '<span v-if="!props.row.flag_list.length">—</span></q-td>')
+HEADER_SLOT = (
+    '<q-th :props="props">{{ props.col.label }}<q-tooltip v-if="props.col.hint">{{ props.col.hint }}</q-tooltip></q-th>'
+)
+SCORE_SLOT = (
+    '<q-td :props="props"><b>{{ props.row.score_n }}</b> '
+    '<span class="t-meta">{{ props.row.score_parts }}</span>'
+    "<q-tooltip>{{ props.row.score }}</q-tooltip></q-td>"
+)
+FLAGS_SLOT = (
+    '<q-td :props="props"><span v-for="f in props.row.flag_list" :key="f" '
+    'class="ic-chip ic-chip--neutral q-mr-xs">{{ f }}</span>'
+    '<span v-if="!props.row.flag_list.length">—</span></q-td>'
+)
 CLAMP_SLOT = '<q-td :props="props"><div class="rs-clamp" :title="props.value">{{ props.value }}</div></q-td>'
 REPO_SLOT = '<q-td :props="props"><span class="rs-repo">{{ props.value }}</span></q-td>'
-METRICS = (("Closeness", "close"), ("Source", "source"), ("Score", "score"), ("★", "stars"), ("Forks", "forks"),
-           ("Commits", "commits"), ("Pushed, days ago", "pushed"), ("Created", "created"), ("Language", "lang"))
+METRICS = (
+    ("Closeness", "close"),
+    ("Source", "source"),
+    ("Score", "score"),
+    ("★", "stars"),
+    ("Forks", "forks"),
+    ("Commits", "commits"),
+    ("Pushed, days ago", "pushed"),
+    ("Created", "created"),
+    ("Language", "lang"),
+)
 
 
 def _labeled(options: list[str]) -> dict[str, str]:
@@ -81,14 +113,22 @@ class RunView:
         self.count: ui.label | None = None
 
     def visible(self) -> list[dict]:
-        return rl.filter_rows(self.rows, text=self.flt["text"], source=self.flt["source"],
-                              flag=self.flt["flag"], show_stopped=self.flt["stopped"])
+        return rl.filter_rows(
+            self.rows,
+            text=self.flt["text"],
+            source=self.flt["source"],
+            flag=self.flt["flag"],
+            show_stopped=self.flt["stopped"],
+        )
 
     def columns(self) -> list[dict]:
         """Fit only in advanced mode, Seen only once some repo has a verdict."""
         hidden = {name for name, key in (("fit", "fit"), ("seen", "seen")) if not any(r.get(key) for r in self.rows)}
-        return [{**c, "label": t(c["label"]), **({"hint": t(c["hint"])} if "hint" in c else {})}
-                for c in COLUMNS if c["name"] not in hidden]
+        return [
+            {**c, "label": t(c["label"]), **({"hint": t(c["hint"])} if "hint" in c else {})}
+            for c in COLUMNS
+            if c["name"] not in hidden
+        ]
 
     def refresh(self) -> None:
         shown = self.visible()
@@ -114,12 +154,19 @@ class RunView:
 
     def filters(self) -> None:
         with layout.filter_bar() as self.bar:
-            layout.search_field(t("Search by repo and description"), on_change=lambda e: self.set_filter("text", e.value))
-            ui.select(_labeled(rl.source_options(self.rows)), value=rl.SOURCES_ALL,
-                      on_change=lambda e: self.set_filter("source", e.value)) \
-                .props(f'outlined dense aria-label="{t("Source")}"')
-            ui.select(_labeled(rl.flag_options(self.rows)), value=rl.FLAGS_ALL,
-                      on_change=lambda e: self.set_filter("flag", e.value)).props(f'outlined dense aria-label="{t("Flag")}"')
+            layout.search_field(
+                t("Search by repo and description"), on_change=lambda e: self.set_filter("text", e.value)
+            )
+            ui.select(
+                _labeled(rl.source_options(self.rows)),
+                value=rl.SOURCES_ALL,
+                on_change=lambda e: self.set_filter("source", e.value),
+            ).props(f'outlined dense aria-label="{t("Source")}"')
+            ui.select(
+                _labeled(rl.flag_options(self.rows)),
+                value=rl.FLAGS_ALL,
+                on_change=lambda e: self.set_filter("flag", e.value),
+            ).props(f'outlined dense aria-label="{t("Flag")}"')
             ui.switch(t("Show dropped"), on_change=lambda e: self.set_filter("stopped", e.value))
             ui.space()
             self.count = ui.label().classes("t-meta")
@@ -131,8 +178,9 @@ class RunView:
         with self.panel, layout.section_card().style(shell.PANEL_STYLE):
             with ui.row().classes("ic-split w-full items-start flex-nowrap"):
                 layout.heading(repo, level=2).classes("min-w-0")
-                ui.button(icon="close", on_click=self.panel.close) \
-                    .props(f'flat round dense aria-label="{t("Close")}"').classes("shrink-0")
+                ui.button(icon="close", on_click=self.panel.close).props(
+                    f'flat round dense aria-label="{t("Close")}"'
+                ).classes("shrink-0")
             ui.link(t("Open on GitHub"), row.get("url", ""), new_tab=True)
             ui.label(cells["desc"]).classes("t-meta")
             with ui.row().classes("items-center gap-2"):
@@ -146,16 +194,21 @@ class RunView:
                 layout.button(t("Close"), kind="quiet", on_click=self.panel.close)
                 ui.space()
                 for kind, label in rl.VERDICT_KINDS.items():
-                    layout.button(t(label), on_click=lambda k=kind: self.verdicts.open(
-                        repo, self.params.get("project") or "", self.params.get("task") or "", kind=k))
+                    layout.button(
+                        t(label),
+                        on_click=lambda k=kind: self.verdicts.open(
+                            repo, self.params.get("project") or "", self.params.get("task") or "", kind=k
+                        ),
+                    )
         self.panel.open()
 
     def build(self) -> None:
         ui.add_css(TABLE_CSS)
         with ui.row().classes("ic-split w-full items-start sm:flex-nowrap"):
             layout.heading(self.params.get("task") or self.stem, level=1).classes("min-w-0")
-            layout.button(t("Rerun as draft"), icon="replay",
-                          on_click=lambda: ui.navigate.to(f"/?draft=run:{self.stem}")).classes("shrink-0")
+            layout.button(
+                t("Rerun as draft"), icon="replay", on_click=lambda: ui.navigate.to(f"/?draft=run:{self.stem}")
+            ).classes("shrink-0")
         ui.label(_params_line(self.params)).classes("t-meta")
         if self.data.get("round2_topics"):
             with ui.row().classes("items-center gap-1"):
@@ -163,8 +216,9 @@ class RunView:
                 for topic in self.data["round2_topics"]:
                     ui.label(topic).classes("ic-chip ic-chip--neutral")
         self.filters()
-        self.table = table.empty_aware_table(self.columns(), row_key="repo", pagination={"rowsPerPage": 25},
-                                             empty_text=t("No rows match these filters."))
+        self.table = table.empty_aware_table(
+            self.columns(), row_key="repo", pagination={"rowsPerPage": 25}, empty_text=t("No rows match these filters.")
+        )
         self.table.table.classes("rs-run-table").props("flat dense")
         self.table.table.add_slot("header-cell", HEADER_SLOT)
         self.table.table.add_slot("body-cell-score", SCORE_SLOT)

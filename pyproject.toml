@@ -40,7 +40,8 @@ asyncio_mode = "auto"
 exclude = ["eval/snapshots", "eval/snapshots-llm", "eval/fake-stars/snapshots", "/assets"]
 
 [tool.ruff]
-extend-exclude = [".agents", ".claude", "external_examples"]
+line-length = 120
+extend-exclude = [".agents", ".claude", "external_examples", "repo_scout/gui/kit"]  # kit: vendored, byte-identical to upstream (VENDORED.md)
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F"]  # ruff's long-standing defaults; newer ruff versions widen the default set

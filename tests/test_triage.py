@@ -1,4 +1,5 @@
 """Checks stop rules, flags and score axes."""
+
 from datetime import UTC, datetime, timedelta
 
 from repo_scout.triage import triage
@@ -9,10 +10,21 @@ NOW = datetime(2026, 10, 11, tzinfo=UTC)
 def repo(stars=0, commits=100, pushed=1, created=400, fork=False):
     def iso(d):
         return (NOW - timedelta(days=d)).isoformat().replace("+00:00", "Z")
-    return {"nameWithOwner": "a/b", "url": "u", "description": None, "stargazerCount": stars,
-            "forkCount": 0, "pushedAt": iso(pushed), "createdAt": iso(created), "isArchived": False,
-            "isFork": fork, "parent": {"nameWithOwner": "o/b"} if fork else None, "primaryLanguage": None,
-            "defaultBranchRef": {"target": {"history": {"totalCount": commits}}}}
+
+    return {
+        "nameWithOwner": "a/b",
+        "url": "u",
+        "description": None,
+        "stargazerCount": stars,
+        "forkCount": 0,
+        "pushedAt": iso(pushed),
+        "createdAt": iso(created),
+        "isArchived": False,
+        "isFork": fork,
+        "parent": {"nameWithOwner": "o/b"} if fork else None,
+        "primaryLanguage": None,
+        "defaultBranchRef": {"target": {"history": {"totalCount": commits}}},
+    }
 
 
 def test_triage():
@@ -29,5 +41,6 @@ def test_triage():
 
 def test_never_pushed_repo_ages_from_creation():
     from tests.test_conditions import NOW, node
+
     row = triage({**node("a/b"), "pushedAt": None, "createdAt": "2026-10-01T00:00:00Z"}, NOW, 60)
     assert row["pushed_days"] == (NOW - datetime.fromisoformat("2026-10-01T00:00:00Z")).days

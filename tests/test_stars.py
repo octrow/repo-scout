@@ -34,6 +34,7 @@ def fake_gh(monkeypatch, pages: dict[int, str | tuple[int, str]]):
         if isinstance(r, tuple):
             return subprocess.CompletedProcess(cmd, 1, "", r[1])
         return subprocess.CompletedProcess(cmd, 0, r, "")
+
     monkeypatch.setattr(subprocess, "run", run)
     return calls
 
@@ -130,11 +131,14 @@ def test_burst_forks_counts_forks_near_covered_bursts():
 
 def test_add_stars_flag_top_k_only_with_min_stars(monkeypatch):
     from repo_scout.cli import add_stars_flag
+
     h = History(NOW.date(), [2, 3] * 30 + [900] + [2, 3] * 5, True)
     asked = []
     monkeypatch.setattr(stars, "history", lambda name, now: asked.append(name) or h)
-    rows = [{"repo": n, "stars": s, "stop": st, "flags": []}
-            for n, s, st in [("a/a", 10, None), ("b/b", 500, "x"), ("c/c", 500, None), ("d/d", 500, None)]]
+    rows = [
+        {"repo": n, "stars": s, "stop": st, "flags": []}
+        for n, s, st in [("a/a", 10, None), ("b/b", 500, "x"), ("c/c", 500, None), ("d/d", 500, None)]
+    ]
     add_stars_flag(rows, 1, NOW)
     assert asked == ["c/c"] and rows[2]["flags"][0].startswith("burst★") and not rows[3]["flags"]
 
@@ -144,6 +148,7 @@ def test_add_stars_flag_survives_github_error(monkeypatch):
 
     def boom(name, now):
         raise GitHubError("x")
+
     monkeypatch.setattr(stars, "history", boom)
     rows = [{"repo": "a/a", "stars": 500, "stop": None, "flags": []}]
     add_stars_flag(rows, 5, NOW)
@@ -153,6 +158,9 @@ def test_add_stars_flag_survives_github_error(monkeypatch):
 def test_fork_dates_of_missing_repo_or_null_fork_is_empty(monkeypatch):
     monkeypatch.setattr(github, "graphql", lambda q, v: {"data": {"repository": None}})
     assert stars.fork_dates("a/b") == []
-    monkeypatch.setattr(github, "graphql", lambda q, v: {"data": {"repository": {"forks": {"nodes": [
-        None, {"createdAt": "2026-01-01T00:00:00Z"}]}}}})
+    monkeypatch.setattr(
+        github,
+        "graphql",
+        lambda q, v: {"data": {"repository": {"forks": {"nodes": [None, {"createdAt": "2026-01-01T00:00:00Z"}]}}}},
+    )
     assert stars.fork_dates("a/b") == [datetime(2026, 1, 1, tzinfo=UTC)]

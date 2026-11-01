@@ -1,4 +1,5 @@
 """Main file for nicegui.testing.User: registers pages without ui.run."""
+
 from nicegui import ui
 
 from repo_scout.gui import app

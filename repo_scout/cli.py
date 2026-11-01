@@ -5,6 +5,7 @@ Each query uses GitHub search syntax (language:python, topic:x ...).
 Needs the GitHub CLI (gh), logged in. Check with: repo-scout doctor
 Other commands: repo-scout gui | doctor | config | draft | verdict | eval
 """
+
 import argparse
 import json
 import re
@@ -64,7 +65,9 @@ def validate_query(q: str) -> None:
     tokens = TOKEN.findall(q)
     text = " ".join(t for t in tokens if not QUALIFIER.fullmatch(t))
     if len(text) > MAX_TEXT_CHARS:
-        raise ValueError(f"query {q!r}: the text without qualifiers has {len(text)} chars. GitHub allows {MAX_TEXT_CHARS}")
+        raise ValueError(
+            f"query {q!r}: the text without qualifiers has {len(text)} chars. GitHub allows {MAX_TEXT_CHARS}"
+        )
     ops = sum(t in OPERATORS for t in tokens)
     if ops > MAX_OPERATORS:
         raise ValueError(f"query {q!r}: {ops} AND/OR/NOT operators. GitHub allows {MAX_OPERATORS}")
@@ -80,8 +83,22 @@ def _fmt_fit(r: dict) -> str:
 
 def to_markdown(rows: list[dict]) -> str:
     fit = any("fit" in r for r in rows)  # advanced mode: a fit column right after closeness
-    cols = ["close", *(["fit"] if fit else []), "source", "score", "repo", "★", "forks", "commits", "pushed, d",
-            "created", "lang", "flags / stop", "seen", "desc"]
+    cols = [
+        "close",
+        *(["fit"] if fit else []),
+        "source",
+        "score",
+        "repo",
+        "★",
+        "forks",
+        "commits",
+        "pushed, d",
+        "created",
+        "lang",
+        "flags / stop",
+        "seen",
+        "desc",
+    ]
     head = "| " + " | ".join(cols) + " |\n" + "|---" * len(cols) + "|"
     lines = [
         f"| {_fmt_close(r)} |{_fmt_fit(r) if fit else ''} {r['source']} "
@@ -110,9 +127,15 @@ def _screen_meta(rows: list[dict], nodes: dict, lang: str | None, exclude: list[
         _stop(row, exclude_stop(meta_text(row), exclude))
 
 
-def _screen_details(rows: list[dict], nodes: dict, now: datetime, new_days: int,
-                    exclude: list[re.Pattern], must: list[re.Pattern],
-                    known: dict[str, dict]) -> dict[str, str | None]:
+def _screen_details(
+    rows: list[dict],
+    nodes: dict,
+    now: datetime,
+    new_days: int,
+    exclude: list[re.Pattern],
+    must: list[re.Pattern],
+    known: dict[str, dict],
+) -> dict[str, str | None]:
     """README and commits for survivors: freshness recheck, forbidden and required words. Returns READMEs."""
     readmes: dict[str, str | None] = {}
     alive = [r for r in rows if not r["stop"]]
@@ -178,9 +201,22 @@ def sort_key(r: dict) -> tuple:
     return (-(-1.0 if c is None else c), -r.get("score", 0), r.get("pushed_days", 0))
 
 
-def _process(nodes: dict, live: set[str], source: str, *, now: datetime, new_days: int, lang: str | None,
-             exclude: list[re.Pattern], must: list[re.Pattern], task: str | None, min_closeness: float,
-             index: Index | None, known: dict[str, dict], texts: dict[str, str] | None = None) -> list[dict]:
+def _process(
+    nodes: dict,
+    live: set[str],
+    source: str,
+    *,
+    now: datetime,
+    new_days: int,
+    lang: str | None,
+    exclude: list[re.Pattern],
+    must: list[re.Pattern],
+    task: str | None,
+    min_closeness: float,
+    index: Index | None,
+    known: dict[str, dict],
+    texts: dict[str, str] | None = None,
+) -> list[dict]:
     """Pipeline for a set of nodes: triage, noise, conditions, details, closeness, threshold, index upsert.
     `texts` collects candidate texts of rows that passed, for the optional fit column."""
     log.info("pipeline (%s): %d candidates", source, len(nodes))
@@ -211,8 +247,18 @@ def _search_all(queries: list[str], *, months: int, since: str, lang: str | None
         log.info("search %d/%d: %s → %d (pool %d)", i, len(queries), q, len(found), len(into))
 
 
-def _round2(rows: list[dict], queries: list[str], pool: dict, *, k: int, floor: float, lang: str | None,
-            months: int, since: str, limit: int) -> tuple[dict, list[str]]:
+def _round2(
+    rows: list[dict],
+    queries: list[str],
+    pool: dict,
+    *,
+    k: int,
+    floor: float,
+    lang: str | None,
+    months: int,
+    since: str,
+    limit: int,
+) -> tuple[dict, list[str]]:
     """New nodes via `topic:` queries from top-k surviving rows (closeness not below floor)."""
     top = sorted((r for r in rows if not r["stop"] and (r.get("closeness") or 0) >= floor), key=sort_key)[:k]
     topics = pick_topics(top, queries)
@@ -222,11 +268,25 @@ def _round2(rows: list[dict], queries: list[str], pool: dict, *, k: int, floor: 
     return {n: v for n, v in found.items() if n.lower() not in lower}, topics
 
 
-def run(queries: list[str], *, months: int, new_days: int, limit: int, lang: str | None, now: datetime,
-        exclude: list[re.Pattern] = (), must: list[re.Pattern] = (), task: str | None = None,
-        min_closeness: float = semantic.MIN_CLOSENESS, index: Index | None = None,
-        from_index: int = FROM_INDEX, round2: bool = True, round2_k: int = ROUND2_K, stars_k: int = 0,
-        fit_k: int = 0) -> list[dict]:
+def run(
+    queries: list[str],
+    *,
+    months: int,
+    new_days: int,
+    limit: int,
+    lang: str | None,
+    now: datetime,
+    exclude: list[re.Pattern] = (),
+    must: list[re.Pattern] = (),
+    task: str | None = None,
+    min_closeness: float = semantic.MIN_CLOSENESS,
+    index: Index | None = None,
+    from_index: int = FROM_INDEX,
+    round2: bool = True,
+    round2_k: int = ROUND2_K,
+    stars_k: int = 0,
+    fit_k: int = 0,
+) -> list[dict]:
     """All triage rows (including dropped), sorted by closeness, then score."""
     global last_round2_topics
     last_round2_topics = []
@@ -235,12 +295,30 @@ def run(queries: list[str], *, months: int, new_days: int, limit: int, lang: str
     _search_all(queries, months=months, since=since, lang=lang, limit=limit, into=nodes)
     live = set(nodes)
     known = _from_index(index, task, nodes, from_index) if index and task and from_index else {}
-    kw = {"now": now, "new_days": new_days, "lang": lang, "exclude": list(exclude), "must": list(must),
-          "task": task, "min_closeness": min_closeness, "index": index, "texts": {} if fit_k else None}
+    kw = {
+        "now": now,
+        "new_days": new_days,
+        "lang": lang,
+        "exclude": list(exclude),
+        "must": list(must),
+        "task": task,
+        "min_closeness": min_closeness,
+        "index": index,
+        "texts": {} if fit_k else None,
+    }
     rows = _process(nodes, live, "query", known=known, **kw)
     if task and round2:
-        extra, topics = _round2(rows, queries, nodes, k=round2_k, floor=max(min_closeness, semantic.MIN_CLOSENESS),
-                                lang=lang, months=months, since=since, limit=limit)
+        extra, topics = _round2(
+            rows,
+            queries,
+            nodes,
+            k=round2_k,
+            floor=max(min_closeness, semantic.MIN_CLOSENESS),
+            lang=lang,
+            months=months,
+            since=since,
+            limit=limit,
+        )
         last_round2_topics = topics
         log.info("round two: topics %s → %d new", ", ".join(topics) or "—", len(extra))
         rows += _process(extra, set(extra), "round two", known={}, **kw)
@@ -271,8 +349,9 @@ def add_stars_flag(rows: list[dict], k: int, now: datetime) -> None:
 def draft_params(d, need: str) -> dict:
     """Search parameters from LLM draft (remaining values default to parser defaults)."""
     params = search_params(_parser().parse_args(["--task", "x", "q"]))
-    params.update(task=d.task, queries=list(d.queries), must=list(d.must), exclude=list(d.exclude),
-                  lang=d.lang, need=need.strip())
+    params.update(
+        task=d.task, queries=list(d.queries), must=list(d.must), exclude=list(d.exclude), lang=d.lang, need=need.strip()
+    )
     return params
 
 
@@ -296,6 +375,7 @@ def draft_main(argv: list[str]) -> None:
     import shlex
 
     from repo_scout import llm
+
     ap = argparse.ArgumentParser(prog="repo-scout draft")
     ap.add_argument("need", help="what you are looking for, in any language")
     a = ap.parse_args(argv)
@@ -315,9 +395,11 @@ def main() -> None:
         stream.reconfigure(errors="replace")
     if sys.argv[1:2] == ["eval"]:
         from repo_scout import evaluate
+
         return evaluate.main(sys.argv[2:])
     if sys.argv[1:2] == ["gui"] or not sys.argv[1:]:
         from repo_scout.gui import app
+
         return app.main(sys.argv[2:] if sys.argv[1:] else ["--open"])  # bare run (or double-click) opens the browser
     if sys.argv[1:2] == ["verdict"]:
         return verdict_main(sys.argv[2:])
@@ -325,9 +407,11 @@ def main() -> None:
         return draft_main(sys.argv[2:])
     if sys.argv[1:2] == ["config"]:
         from repo_scout import config
+
         return config.main(sys.argv[2:])
     if sys.argv[1:2] == ["doctor"]:
         from repo_scout import doctor
+
         return doctor.main(sys.argv[2:])
     a = _parser().parse_args()
     logmod.setup(quiet=a.quiet)
@@ -346,30 +430,67 @@ class _Parser(argparse.ArgumentParser):
 def _parser() -> argparse.ArgumentParser:
     ap = _Parser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("queries", nargs="+")
-    ap.add_argument("--task", required=True, metavar="TEXT",
-                    help="the task in 1-3 English sentences; closeness is measured against it")
-    ap.add_argument("--min-closeness", type=float, default=semantic.MIN_CLOSENESS, metavar="FLOAT",
-                    help="rows below this closeness are dropped as 'off-topic' (default %(default)s)")
+    ap.add_argument(
+        "--task",
+        required=True,
+        metavar="TEXT",
+        help="the task in 1-3 English sentences; closeness is measured against it",
+    )
+    ap.add_argument(
+        "--min-closeness",
+        type=float,
+        default=semantic.MIN_CLOSENESS,
+        metavar="FLOAT",
+        help="rows below this closeness are dropped as 'off-topic' (default %(default)s)",
+    )
     ap.add_argument("--months", type=int, default=6, help="only repos pushed to within N months (0 = any)")
     ap.add_argument("--new-days", type=int, default=60, help="flag repos younger than N days as 'new'")
     ap.add_argument("--limit", type=int, default=50, help="results per query (max 100)")
     ap.add_argument("--lang", help="add language:<X> to each query")
-    ap.add_argument("--exclude", action="append", default=[], metavar="REGEX",
-                    help="drop a repo if REGEX matches its name, description, topics or README (repeatable)")
-    ap.add_argument("--must", action="append", default=[], metavar="REGEX",
-                    help="words the README, topics or description must contain; every --must must match (repeatable)")
-    ap.add_argument("--from-index", type=int, default=FROM_INDEX, metavar="N",
-                    help="add the N closest repos from the Index (0 = off, default %(default)s)")
-    ap.add_argument("--round2-k", type=int, default=ROUND2_K, metavar="K",
-                    help="round two takes topics from the top K rows (default %(default)s)")
-    ap.add_argument("--stars-k", type=int, default=STARS_K, metavar="K",
-                    help="check the top K rows with 50+ stars for a star burst (default %(default)s)")
+    ap.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        metavar="REGEX",
+        help="drop a repo if REGEX matches its name, description, topics or README (repeatable)",
+    )
+    ap.add_argument(
+        "--must",
+        action="append",
+        default=[],
+        metavar="REGEX",
+        help="words the README, topics or description must contain; every --must must match (repeatable)",
+    )
+    ap.add_argument(
+        "--from-index",
+        type=int,
+        default=FROM_INDEX,
+        metavar="N",
+        help="add the N closest repos from the Index (0 = off, default %(default)s)",
+    )
+    ap.add_argument(
+        "--round2-k",
+        type=int,
+        default=ROUND2_K,
+        metavar="K",
+        help="round two takes topics from the top K rows (default %(default)s)",
+    )
+    ap.add_argument(
+        "--stars-k",
+        type=int,
+        default=STARS_K,
+        metavar="K",
+        help="check the top K rows with 50+ stars for a star burst (default %(default)s)",
+    )
     ap.add_argument("--no-stars-check", action="store_true", help="skip the star burst check")
     ap.add_argument("--no-round2", action="store_true", help="skip round two (`topic:` queries from the top rows)")
-    ap.add_argument("--no-fit", action="store_true",
-                    help="skip the fit column (advanced mode, on when TYPESAFE_API_KEY is set)")
+    ap.add_argument(
+        "--no-fit", action="store_true", help="skip the fit column (advanced mode, on when TYPESAFE_API_KEY is set)"
+    )
     ap.add_argument("--project", help="project name, saved with the run")
-    ap.add_argument("--need", metavar="TEXT", help="your request in your own words, saved with the run (the search ignores it)")
+    ap.add_argument(
+        "--need", metavar="TEXT", help="your request in your own words, saved with the run (the search ignores it)"
+    )
     ap.add_argument("--out", metavar="PATH", help="where to save the run (default: the runs folder)")
     ap.add_argument("--no-save", action="store_true", help="do not save the run")
     ap.add_argument("--all", action="store_true", help="show dropped rows too")
@@ -377,7 +498,12 @@ def _parser() -> argparse.ArgumentParser:
     snap = ap.add_mutually_exclusive_group()
     snap.add_argument("--record", metavar="DIR", help="record GitHub responses to DIR")
     snap.add_argument("--replay", metavar="DIR", help="replay responses from DIR without network")
-    ap.add_argument("-q", "--quiet", action="store_true", help="write progress to the log file only; the terminal shows warnings only")
+    ap.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="write progress to the log file only; the terminal shows warnings only",
+    )
     return ap
 
 
@@ -397,12 +523,24 @@ def _main(a: argparse.Namespace) -> None:
         exclude, must = compile_all("--exclude", a.exclude), compile_all("--must", a.must)
         github.configure("record" if a.record else "replay" if a.replay else None, a.record or a.replay)
         now = github.recorded_at() if a.replay else datetime.now(UTC)
-        rows = run(a.queries, months=a.months, new_days=a.new_days, limit=a.limit, lang=a.lang, now=now,
-                   exclude=exclude, must=must, task=a.task, min_closeness=a.min_closeness,
-                   index=None if a.record or a.replay else Index(default_path()), from_index=a.from_index,
-                   round2=not a.no_round2, round2_k=a.round2_k,
-                   stars_k=0 if a.no_stars_check else a.stars_k,
-                   fit_k=0 if a.no_fit or a.record or a.replay else systemone.FIT_K)
+        rows = run(
+            a.queries,
+            months=a.months,
+            new_days=a.new_days,
+            limit=a.limit,
+            lang=a.lang,
+            now=now,
+            exclude=exclude,
+            must=must,
+            task=a.task,
+            min_closeness=a.min_closeness,
+            index=None if a.record or a.replay else Index(default_path()),
+            from_index=a.from_index,
+            round2=not a.no_round2,
+            round2_k=a.round2_k,
+            stars_k=0 if a.no_stars_check else a.stars_k,
+            fit_k=0 if a.no_fit or a.record or a.replay else systemone.FIT_K,
+        )
     except ValueError as e:
         print(e, file=sys.stderr)
         sys.exit(2)
@@ -411,7 +549,16 @@ def _main(a: argparse.Namespace) -> None:
     github.log_usage()
 
     kept = [r for r in rows if not r["stop"]]
-    by_must = [r for r in rows if (r["stop"] or "").startswith((MUST_STOP, "\u043d\u0435\u0442 \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u043e\u0433\u043e"))]
+    by_must = [
+        r
+        for r in rows
+        if (r["stop"] or "").startswith(
+            (
+                MUST_STOP,
+                "\u043d\u0435\u0442 \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u043e\u0433\u043e",
+            )
+        )
+    ]
     shown = [r for r in (rows if a.all else kept) if r not in by_must]
     if a.json:
         print(json.dumps({"rows": shown, "dropped_by_must": by_must}, ensure_ascii=False, indent=1))
@@ -420,6 +567,8 @@ def _main(a: argparse.Namespace) -> None:
     print(to_markdown(shown))
     if by_must:
         print("\ndropped by --must: " + ", ".join(r["repo"] for r in by_must))
-    print(f"\nfound {len(rows)}, passed stop rules {len(kept)}, dropped {len(rows) - len(kept)}"
-          + ("" if a.all else " (--all to show)"))
+    print(
+        f"\nfound {len(rows)}, passed stop rules {len(kept)}, dropped {len(rows) - len(kept)}"
+        + ("" if a.all else " (--all to show)")
+    )
     _save_run(a, rows, now)

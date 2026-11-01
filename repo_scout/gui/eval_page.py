@@ -1,4 +1,5 @@
 """Eval page (`/eval`): eval/*.toml datasets, subprocess execution, report from `--out`."""
+
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -16,9 +17,15 @@ from .verdict_dialog import open_index
 
 POLL_PERIOD = 1.0
 REPORTS_DIR = "eval-reports"
-FLAG_LABELS = {"detail": "List repos per set", "sweep": "Closeness thresholds 0.50-0.90", "no_round2": "Skip round 2",
-               "calls": "API call counts", "index_check": "Index check",
-               "fake_stars": "Star burst flag", "all_grid": "Star burst: full threshold grid"}
+FLAG_LABELS = {
+    "detail": "List repos per set",
+    "sweep": "Closeness thresholds 0.50-0.90",
+    "no_round2": "Skip round 2",
+    "calls": "API call counts",
+    "index_check": "Index check",
+    "fake_stars": "Star burst flag",
+    "all_grid": "Star burst: full threshold grid",
+}
 
 
 def report_path(now: datetime) -> Path:
@@ -43,8 +50,11 @@ class EvalPage:
         self.report: ui.column | None = None
 
     def options(self) -> el.EvalOptions:
-        o = el.EvalOptions(sets=[s.path for s in self.sets if s.path in self.picked],
-                           record=self.opts["mode"].value == "record", top=int(self.opts["top"].value or 0))
+        o = el.EvalOptions(
+            sets=[s.path for s in self.sets if s.path in self.picked],
+            record=self.opts["mode"].value == "record",
+            top=int(self.opts["top"].value or 0),
+        )
         for key in FLAG_LABELS:
             setattr(o, key, bool(self.opts[key].value))
         return o
@@ -86,19 +96,28 @@ class EvalPage:
         with layout.grid(min_col="18rem"):
             for s in self.sets:
                 with layout.section_card(recessive=True):
-                    ui.checkbox(s.name, on_change=lambda e, p=s.path: self.picked.add(p) if e.value else self.picked.discard(p))
+                    ui.checkbox(
+                        s.name, on_change=lambda e, p=s.path: self.picked.add(p) if e.value else self.picked.discard(p)
+                    )
                     ui.label(s.task[:160]).classes("t-meta")
-                    ui.label(t("Expected: {n} · snapshot: {date}").format(n=s.n_expected, date=s.snapshot)).classes("t-meta")
+                    ui.label(t("Expected: {n} · snapshot: {date}").format(n=s.n_expected, date=s.snapshot)).classes(
+                        "t-meta"
+                    )
 
     def controls(self) -> None:
         with layout.section_card():
-            self.opts["mode"] = ui.toggle({"replay": t("Snapshots (offline)"), "record": t("Record snapshots (network)")},
-                                          value="replay")
+            self.opts["mode"] = ui.toggle(
+                {"replay": t("Snapshots (offline)"), "record": t("Record snapshots (network)")}, value="replay"
+            )
             with layout.grid():
                 for key, label in FLAG_LABELS.items():
                     self.opts[key] = ui.checkbox(t(label)).classes("ic-span-6")
-                self.opts["top"] = ui.number(t("Top results to show (0 = none)"), value=0, min=0, precision=0) \
-                    .props("outlined dense stack-label").classes("ic-span-6").style("max-width: 26rem")
+                self.opts["top"] = (
+                    ui.number(t("Top results to show (0 = none)"), value=0, min=0, precision=0)
+                    .props("outlined dense stack-label")
+                    .classes("ic-span-6")
+                    .style("max-width: 26rem")
+                )
             export = self.export_dialog()
             with layout.actions_row(end=False):
                 layout.button(t("Launch eval"), kind="primary", icon="play_arrow", on_click=self.start)
@@ -108,8 +127,11 @@ class EvalPage:
         with ui.dialog() as dialog, layout.section_card():
             layout.heading(t("Export verdicts"), level=2)
             ui.label(t("Index verdicts as [[expected]] blocks for datasets.")).classes("t-meta")
-            project = ui.select(_projects(), label=t("Project"), clearable=True) \
-                .props(f'outlined dense stack-label hint="{t("Empty: all projects")}"').classes("w-full")
+            project = (
+                ui.select(_projects(), label=t("Project"), clearable=True)
+                .props(f'outlined dense stack-label hint="{t("Empty: all projects")}"')
+                .classes("w-full")
+            )
 
             def go() -> None:
                 out = report_path(datetime.now())

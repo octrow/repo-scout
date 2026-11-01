@@ -1,4 +1,5 @@
 """Runs: a complete single search run (parameters, round two, all rows), saved as a JSON file."""
+
 import json
 import os
 import re
@@ -44,8 +45,13 @@ def save(params: dict, rows: list[dict], round2_topics: list[str], now: datetime
         name = f"{now.strftime('%Y%m%d-%H%M%S')}-{slug(params.get('task') or '')}.json"
         path = free_path(runs_dir() / name)
     path.parent.mkdir(parents=True, exist_ok=True)
-    data = {"version": VERSION, "created_at": now.isoformat(), "params": params,
-            "round2_topics": round2_topics, "rows": rows}
+    data = {
+        "version": VERSION,
+        "created_at": now.isoformat(),
+        "params": params,
+        "round2_topics": round2_topics,
+        "rows": rows,
+    }
     path.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     return path
 
@@ -60,9 +66,13 @@ def load(path: Path) -> dict:
     if missing := [k for k in REQUIRED if k not in data]:
         raise ValueError(f"{path}: missing keys {', '.join(missing)}")
     topics = data["round2_topics"]
-    if not (isinstance(data["params"], dict) and isinstance(data["rows"], list)
-            and all(isinstance(r, dict) for r in data["rows"])
-            and isinstance(topics, list) and all(isinstance(t, str) for t in topics)):
+    if not (
+        isinstance(data["params"], dict)
+        and isinstance(data["rows"], list)
+        and all(isinstance(r, dict) for r in data["rows"])
+        and isinstance(topics, list)
+        and all(isinstance(t, str) for t in topics)
+    ):
         raise ValueError(f"{path}: invalid Run structure")
     return data
 
@@ -79,8 +89,16 @@ def list_runs() -> list[Summary]:
             out.append(Summary(p, error=str(e)))
             continue
         params = d["params"]
-        out.append(Summary(p, d["created_at"], params.get("task"), params.get("project"),
-                           len(d["rows"]), sum(1 for r in d["rows"] if not r.get("stop"))))
+        out.append(
+            Summary(
+                p,
+                d["created_at"],
+                params.get("task"),
+                params.get("project"),
+                len(d["rows"]),
+                sum(1 for r in d["rows"] if not r.get("stop")),
+            )
+        )
     return out
 
 

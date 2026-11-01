@@ -6,8 +6,14 @@ import pytest
 
 from repo_scout import github
 
-OK = json.dumps({"data": {"search": {"nodes": [{"nameWithOwner": "a/b"}, None]},
-                          "rateLimit": {"cost": 1, "remaining": 9, "resetAt": "t"}}})
+OK = json.dumps(
+    {
+        "data": {
+            "search": {"nodes": [{"nameWithOwner": "a/b"}, None]},
+            "rateLimit": {"cost": 1, "remaining": 9, "resetAt": "t"},
+        }
+    }
+)
 
 
 def run_with(monkeypatch, results):
@@ -66,8 +72,12 @@ def test_gives_up_after_max_retries(monkeypatch):
 
 
 def test_partial_errors_return_data(monkeypatch, caplog):
-    body = json.dumps({"data": {"search": {"nodes": [{"nameWithOwner": "a/b"}]}},
-                       "errors": [{"type": "FORBIDDEN", "message": "boom"}]})
+    body = json.dumps(
+        {
+            "data": {"search": {"nodes": [{"nameWithOwner": "a/b"}]}},
+            "errors": [{"type": "FORBIDDEN", "message": "boom"}],
+        }
+    )
     run_with(monkeypatch, [(1, body, "")])
     assert github.search("q", 5) == [{"nameWithOwner": "a/b"}]
     assert "boom" in caplog.text
@@ -81,11 +91,13 @@ def test_retry_on_502(monkeypatch):
 
 def _flaky_live(bad: set[str]):
     """Chunk containing repo from bad fails with 502; single bad repos also fail."""
+
     def live(query, variables, **_):
         names = re.findall(r'r(\d+): repository\(owner: "(\w+)", name: "(\w+)"\)', query)
         if any(f"{o}/{n}" in bad for _, o, n in names):
             raise github.GitHubError("GitHub failed to respond: gh: HTTP 502")
         return {"data": {f"r{i}": {"m0": {"text": f"{o}/{n}"}} for i, o, n in names}}
+
     return live
 
 
@@ -122,9 +134,14 @@ def test_retry_on_null_data(monkeypatch):
 
 def test_alias_error_other_than_not_found_is_a_failure_not_a_deletion(monkeypatch):
     github.last_failed.clear()
-    monkeypatch.setattr(github, "_graphql_live", lambda q, v, **_: {
-        "data": {"r0": None, "r1": None, "r2": {"m0": {"text": "ok"}}},
-        "errors": [{"type": "NOT_FOUND", "path": ["r0"]}, {"type": "TIMEOUT", "path": ["r1"]}]})
+    monkeypatch.setattr(
+        github,
+        "_graphql_live",
+        lambda q, v, **_: {
+            "data": {"r0": None, "r1": None, "r2": {"m0": {"text": "ok"}}},
+            "errors": [{"type": "NOT_FOUND", "path": ["r0"]}, {"type": "TIMEOUT", "path": ["r1"]}],
+        },
+    )
     got = github._batch(["a/gone", "a/slow", "a/ok"], github._alias)
     assert got == {"a/gone": None, "a/ok": {"m0": {"text": "ok"}}}
     assert github.last_failed == {"a/slow"}

@@ -1,4 +1,5 @@
 """AA contrast of vendored theme (ported from nicegui-kit tests)."""
+
 from pathlib import Path
 
 import pytest
@@ -23,6 +24,9 @@ def test_both_themes_define_the_same_tokens() -> None:
 @pytest.mark.parametrize("mode", ["light", "dark"])
 def test_every_text_pair_reads_at_aa_in_both_themes(mode: str) -> None:
     tokens = theme.TOKENS[mode]
-    weak = [(fg, bg, round(theme.contrast(tokens[fg], tokens[bg]), 2))
-            for fg, bg in theme.TEXT_PAIRS if theme.contrast(tokens[fg], tokens[bg]) < 4.5]
+    weak = [
+        (fg, bg, round(theme.contrast(tokens[fg], tokens[bg]), 2))
+        for fg, bg in theme.TEXT_PAIRS
+        if theme.contrast(tokens[fg], tokens[bg]) < 4.5
+    ]
     assert not weak

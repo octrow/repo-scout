@@ -1,4 +1,5 @@
 """Eval page logic without UI: eval/*.toml datasets and subprocess argv."""
+
 import tomllib
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -43,7 +44,8 @@ def list_sets(eval_dir: Path = EVAL_DIR) -> list[EvalSet]:
             continue
         snap = eval_dir / "snapshots" / str(data.get("name", p.stem))
         date = data.get("analysis_date") or (
-            datetime.fromtimestamp(snap.stat().st_mtime).date().isoformat() if snap.is_dir() else NO_DATE)
+            datetime.fromtimestamp(snap.stat().st_mtime).date().isoformat() if snap.is_dir() else NO_DATE
+        )
         out.append(EvalSet(data.get("name", p.stem), p, data.get("task", ""), len(data.get("expected", [])), date))
     return out
 
@@ -54,9 +56,15 @@ def eval_argv(o: EvalOptions, out: Path) -> list[str]:
     if not o.fake_stars:
         argv += [str(p) for p in o.sets]
     argv.append("--record" if o.record else "--replay")
-    for flag, on in (("--detail", o.detail), ("--sweep", o.sweep), ("--no-round2", o.no_round2),
-                     ("--calls", o.calls), ("--index-check", o.index_check), ("--fake-stars", o.fake_stars),
-                     ("--all-grid", o.fake_stars and o.all_grid)):
+    for flag, on in (
+        ("--detail", o.detail),
+        ("--sweep", o.sweep),
+        ("--no-round2", o.no_round2),
+        ("--calls", o.calls),
+        ("--index-check", o.index_check),
+        ("--fake-stars", o.fake_stars),
+        ("--all-grid", o.fake_stars and o.all_grid),
+    ):
         if on:
             argv.append(flag)
     if o.top > 0:

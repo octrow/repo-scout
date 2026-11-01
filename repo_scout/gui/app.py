@@ -1,4 +1,5 @@
 """NiceGUI interface for repo-scout: `repo-scout` without arguments or `repo-scout gui [--port 8790]`."""
+
 import argparse
 import os
 import sys

@@ -1,4 +1,5 @@
 """Runs pages: list `/runs` and single Run `/runs/{id}`."""
+
 from nicegui import ui
 
 from .. import runs
@@ -9,8 +10,7 @@ from .run_view import run_page
 from .runs_logic import resolve_run
 
 COLUMNS = [
-    {"name": "date", "label": "Date", "field": "date", "align": "left", "sortable": True,
-     "classes": "ic-nowrap"},
+    {"name": "date", "label": "Date", "field": "date", "align": "left", "sortable": True, "classes": "ic-nowrap"},
     {"name": "task", "label": "Task", "field": "task", "align": "left"},
     {"name": "project", "label": "Project", "field": "project", "align": "left", "sortable": True},
     {"name": "count", "label": "Kept / total", "field": "count", "align": "right", "classes": "ic-nowrap"},
@@ -27,10 +27,22 @@ RUNS_CSS = ".rs-delete { color: var(--ic-text-muted); } .rs-delete:hover { color
 
 def summary_row(s: runs.Summary) -> dict:
     if s.error:
-        return {"id": s.path.stem, "date": "", "task": t("Unreadable file: {name}").format(name=s.path.name), "project": "",
-                "count": "", "error": True}
-    return {"id": s.path.stem, "date": (s.created_at or "")[:16].replace("T", " "), "task": s.task or s.path.stem,
-                "project": s.project or "—", "count": f"{s.n_kept} / {s.n_total}", "error": False}
+        return {
+            "id": s.path.stem,
+            "date": "",
+            "task": t("Unreadable file: {name}").format(name=s.path.name),
+            "project": "",
+            "count": "",
+            "error": True,
+        }
+    return {
+        "id": s.path.stem,
+        "date": (s.created_at or "")[:16].replace("T", " "),
+        "task": s.task or s.path.stem,
+        "project": s.project or "—",
+        "count": f"{s.n_kept} / {s.n_total}",
+        "error": False,
+    }
 
 
 class RunsList:
@@ -64,12 +76,20 @@ class RunsList:
 
     def build(self) -> None:
         columns = [{**c, "label": t(c["label"]) if c["label"] else ""} for c in COLUMNS]
-        self.table = table.empty_aware_table(columns, row_key="id", pagination={"rowsPerPage": 25},
-                                             empty_text=t("No runs yet. Start one on the Search page."))
+        self.table = table.empty_aware_table(
+            columns,
+            row_key="id",
+            pagination={"rowsPerPage": 25},
+            empty_text=t("No runs yet. Start one on the Search page."),
+        )
         self.table.table.add_slot("body-cell-task", TASK_SLOT)
         ui.add_css(RUNS_CSS)
-        self.table.table.add_slot("body-cell-actions", DELETE_SLOT.replace(">Delete<", f">{t('Delete')}<")
-                                  .replace('aria-label="Delete"', f'aria-label="{t("Delete")}"'))
+        self.table.table.add_slot(
+            "body-cell-actions",
+            DELETE_SLOT.replace(">Delete<", f">{t('Delete')}<").replace(
+                'aria-label="Delete"', f'aria-label="{t("Delete")}"'
+            ),
+        )
         self.table.table.on("delete", lambda e: self.confirm_delete(e.args))
         self.refresh()
 

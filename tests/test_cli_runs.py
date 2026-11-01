@@ -1,4 +1,5 @@
 """Run from CLI, parse_command / to_argv, python -m repo_scout."""
+
 import os
 import shlex
 import subprocess
@@ -8,9 +9,24 @@ import pytest
 
 from repo_scout import cli, runs
 
-ROW = {"repo": "a/b", "stop": None, "url": "u", "score": 1, "fresh": 1, "pop": 0, "stars": 1, "forks": 0,
-       "commits": 1, "pushed_days": 1, "created": "2020", "lang": "Py", "desc": "d", "source": "query",
-       "flags": [], "closeness": 0.9}
+ROW = {
+    "repo": "a/b",
+    "stop": None,
+    "url": "u",
+    "score": 1,
+    "fresh": 1,
+    "pop": 0,
+    "stars": 1,
+    "forks": 0,
+    "commits": 1,
+    "pushed_days": 1,
+    "created": "2020",
+    "lang": "Py",
+    "desc": "d",
+    "source": "query",
+    "flags": [],
+    "closeness": 0.9,
+}
 DROPPED = {**ROW, "repo": "c/d", "stop": "dead"}
 
 
@@ -22,6 +38,7 @@ def _fake_run(monkeypatch):
     def fake(*a, **k):
         cli.last_round2_topics = ["asr"]
         return [ROW, DROPPED]
+
     monkeypatch.setattr(cli, "run", fake)
     monkeypatch.setattr(cli, "Index", lambda p: None)
 
@@ -63,8 +80,17 @@ def test_parse_command_strips_prefix():
     assert cli.parse_command("repo_scout --task t q").queries == ["q"]
 
 
-@pytest.mark.parametrize("text", ["repo-scout q", "repo-scout --task t", "--task t q --bogus 1", "--task t --months x q",
-                                  "--task 'unclosed q", "--task t '" + "x " * 200 + "'"])
+@pytest.mark.parametrize(
+    "text",
+    [
+        "repo-scout q",
+        "repo-scout --task t",
+        "--task t q --bogus 1",
+        "--task t --months x q",
+        "--task 'unclosed q",
+        "--task t '" + "x " * 200 + "'",
+    ],
+)
 def test_parse_command_errors(text, capsys):
     with pytest.raises(ValueError):
         cli.parse_command(text)
@@ -109,6 +135,7 @@ def test_main_prints_before_save_and_survives_oserror(monkeypatch, capsys):
 
     def boom(*a, **k):
         raise OSError("disk full")
+
     monkeypatch.setattr(cli.runs, "save", boom)
     _go(monkeypatch, _argv())
     assert "a/b" in capsys.readouterr().out

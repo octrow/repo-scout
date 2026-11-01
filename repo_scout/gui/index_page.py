@@ -1,4 +1,5 @@
 """Index page (`/index`): Index repositories, Verdicts, renaming, and 'forget'."""
+
 import re
 
 from nicegui import ui
@@ -19,8 +20,15 @@ COLUMNS = [
     {"name": "desc", "label": "Description", "field": "desc", "align": "left"},
     {"name": "stars", "label": "★", "field": "stars", "align": "right", "sortable": True},
     {"name": "lang", "label": "Language", "field": "lang", "align": "left", "priority": 3},
-    {"name": "date", "label": "Added", "field": "date", "align": "left", "sortable": True, "priority": 2,
-     "classes": "ic-nowrap"},
+    {
+        "name": "date",
+        "label": "Added",
+        "field": "date",
+        "align": "left",
+        "sortable": True,
+        "priority": 2,
+        "classes": "ic-nowrap",
+    },
     {"name": "readme", "label": "README", "field": "readme", "align": "center", "priority": 3},
     {"name": "seen", "label": "Verdicts", "field": "seen", "align": "left", "priority": 2},
 ]
@@ -49,10 +57,19 @@ def index_rows(idx: Index, *, project: str = "", kind: str = "", text: str = "")
             continue
         if needle and needle not in f"{r['name']} {m.get('desc', '')} {m.get('lang', '')}".lower():
             continue
-        out.append({"key": r["key"], "name": r["name"], "desc": rl.plain_desc(m.get("desc")),
-                    "stars": m.get("stars"), "lang": m.get("lang") or "—", "date": (r["fetched_at"] or "")[:10],
-                    "readme": bool(r["has_readme"]), "seen": seen.get(r["key"], "—"),
-                    "url": m.get("url") or f"https://github.com/{r['name']}"})
+        out.append(
+            {
+                "key": r["key"],
+                "name": r["name"],
+                "desc": rl.plain_desc(m.get("desc")),
+                "stars": m.get("stars"),
+                "lang": m.get("lang") or "—",
+                "date": (r["fetched_at"] or "")[:10],
+                "readme": bool(r["has_readme"]),
+                "seen": seen.get(r["key"], "—"),
+                "url": m.get("url") or f"https://github.com/{r['name']}",
+            }
+        )
     return out
 
 
@@ -76,8 +93,13 @@ class IndexPage:
         self.rows = {r["key"]: r for r in rows}
         # Verdicts column only once some shown repo has one
         has_seen = any(r["seen"] != "—" for r in rows)
-        self.table.set_columns([{**c, "label": t(c["label"]), "yes": t("yes")}  # type: ignore[union-attr]
-                                for c in COLUMNS if c["name"] != "seen" or has_seen])
+        self.table.set_columns(
+            [
+                {**c, "label": t(c["label"]), "yes": t("yes")}  # type: ignore[union-attr]
+                for c in COLUMNS
+                if c["name"] != "seen" or has_seen
+            ]
+        )
         self.table.set_rows(rows)  # type: ignore[union-attr]
         self.count.set_text(t("Showing {shown} of {total}").format(shown=len(rows), total=total))  # type: ignore[union-attr]
 
@@ -91,12 +113,17 @@ class IndexPage:
         with open_index() as idx:
             projects = list(dict.fromkeys(v[0] for v in idx.verdicts()))
         with layout.filter_bar() as self.bar:
-            layout.search_field(t("Search by repo and description"), on_change=lambda e: self.set_filter("text", e.value))
-            ui.select({ALL_PROJECTS: t(ALL_PROJECTS), **{p: p for p in projects}}, value=ALL_PROJECTS,
-                      on_change=lambda e: self.set_filter("project", e.value)) \
-                .props(f'outlined dense aria-label="{t("Project")}"')
-            ui.select(rl.verdict_filter_options(), value="",
-                      on_change=lambda e: self.set_filter("kind", e.value)).props(f'outlined dense aria-label="{t("Verdict")}"')
+            layout.search_field(
+                t("Search by repo and description"), on_change=lambda e: self.set_filter("text", e.value)
+            )
+            ui.select(
+                {ALL_PROJECTS: t(ALL_PROJECTS), **{p: p for p in projects}},
+                value=ALL_PROJECTS,
+                on_change=lambda e: self.set_filter("project", e.value),
+            ).props(f'outlined dense aria-label="{t("Project")}"')
+            ui.select(
+                rl.verdict_filter_options(), value="", on_change=lambda e: self.set_filter("kind", e.value)
+            ).props(f'outlined dense aria-label="{t("Verdict")}"')
             ui.space()
             self.count = ui.label().classes("t-meta")
 
@@ -106,8 +133,9 @@ class IndexPage:
         with self.panel, layout.section_card().style(shell.PANEL_STYLE):
             with ui.row().classes("ic-split w-full items-start flex-nowrap"):
                 layout.heading(row["name"], level=2).classes("min-w-0")
-                ui.button(icon="close", on_click=self.panel.close) \
-                    .props(f'flat round dense aria-label="{t("Close")}"').classes("shrink-0")
+                ui.button(icon="close", on_click=self.panel.close).props(
+                    f'flat round dense aria-label="{t("Close")}"'
+                ).classes("shrink-0")
             ui.link(t("Open on GitHub"), row["url"], new_tab=True)
             ui.label(row["desc"]).classes("t-meta")
             ui.label(t("Verdicts: {seen}").format(seen=row["seen"]))
@@ -119,8 +147,12 @@ class IndexPage:
                 layout.button(t("Rename"), kind="quiet", icon="edit", on_click=lambda: self.rename_dialog(row["name"]))
                 ui.space()
                 layout.button(t("Close"), kind="quiet", on_click=self.panel.close)
-                layout.button(t("Set verdict"), kind="primary", icon="rate_review",
-                              on_click=lambda: self.verdicts.open(row["name"]))
+                layout.button(
+                    t("Set verdict"),
+                    kind="primary",
+                    icon="rate_review",
+                    on_click=lambda: self.verdicts.open(row["name"]),
+                )
         self.panel.open()
 
     def rename_dialog(self, name: str) -> None:
@@ -128,8 +160,12 @@ class IndexPage:
         with self.confirm, layout.section_card():
             layout.heading(t("Rename repo"), level=2)
             ui.label(t("Old record will be removed from Index; verdicts will move to the new name.")).classes("t-meta")
-            new = layout.field(t("New name"), value=name, hint="owner/repo", validation={
-                t("Use the owner/repo format"): lambda v: check_repo(v) is None})
+            new = layout.field(
+                t("New name"),
+                value=name,
+                hint="owner/repo",
+                validation={t("Use the owner/repo format"): lambda v: check_repo(v) is None},
+            )
 
             def apply() -> None:
                 if not new.validate():
@@ -175,8 +211,12 @@ class IndexPage:
     def build(self) -> None:
         self.filters()
         columns = [{**c, "label": t(c["label"])} for c in COLUMNS]
-        self.table = table.empty_aware_table(columns, row_key="key", pagination={"rowsPerPage": 25},
-                                             empty_text=t("No repos in the Index yet. Run a search to add them."))
+        self.table = table.empty_aware_table(
+            columns,
+            row_key="key",
+            pagination={"rowsPerPage": 25},
+            empty_text=t("No repos in the Index yet. Run a search to add them."),
+        )
         self.table.table.add_slot("body-cell-readme", README_SLOT)
         with self.bar:
             self.table.column_picker("repo-scout-index-columns")

@@ -2,8 +2,12 @@ from repo_scout.noise import is_template, noise_stop
 
 
 def node(name="o/proj", desc="", topics=(), template=False):
-    return {"nameWithOwner": name, "description": desc, "isTemplate": template,
-            "repositoryTopics": {"nodes": [{"topic": {"name": t}} for t in topics]}}
+    return {
+        "nameWithOwner": name,
+        "description": desc,
+        "isTemplate": template,
+        "repositoryTopics": {"nodes": [{"topic": {"name": t}} for t in topics]},
+    }
 
 
 def test_one_signal_passes():
@@ -37,7 +41,11 @@ def test_template_is_flag_and_still_noise_if_noisy():
 
 
 def test_real_projects_are_not_noise():
-    assert noise_stop(node("OpenAPITools/openapi-generator", "Generate API clients from OpenAPI",
-                           ["generator", "openapi"])) is None
+    assert (
+        noise_stop(
+            node("OpenAPITools/openapi-generator", "Generate API clients from OpenAPI", ["generator", "openapi"])
+        )
+        is None
+    )
     assert noise_stop(node("o/deep-learning-kit", "Of course, a fast toolkit", ["learning", "list"])) is None
     assert noise_stop(node("o/free-tool", "free to use", ["free-money-no"])) is None

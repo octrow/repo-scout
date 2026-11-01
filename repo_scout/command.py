@@ -1,4 +1,5 @@
 """Command `repo-scout …` <-> search parameters: string parsing and argv serialization."""
+
 import argparse
 import shlex
 import sys

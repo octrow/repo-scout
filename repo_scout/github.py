@@ -1,4 +1,5 @@
 """GitHub GraphQL via `gh api graphql` with rate limit retries."""
+
 import gzip
 import hashlib
 import json
@@ -22,8 +23,10 @@ NODE_FIELDS = """nameWithOwner url description stargazerCount forkCount pushedAt
 repositoryTopics(first:20){nodes{topic{name}}}
 parent{nameWithOwner} primaryLanguage{name}
 defaultBranchRef{target{... on Commit{history{totalCount}}}}"""
-SEARCH_GQL = ("query($q:String!,$n:Int!){rateLimit{cost remaining resetAt}\n"
-              "search(query:$q,type:REPOSITORY,first:$n){nodes{... on Repository{\n" + NODE_FIELDS + "}}}}")
+SEARCH_GQL = (
+    "query($q:String!,$n:Int!){rateLimit{cost remaining resetAt}\n"
+    "search(query:$q,type:REPOSITORY,first:$n){nodes{... on Repository{\n" + NODE_FIELDS + "}}}}"
+)
 
 last_rate_limit: dict | None = None
 spent = 0  # GraphQL cost points consumed by live requests in this process
@@ -127,8 +130,9 @@ def _read(path: Path):
 def _cap_text(node):
     """Truncate README texts (text field) to README_MAX_CHARS."""
     if isinstance(node, dict):
-        return {k: v[:README_MAX_CHARS] if k == "text" and isinstance(v, str) else _cap_text(v)
-                for k, v in node.items()}
+        return {
+            k: v[:README_MAX_CHARS] if k == "text" and isinstance(v, str) else _cap_text(v) for k, v in node.items()
+        }
     return [_cap_text(v) for v in node] if isinstance(node, list) else node
 
 
@@ -157,8 +161,12 @@ def _note_cost(data: dict) -> None:
 def log_usage() -> None:
     """Log GitHub GraphQL quota used in this process; replay and cached runs remain silent."""
     if spent and last_rate_limit:
-        log.info("GitHub: spent %d GraphQL points, %s remaining, resets %s", spent,
-                 last_rate_limit.get("remaining"), last_rate_limit.get("resetAt"))
+        log.info(
+            "GitHub: spent %d GraphQL points, %s remaining, resets %s",
+            spent,
+            last_rate_limit.get("remaining"),
+            last_rate_limit.get("resetAt"),
+        )
 
 
 def _graphql_live(query: str, variables: dict, retries: int = MAX_RETRIES) -> dict:
@@ -180,7 +188,15 @@ def _batch(chunk: list[str], alias) -> dict[str, dict | None]:
     Single failing repo is retried; on persistent failure, it is skipped with a warning and tracked in last_failed."""
     q = "query{rateLimit{cost remaining resetAt} " + " ".join(alias(i, n) for i, n in enumerate(chunk)) + "}"
     try:
-        resp = _cap_text(_graphql_live(q, {}, retries=(EVAL_SINGLE_RETRIES if _mode == "record" and _details_dir else MAX_RETRIES) if len(chunk) == 1 else 0))
+        resp = _cap_text(
+            _graphql_live(
+                q,
+                {},
+                retries=(EVAL_SINGLE_RETRIES if _mode == "record" and _details_dir else MAX_RETRIES)
+                if len(chunk) == 1
+                else 0,
+            )
+        )
     except GitHubError as e:
         if len(chunk) > 1:
             log.info("batch of %d failed (%s), splitting in half", len(chunk), e)
@@ -217,11 +233,14 @@ _NAME = re.compile(r"[\w.-]+/[\w.-]+")
 
 def _alias(i: int, name: str) -> str:
     owner, repo = name.split("/")
-    readmes = " ".join(f'm{k}: object(expression: "HEAD:{n}") {{ ... on Blob {{ text }} }}'
-                       for k, n in enumerate(README_NAMES))
-    return (f"r{i}: repository(owner: {json.dumps(owner)}, name: {json.dumps(repo)}) {{ {readmes} "
-            "defaultBranchRef{target{... on Commit{history(first:20){nodes{committedDate message: messageHeadline additions "
-            "deletions author{name user{login}}}}}}}}")
+    readmes = " ".join(
+        f'm{k}: object(expression: "HEAD:{n}") {{ ... on Blob {{ text }} }}' for k, n in enumerate(README_NAMES)
+    )
+    return (
+        f"r{i}: repository(owner: {json.dumps(owner)}, name: {json.dumps(repo)}) {{ {readmes} "
+        "defaultBranchRef{target{... on Commit{history(first:20){nodes{committedDate message: messageHeadline additions "
+        "deletions author{name user{login}}}}}}}}"
+    )
 
 
 def _fetch_details(chunk: list[str]) -> dict[str, dict | None]:
@@ -232,8 +251,10 @@ def _fetch_details(chunk: list[str]) -> dict[str, dict | None]:
             continue
         texts = (repo.get(f"m{k}") for k in range(len(README_NAMES)))
         target = (repo.get("defaultBranchRef") or {}).get("target") or {}
-        out[name] = {"readme": next((t["text"] for t in texts if t), None),
-                     "commits": (target.get("history") or {}).get("nodes") or []}
+        out[name] = {
+            "readme": next((t["text"] for t in texts if t), None),
+            "commits": (target.get("history") or {}).get("nodes") or [],
+        }
     return out
 
 
@@ -252,7 +273,7 @@ def details(names: list[str]) -> dict[str, dict]:
             raise GitHubError(f"missing details snapshot for {n} (--record)")
         else:
             missing.append(n)
-    chunks = [missing[i:i + DETAILS_CHUNK] for i in range(0, len(missing), DETAILS_CHUNK)]
+    chunks = [missing[i : i + DETAILS_CHUNK] for i in range(0, len(missing), DETAILS_CHUNK)]
     with ThreadPoolExecutor(DETAILS_WORKERS) as pool:
         for k, (chunk, got) in enumerate(zip(chunks, pool.map(_fetch_details, chunks)), 1):
             log.info("details %d/%d", min(k * DETAILS_CHUNK, len(missing)), len(missing))
@@ -289,19 +310,27 @@ def _record_skipped(chunk: list[str], got: dict, kind: str) -> None:
 def _alias_full(i: int, name: str) -> str:
     """Search metadata + README + commits in a single alias (commits under recent alias)."""
     owner, repo = name.split("/")
-    readmes = " ".join(f'm{k}: object(expression: "HEAD:{n}") {{ ... on Blob {{ text }} }}'
-                       for k, n in enumerate(README_NAMES))
-    return (f"r{i}: repository(owner: {json.dumps(owner)}, name: {json.dumps(repo)}) {{ {NODE_FIELDS} {readmes} "
-            "recent: defaultBranchRef{target{... on Commit{history(first:20){nodes{committedDate message: messageHeadline "
-            "additions deletions author{name user{login}}}}}}}}")
+    readmes = " ".join(
+        f'm{k}: object(expression: "HEAD:{n}") {{ ... on Blob {{ text }} }}' for k, n in enumerate(README_NAMES)
+    )
+    return (
+        f"r{i}: repository(owner: {json.dumps(owner)}, name: {json.dumps(repo)}) {{ {NODE_FIELDS} {readmes} "
+        "recent: defaultBranchRef{target{... on Commit{history(first:20){nodes{committedDate message: messageHeadline "
+        "additions deletions author{name user{login}}}}}}}}"
+    )
 
 
 def _split_full(repo: dict) -> dict:
     texts = (repo.get(f"m{k}") for k in range(len(README_NAMES)))
     target = (repo.get("recent") or {}).get("target") or {}
     node = {k: v for k, v in repo.items() if k != "recent" and not re.fullmatch(r"m\d+", k)}
-    return {"node": node, "details": {"readme": next((t["text"] for t in texts if t), None),
-                                      "commits": (target.get("history") or {}).get("nodes") or []}}
+    return {
+        "node": node,
+        "details": {
+            "readme": next((t["text"] for t in texts if t), None),
+            "commits": (target.get("history") or {}).get("nodes") or [],
+        },
+    }
 
 
 def refresh(names: list[str]) -> dict[str, dict]:
@@ -321,7 +350,7 @@ def refresh(names: list[str]) -> dict[str, dict]:
             missing.append(n)
     for start in range(0, len(missing), DETAILS_CHUNK):
         log.info("refresh from Index: %d–%d of %d", start + 1, min(start + DETAILS_CHUNK, len(missing)), len(missing))
-        chunk = missing[start:start + DETAILS_CHUNK]
+        chunk = missing[start : start + DETAILS_CHUNK]
         got = _batch(chunk, _alias_full)
         for name, repo in got.items():
             d = _split_full(repo) if repo else None

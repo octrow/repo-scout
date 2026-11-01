@@ -1,4 +1,5 @@
 """Search form logic without UI: form state <-> CLI parameters, drafts, prompt text."""
+
 import shlex
 import tomllib
 from dataclasses import dataclass
@@ -45,8 +46,14 @@ def params_to_state(params: dict) -> dict:
     base = search_params(_parser().parse_args(["--task", "x", "q"]))
     p = {**base, **{k: v for k, v in params.items() if k in base}}
     state = {k: p[k] for k in (*NUMBER_KEYS, *FLAG_KEYS, "task")}
-    state.update(queries="\n".join(p["queries"]), must="\n".join(p["must"]),
-                 exclude="\n".join(p["exclude"]), lang=p["lang"] or "", project=p["project"] or "", need=p["need"] or "")
+    state.update(
+        queries="\n".join(p["queries"]),
+        must="\n".join(p["must"]),
+        exclude="\n".join(p["exclude"]),
+        lang=p["lang"] or "",
+        project=p["project"] or "",
+        need=p["need"] or "",
+    )
     return state
 
 
@@ -60,11 +67,15 @@ def state_to_params(state: dict) -> dict:
     for k in (*NUMBER_KEYS, *FLAG_KEYS):
         if state.get(k) is not None:
             params[k] = type(params[k])(state[k])
-    params.update(task=(state.get("task") or "").strip(), queries=_lines(state.get("queries", "")),
-                  must=_lines(state.get("must", "")), exclude=_lines(state.get("exclude", "")),
-                  lang=(state.get("lang") or "").strip() or None,
-                  project=(state.get("project") or "").strip() or None,
-                  need=(state.get("need") or "").strip() or None)
+    params.update(
+        task=(state.get("task") or "").strip(),
+        queries=_lines(state.get("queries", "")),
+        must=_lines(state.get("must", "")),
+        exclude=_lines(state.get("exclude", "")),
+        lang=(state.get("lang") or "").strip() or None,
+        project=(state.get("project") or "").strip() or None,
+        need=(state.get("need") or "").strip() or None,
+    )
     return params
 
 
@@ -110,9 +121,15 @@ def form_errors(state: dict) -> list[str]:
         errors.append(t("Add a task description"))
     if not _lines(state.get("queries", "")):
         errors.append(t("Add at least one query"))
-    errors += [e for e in (check_queries(state.get("queries", "")),
-                           check_regexes("--must", state.get("must", "")),
-                           check_regexes("--exclude", state.get("exclude", ""))) if e]
+    errors += [
+        e
+        for e in (
+            check_queries(state.get("queries", "")),
+            check_regexes("--must", state.get("must", "")),
+            check_regexes("--exclude", state.get("exclude", "")),
+        )
+        if e
+    ]
     return errors
 
 
@@ -129,9 +146,16 @@ def agent_prompt(task: str) -> str:
 def eval_to_state(path: Path) -> dict:
     """Dataset eval/*.toml -> form."""
     data = tomllib.loads(path.read_text(encoding="utf-8"))
-    return params_to_state({"task": data.get("task", ""), "queries": data.get("queries", []),
-                            "lang": data.get("lang") or None, "must": data.get("must", []),
-                            "exclude": data.get("exclude", []), "project": data.get("name")})
+    return params_to_state(
+        {
+            "task": data.get("task", ""),
+            "queries": data.get("queries", []),
+            "lang": data.get("lang") or None,
+            "must": data.get("must", []),
+            "exclude": data.get("exclude", []),
+            "project": data.get("name"),
+        }
+    )
 
 
 def run_to_state(path: Path) -> dict:
@@ -144,13 +168,16 @@ DRAFT_TASK_LIMIT = 60
 def _short(task: str | None) -> str:
     """A task cut to one scannable line of the draft list."""
     task = " ".join((task or "").split())
-    return task if len(task) <= DRAFT_TASK_LIMIT else task[:DRAFT_TASK_LIMIT - 1].rstrip() + "…"
+    return task if len(task) <= DRAFT_TASK_LIMIT else task[: DRAFT_TASK_LIMIT - 1].rstrip() + "…"
 
 
 def list_drafts(eval_dir: Path = EVAL_DIR) -> list[Draft]:
     """Past Runs (newest first, corrupt skipped) and eval datasets."""
-    out = [Draft(f"{RUN_PREFIX}{s.path.stem}", f"{t('Run')} · {(s.created_at or '')[:10]} · {_short(s.task)}", s.path)
-           for s in runs.list_runs() if not s.error]
+    out = [
+        Draft(f"{RUN_PREFIX}{s.path.stem}", f"{t('Run')} · {(s.created_at or '')[:10]} · {_short(s.task)}", s.path)
+        for s in runs.list_runs()
+        if not s.error
+    ]
     for p in sorted(eval_dir.glob("*.toml")):
         try:
             tomllib.loads(p.read_text(encoding="utf-8"))
@@ -166,6 +193,9 @@ def load_draft(draft: Draft) -> dict:
 
 def project_suggestions(verdict_projects: list[str], dev_dir: Path = DEV_DIR) -> list[str]:
     """Projects from Index verdicts and folder names in ~/dev, deduplicated."""
-    dirs = sorted(p.name for p in dev_dir.iterdir() if p.is_dir() and not p.name.startswith(".")) \
-        if dev_dir.is_dir() else []
+    dirs = (
+        sorted(p.name for p in dev_dir.iterdir() if p.is_dir() and not p.name.startswith("."))
+        if dev_dir.is_dir()
+        else []
+    )
     return list(dict.fromkeys([*verdict_projects, *dirs]))

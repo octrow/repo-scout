@@ -1,4 +1,5 @@
 """Fit column from a System One model: optional, never drops or reorders, failures are warnings."""
+
 import pytest
 
 from repo_scout import systemone
@@ -16,6 +17,7 @@ def posted(monkeypatch):
     def fake(body):
         sent.append(body)
         return {"answers": {"r0": {"type": "noul", "noul": 0.91}, "r1": {"noul": "bad"}}}
+
     monkeypatch.setattr(systemone, "_post", fake)
     return sent
 
@@ -49,6 +51,7 @@ def test_failure_is_a_warning(monkeypatch, caplog):
 
     def boom(body):
         raise systemone.SystemOneError("HTTP error 401; check TYPESAFE_API_KEY")
+
     monkeypatch.setattr(systemone, "_post", boom)
     rows = _rows("a/a")
     systemone.add_fit(rows, "t", {"a/a": "A"}, 20)

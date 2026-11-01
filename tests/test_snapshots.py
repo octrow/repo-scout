@@ -7,10 +7,20 @@ import pytest
 from repo_scout import github
 from repo_scout.cli import run
 
-NODE = {"nameWithOwner": "a/b", "url": "u", "description": None, "stargazerCount": 5, "forkCount": 0,
-        "pushedAt": "2026-10-10T00:00:00Z", "createdAt": "2020-01-01T00:00:00Z", "isArchived": False,
-        "isFork": False, "parent": None, "primaryLanguage": None,
-        "defaultBranchRef": {"target": {"history": {"totalCount": 100}}}}
+NODE = {
+    "nameWithOwner": "a/b",
+    "url": "u",
+    "description": None,
+    "stargazerCount": 5,
+    "forkCount": 0,
+    "pushedAt": "2026-10-10T00:00:00Z",
+    "createdAt": "2020-01-01T00:00:00Z",
+    "isArchived": False,
+    "isFork": False,
+    "parent": None,
+    "primaryLanguage": None,
+    "defaultBranchRef": {"target": {"history": {"totalCount": 100}}},
+}
 RESP = json.dumps({"data": {"search": {"nodes": [NODE]}, "rateLimit": {"cost": 1, "remaining": 9, "resetAt": "t"}}})
 
 
@@ -22,8 +32,9 @@ def reset():
 
 def test_record_then_replay(monkeypatch, tmp_path):
     calls = []
-    monkeypatch.setattr(subprocess, "run", lambda cmd, **kw: calls.append(cmd) or
-                        subprocess.CompletedProcess(cmd, 0, RESP, ""))
+    monkeypatch.setattr(
+        subprocess, "run", lambda cmd, **kw: calls.append(cmd) or subprocess.CompletedProcess(cmd, 0, RESP, "")
+    )
     now = datetime(2026, 10, 11, tzinfo=UTC)
     github.configure("record", tmp_path)
     (tmp_path / "meta.json").write_text(json.dumps({"recorded_at": now.isoformat()}))
@@ -45,8 +56,9 @@ def test_replay_missing_snapshot(tmp_path):
 
 def test_record_reuses_existing_and_keeps_meta(monkeypatch, tmp_path):
     calls = []
-    monkeypatch.setattr(subprocess, "run", lambda cmd, **kw: calls.append(cmd) or
-                        subprocess.CompletedProcess(cmd, 0, RESP, ""))
+    monkeypatch.setattr(
+        subprocess, "run", lambda cmd, **kw: calls.append(cmd) or subprocess.CompletedProcess(cmd, 0, RESP, "")
+    )
     github.configure("record", tmp_path)
     first = (tmp_path / "meta.json").read_text()
     github.search("q", 5)
@@ -59,9 +71,13 @@ def fake_live(sent):
     def live(query, variables, **_):
         sent.append(query)
         aliases = [i for i in range(10) if f"r{i}:" in query]
-        repo = {"m0": None, "m1": {"text": "hello"}, "defaultBranchRef": {"target": {
-            "history": {"nodes": [{"message": "x"}]}}}}
+        repo = {
+            "m0": None,
+            "m1": {"text": "hello"},
+            "defaultBranchRef": {"target": {"history": {"nodes": [{"message": "x"}]}}},
+        }
         return {"data": {f"r{i}": (None if i == 1 else repo) for i in aliases}}
+
     return live
 
 
@@ -117,8 +133,11 @@ def test_shared_details_dir(monkeypatch, tmp_path):
 def test_record_single_repo_retries_once(monkeypatch, tmp_path):
     got = []
     monkeypatch.setattr(github, "last_failed", set())
-    monkeypatch.setattr(github, "_graphql_live", lambda q, v, retries: got.append(retries) or (_ for _ in ()).throw(
-        github.GitHubError("502")))
+    monkeypatch.setattr(
+        github,
+        "_graphql_live",
+        lambda q, v, retries: got.append(retries) or (_ for _ in ()).throw(github.GitHubError("502")),
+    )
     github.configure("record", tmp_path, tmp_path / "shared")
     assert github.details(["a/b"]) == {}
     github.configure("record", tmp_path / "plain")  # standard eval --record
@@ -128,6 +147,7 @@ def test_record_single_repo_retries_once(monkeypatch, tmp_path):
 
 def test_detail_chunks_fetched_concurrently(monkeypatch, tmp_path):
     import threading
+
     barrier = threading.Barrier(github.DETAILS_WORKERS, timeout=5)  # without concurrency — BrokenBarrierError
     live = fake_live([])
     monkeypatch.setattr(github, "_graphql_live", lambda q, v, **k: barrier.wait() is not None and live(q, v))
@@ -139,8 +159,9 @@ def test_detail_chunks_fetched_concurrently(monkeypatch, tmp_path):
 
 def test_spent_points_counted_for_live_calls_only(monkeypatch, tmp_path, caplog):
     monkeypatch.setattr(github, "spent", 0)
-    monkeypatch.setattr(github, "_attempt", lambda q, v: (
-        {"data": {"rateLimit": {"cost": 2, "remaining": 4990, "resetAt": "x"}}}, None))
+    monkeypatch.setattr(
+        github, "_attempt", lambda q, v: ({"data": {"rateLimit": {"cost": 2, "remaining": 4990, "resetAt": "x"}}}, None)
+    )
     github.configure("record", tmp_path)
     github.graphql("q", {})
     github.graphql("q", {})  # second from snapshot: does not spend limit

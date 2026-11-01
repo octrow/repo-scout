@@ -4,6 +4,7 @@ The share of stars in bursts is a measurement, not an accusation: bought stars a
 The burst algorithm is ported from real-stars `src/shared/mad.ts:72-179` and `src/shared/constants.ts:13-19`
 (MIT; itself a port of StarGuard, Apache-2.0). License texts: THIRD_PARTY_NOTICES.md.
 """
+
 import json
 import subprocess
 import time
@@ -76,10 +77,10 @@ def _daily(weeks: list[dict], now: datetime, complete: bool) -> History:
     counts = [0] * ((max(w["week"] for w in weeks) - first) // 86400 + 7)
     for w in weeks:
         base = (w["week"] - first) // 86400
-        counts[base:base + 7] = w["days"]
+        counts[base : base + 7] = w["days"]
     start = datetime.fromtimestamp(first, UTC).date()
     keep = (now.date() - start).days + 1  # drop days of current week after 'now'
-    return History(start, counts[:max(keep, 0)], complete)
+    return History(start, counts[: max(keep, 0)], complete)
 
 
 def history(name: str, now: datetime) -> History | None:
@@ -109,14 +110,15 @@ def bursts(counts: list[int], min_count: int = MIN_BURST, complete: bool = True)
     for i, today in enumerate(counts):
         med = mad = 0.0
         if i >= WINDOW:
-            win = counts[i - WINDOW:i]
+            win = counts[i - WINDOW : i]
             med = median(win)
             mad = median(abs(v - med) for v in win)
         if before >= MIN_TOTAL and mad > 0.001 and i >= WINDOW:
             hit = today > med + MAD_THRESHOLD * mad and today > med + 1
         else:  # fallback for small repos and MAD == 0
-            hit = today > 0 and ((today / max(1, before) * 100 > GROWTH_PERCENT and today > 5)
-                                 or today > max(5, med * 2))
+            hit = today > 0 and (
+                (today / max(1, before) * 100 > GROWTH_PERCENT and today > 5) or today > max(5, med * 2)
+            )
         flags.append(hit and today >= min_count)
         before += today
     return flags
@@ -147,8 +149,10 @@ def flag(h: History | None, threshold: float = SHARE_THRESHOLD, min_count: int =
 def fork_dates(name: str) -> list[datetime]:
     """Creation dates of last 100 forks (GraphQL, 1 call)."""
     owner, repo = name.split("/")
-    q = ("query($o:String!,$n:String!){repository(owner:$o,name:$n){forks(first:100,orderBy:{field:CREATED_AT,direction:DESC})"
-         "{nodes{createdAt}}}}")
+    q = (
+        "query($o:String!,$n:String!){repository(owner:$o,name:$n){forks(first:100,orderBy:{field:CREATED_AT,direction:DESC})"
+        "{nodes{createdAt}}}}"
+    )
     found = github.graphql(q, {"o": owner, "n": repo})["data"]["repository"]  # null: renamed, deleted, DMCA
     return [datetime.fromisoformat(n["createdAt"]) for n in (found or {}).get("forks", {}).get("nodes") or [] if n]
 

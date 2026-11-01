@@ -1,4 +1,5 @@
 """`repo-scout doctor [--fix]`: is this machine ready to search? One line per check with a fix hint."""
+
 import argparse
 import shutil
 import subprocess
@@ -13,6 +14,7 @@ LOGIN_HINT = "log in: gh auth login --web"
 def _load_model(local_only: bool) -> None:
     from fastembed import TextEmbedding  # lazy import: model loading is heavy
     from loguru import logger
+
     logger.disable("fastembed")  # a cache miss is logged as ERROR; the check reports it instead
     TextEmbedding(semantic.MODEL, cache_dir=semantic.cache_dir(), local_files_only=local_only)
 
@@ -48,7 +50,9 @@ def optional() -> list[str]:
     lines = [f"Mode: advanced ({', '.join(on)})" if on else "Mode: basic (no external models)"]
     if draft:
         gui = "on" if llm.gui_enabled() else "off"
-        lines.append(f"✓ LLM draft: model {llm.model()} at {llm.setting(llm.URL_VAR, llm.DEFAULT_URL)}. GUI button: {gui}")
+        lines.append(
+            f"✓ LLM draft: model {llm.model()} at {llm.setting(llm.URL_VAR, llm.DEFAULT_URL)}. GUI button: {gui}"
+        )
     else:
         lines.append(f"○ LLM draft: off. Free: OmniRoute ({config.OMNIROUTE_URL}) or Ollama")
     if fit:

@@ -1,4 +1,5 @@
 """Hard conditions: language, forbidden and required words. Violations return a stop reason."""
+
 import re
 
 MATCH_SHOWN = 40

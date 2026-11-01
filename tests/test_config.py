@@ -1,4 +1,5 @@
 """`repo-scout config`: optional advanced-mode settings, filled interactively."""
+
 import os
 import stat
 

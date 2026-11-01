@@ -1,4 +1,5 @@
 """GUI language switch: English by default, Russian on REPO_SCOUT_LANG=ru, every t("...") has a translation."""
+
 import ast
 from pathlib import Path
 
@@ -15,8 +16,14 @@ def _t_literals() -> set[str]:
     out = set()
     for path in GUI.glob("*.py"):
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "t"
-                    and node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str)):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "t"
+                and node.args
+                and isinstance(node.args[0], ast.Constant)
+                and isinstance(node.args[0].value, str)
+            ):
                 out.add(node.args[0].value)
     return out
 
@@ -24,12 +31,25 @@ def _t_literals() -> set[str]:
 def _constant_labels() -> set[str]:
     """Labels kept in module constants and translated at render time."""
     cols = [*run_view.COLUMNS, *runs_page.COLUMNS, *index_page.COLUMNS]
-    return ({c["label"] for c in cols if c["label"] not in ("", "★")} | {m for m, _ in run_view.METRICS if m != "★"}
-            | set(search_page.NUMBER_LABELS.values()) | set(search_page.FLAG_LABELS.values())
-            | set(eval_page.FLAG_LABELS.values()) | set(shell.PAGES.values())
-            | set(runs_logic.NOTE_LABELS.values()) | {"Drop", "Doubt", search_page.COMMAND_HINT, search_page.LLM_FAILED,
-                                                       runs_logic.SOURCES_ALL, runs_logic.FLAGS_ALL, runs_logic.ALL,
-                                                       index_page.ALL_PROJECTS})
+    return (
+        {c["label"] for c in cols if c["label"] not in ("", "★")}
+        | {m for m, _ in run_view.METRICS if m != "★"}
+        | set(search_page.NUMBER_LABELS.values())
+        | set(search_page.FLAG_LABELS.values())
+        | set(eval_page.FLAG_LABELS.values())
+        | set(shell.PAGES.values())
+        | set(runs_logic.NOTE_LABELS.values())
+        | {
+            "Drop",
+            "Doubt",
+            search_page.COMMAND_HINT,
+            search_page.LLM_FAILED,
+            runs_logic.SOURCES_ALL,
+            runs_logic.FLAGS_ALL,
+            runs_logic.ALL,
+            index_page.ALL_PROJECTS,
+        }
+    )
 
 
 def test_every_gui_string_has_a_russian_translation():
@@ -74,6 +94,7 @@ async def test_runs_page_in_russian(user: User, monkeypatch) -> None:
 def test_kit_texts_follow_the_switch(monkeypatch):
     from repo_scout.gui import i18n
     from repo_scout.gui.kit import texts
+
     monkeypatch.setenv("REPO_SCOUT_LANG", "ru")
     i18n.sync_kit()
     assert texts.tr("rows_per_page") == "Строк на странице:"

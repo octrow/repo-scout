@@ -1,5 +1,6 @@
 """Port selection for GUI: free — use it; occupied by our GUI — show link and (optionally) restart;
 occupied by another program — offer next free port. Without NiceGUI: runs before import."""
+
 import json
 import os
 import signal

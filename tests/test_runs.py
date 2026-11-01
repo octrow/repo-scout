@@ -48,8 +48,9 @@ def test_list_runs_no_dir():
     assert runs.list_runs() == []
 
 
-@pytest.mark.parametrize("data", [{"version": 2, "created_at": "", "params": {}, "round2_topics": [], "rows": []},
-                                  {"version": 1}])
+@pytest.mark.parametrize(
+    "data", [{"version": 2, "created_at": "", "params": {}, "round2_topics": [], "rows": []}, {"version": 1}]
+)
 def test_load_invalid(tmp_path, data):
     p = tmp_path / "x.json"
     p.write_text(json.dumps(data))
@@ -63,11 +64,15 @@ def test_delete():
     assert not path.exists()
 
 
-@pytest.mark.parametrize("bad", [
-    {"version": 1, "created_at": "", "params": [], "round2_topics": [], "rows": []},
-    {"version": 1, "created_at": "", "params": {}, "round2_topics": [], "rows": [1]},
-    {"version": 1, "created_at": "", "params": {}, "round2_topics": [1], "rows": []},
-    {"version": 1, "created_at": "", "params": {}, "round2_topics": [], "rows": {}}])
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"version": 1, "created_at": "", "params": [], "round2_topics": [], "rows": []},
+        {"version": 1, "created_at": "", "params": {}, "round2_topics": [], "rows": [1]},
+        {"version": 1, "created_at": "", "params": {}, "round2_topics": [1], "rows": []},
+        {"version": 1, "created_at": "", "params": {}, "round2_topics": [], "rows": {}},
+    ],
+)
 def test_load_rejects_wrong_shapes_and_list_runs_survives(tmp_path, bad):
     runs.save(PARAMS, ROWS, [], NOW)
     p = runs.runs_dir() / "20260101-000000-bad.json"

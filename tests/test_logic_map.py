@@ -1,4 +1,5 @@
 """docs/logic-map.md `Module:` lines name functions that exist."""
+
 import importlib
 import re
 from functools import reduce
@@ -8,8 +9,12 @@ MAP = Path(__file__).parent.parent / "docs" / "logic-map.md"
 
 
 def test_module_lines_point_to_existing_functions():
-    refs = [ref.strip() for line in MAP.read_text().splitlines() if line.startswith("Module:")
-            for ref in line.removeprefix("Module:").split(",")]
+    refs = [
+        ref.strip()
+        for line in MAP.read_text().splitlines()
+        if line.startswith("Module:")
+        for ref in line.removeprefix("Module:").split(",")
+    ]
     assert refs
     for ref in refs:
         path, _, attr = ref.partition("::")

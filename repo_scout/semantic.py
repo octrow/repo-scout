@@ -1,4 +1,5 @@
 """Closeness: fastembed embeddings (BAAI/bge-small-en-v1.5) and README cleaning."""
+
 import os
 import re
 from pathlib import Path
@@ -16,6 +17,8 @@ _model = None
 def cache_dir() -> str:
     """fastembed defaults to the temp dir, which reboots and cleaners wipe; keep the model next to our data."""
     return os.environ.get("FASTEMBED_CACHE_PATH") or str(Path.home() / ".cache/repo-scout/fastembed")
+
+
 _doc_cache: dict[str, np.ndarray] = {}  # ponytail: per-process, unbounded; eval variants embed the same READMEs
 
 
@@ -23,6 +26,7 @@ def _get():
     global _model
     if _model is None:
         from fastembed import TextEmbedding  # lazy import: model loading is heavy
+
         _model = TextEmbedding(MODEL, cache_dir=cache_dir())
     return _model
 
@@ -53,9 +57,11 @@ BADGE = re.compile(r"^\s*(\[!\[[^\]]{0,300}\]\([^)]{0,500}\)\]\([^)]{0,500}\)\s*
 IMAGE = re.compile(r"!\[[^\]]{0,300}\]\([^)]{0,500}\)")
 COMMENT = re.compile(r"<!--.{0,2000}?-->", re.DOTALL)
 # only known HTML tags to avoid breaking prose like `<T>`; tags can span multiple lines
-TAG = re.compile(r"</?(?:h[1-6]|p|div|span|a|strong|em|b|i|u|s|center|sub|sup|small|picture|source|img|br|hr|table"
-                 r"|thead|tbody|tr|td|th|ul|ol|li|blockquote|details|summary|kbd|figure|figcaption|font)(?:\s[^>]{0,500})?/?>",
-                 re.IGNORECASE)
+TAG = re.compile(
+    r"</?(?:h[1-6]|p|div|span|a|strong|em|b|i|u|s|center|sub|sup|small|picture|source|img|br|hr|table"
+    r"|thead|tbody|tr|td|th|ul|ol|li|blockquote|details|summary|kbd|figure|figcaption|font)(?:\s[^>]{0,500})?/?>",
+    re.IGNORECASE,
+)
 LINK = re.compile(r"\[([^\]]{0,300})\]\([^)]{0,500}\)")
 
 
@@ -66,7 +72,7 @@ def _prose(lines: list[str]) -> str:
 
 def clean_readme(md: str) -> str:
     """Remove badges, images, HTML markup and link URLs (link text kept); preserve code fences."""
-    md = md[:MAX_CHARS * 10]  # truncate input before cleaning so hostile READMEs do not hang
+    md = md[: MAX_CHARS * 10]  # truncate input before cleaning so hostile READMEs do not hang
     out, prose, in_fence = [], [], False
     for line in md.replace("\r\n", "\n").split("\n"):
         if FENCE.match(line):

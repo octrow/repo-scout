@@ -22,8 +22,10 @@ def test_skips_set_without_need(tmp_path: Path, capsys):
 def test_table_totals():
     def m(f, k):
         return {"found": f, "kept": [0] * k, "positives": 4}
-    t = eval_llm.table([{"name": "s", "agent": m(2, 1), "draft": m(3, 2), "union": m(4, 3),
-                         "stats": {"tokens": 600, "seconds": 8.0}}])
+
+    t = eval_llm.table(
+        [{"name": "s", "agent": m(2, 1), "draft": m(3, 2), "union": m(4, 3), "stats": {"tokens": 600, "seconds": 8.0}}]
+    )
     assert "| s | 4 | 2/1 | 3/2 | 4/3 | 600 | 8.0 |" in t and "total found" in t
 
 
@@ -35,9 +37,12 @@ def test_eval_one_end_to_end(tmp_path: Path, monkeypatch):
     def fake_draft(need):
         llm.last_stats.update(tokens=5, seconds=1.5)
         return d
+
     seen = []
     monkeypatch.setattr(llm, "draft", fake_draft)
-    monkeypatch.setattr(eval_llm, "_metrics", lambda path, mode, snap, ov: seen.append(ov) or {"found": 1, "kept": [], "positives": 2})
+    monkeypatch.setattr(
+        eval_llm, "_metrics", lambda path, mode, snap, ov: seen.append(ov) or {"found": 1, "kept": [], "positives": 2}
+    )
     try:
         r = eval_llm.eval_one(p, "replay")
     finally:
@@ -49,9 +54,16 @@ def test_eval_one_end_to_end(tmp_path: Path, monkeypatch):
 
 def test_report_lists_draft_queries(monkeypatch, tmp_path):
     from repo_scout.llm import Draft
+
     m = {"positives": 2, "found": 1, "kept": []}
-    r = {"name": "s", "llm_draft": Draft("T", ("q1", "q2"), None, (), ()), "stats": {"tokens": 5, "seconds": 1.5},
-         "agent": m, "draft": m, "union": m}
+    r = {
+        "name": "s",
+        "llm_draft": Draft("T", ("q1", "q2"), None, (), ()),
+        "stats": {"tokens": 5, "seconds": 1.5},
+        "agent": m,
+        "draft": m,
+        "union": m,
+    }
     monkeypatch.setattr(eval_llm, "eval_one", lambda p, mode: r)
     out = eval_llm.report([tmp_path / "s.toml"], "replay")
     assert "s: q1 | q2" in out

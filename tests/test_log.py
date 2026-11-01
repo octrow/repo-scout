@@ -26,11 +26,13 @@ def test_prune_keeps_total_under_limit_and_current(tmp_path):
 
 def test_fatal_exit_message_goes_to_log_file():
     import pytest
+
     path = logmod.setup(quiet=True)
 
     @logmod.logged_exit
     def main() -> None:
         raise SystemExit("eval: LLM unavailable")
+
     with pytest.raises(SystemExit):
         main()
     assert "ERROR eval: LLM unavailable" in path.read_text()

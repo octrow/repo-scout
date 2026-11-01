@@ -15,8 +15,11 @@ from tests.test_runs_logic import row
 
 pytestmark = pytest.mark.nicegui_main_file(str(Path(__file__).parent / "gui_main.py"))
 NOW = datetime(2026, 5, 1, 12, 30, 5, tzinfo=UTC)
-ROWS = [row("a/alpha", closeness=0.9), row("b/beta", closeness=0.5, flags=["new"], source="round 2"),
-        row("c/dead", stop="dead")]
+ROWS = [
+    row("a/alpha", closeness=0.9),
+    row("b/beta", closeness=0.5, flags=["new"], source="round 2"),
+    row("c/dead", stop="dead"),
+]
 
 
 def fire(user: User, event: str, *args) -> None:
@@ -24,7 +27,10 @@ def fire(user: User, event: str, *args) -> None:
     table = user.find(ui.table).elements.pop()
     for listener in table._event_listeners.values():
         if listener.type == event:
-            handle_event(listener.handler, GenericEventArguments(sender=table, client=table.client, args=list(args) if len(args) > 1 else args[0]))
+            handle_event(
+                listener.handler,
+                GenericEventArguments(sender=table, client=table.client, args=list(args) if len(args) > 1 else args[0]),
+            )
 
 
 def press(user: User, label: str) -> None:
@@ -41,7 +47,14 @@ def make_run(project: str | None = "proj", task: str = "Find thing") -> Path:
 
 def make_index() -> Index:
     idx = Index(default_path(), model="m1")
-    meta = {"repo": "a/Alpha", "url": "https://github.com/a/Alpha", "desc": "alpha tool", "topics": [], "stars": 7, "lang": "Go"}
+    meta = {
+        "repo": "a/Alpha",
+        "url": "https://github.com/a/Alpha",
+        "desc": "alpha tool",
+        "topics": [],
+        "stars": 7,
+        "lang": "Go",
+    }
     idx.upsert(meta, "# Alpha readme\n\nHello", np.array([1, 0]))
     idx.upsert({**meta, "repo": "b/beta", "desc": "beta", "lang": "Rust"}, None, np.array([0, 1]))
     return idx
@@ -203,4 +216,5 @@ async def test_eval_page_cards_and_run(user: User, monkeypatch) -> None:
 def test_page_css_uses_only_kit_tokens():
     from repo_scout.gui import run_view, runs_page
     from repo_scout.gui.kit import theme
+
     assert theme.raw_values(run_view.TABLE_CSS + runs_page.RUNS_CSS) == []

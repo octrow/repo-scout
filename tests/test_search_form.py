@@ -58,7 +58,9 @@ def test_agent_prompt_has_task_and_one_line_rule() -> None:
 def test_drafts_from_runs_and_eval(tmp_path: Path) -> None:
     params = cli.search_params(cli._parser().parse_args(["--task", "T1", "--project", "pp", "q1", "q2"]))
     runs.save(params, [], [], datetime(2026, 1, 1))
-    (tmp_path / "ev.toml").write_text('name="ev"\ntask="E task"\nqueries=["a","b"]\nlang="go"\nmust=["x"]\nexclude=[]\n')
+    (tmp_path / "ev.toml").write_text(
+        'name="ev"\ntask="E task"\nqueries=["a","b"]\nlang="go"\nmust=["x"]\nexclude=[]\n'
+    )
     (runs.runs_dir() / "broken.json").write_text("{")
     drafts = sf.list_drafts(tmp_path)
     assert [d.key.split(":")[0] for d in drafts] == ["run", "eval"]

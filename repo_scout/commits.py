@@ -1,9 +1,17 @@
 """Substantive commit detection and freshness recalculation (CONTEXT.md)."""
+
 import re
 from datetime import datetime
 
-SERVICE_BOTS = {"dependabot", "renovate", "github-actions", "pre-commit-ci", "allcontributors", "imgbot",
-                "semantic-release-bot"}
+SERVICE_BOTS = {
+    "dependabot",
+    "renovate",
+    "github-actions",
+    "pre-commit-ci",
+    "allcontributors",
+    "imgbot",
+    "semantic-release-bot",
+}
 AI_AGENTS = ("claude", "copilot", "codex", "devin", "cursor", "openai", "deepseek")
 COSMETIC_PREFIX = re.compile(r"^(docs|chore\(deps\)|ci|style)(\(.*\))?:|^merge", re.IGNORECASE)
 COSMETIC_WORDS = re.compile(r"\b(bump(ed)?|release\s+v?\d|typos?|readme)\b", re.IGNORECASE)  # small edits only
@@ -24,9 +32,11 @@ def is_cosmetic(commit: dict) -> bool:
     msg = commit.get("message") or ""
     first = msg.splitlines()[0] if msg else ""
     size = (commit.get("additions") or 0) + (commit.get("deletions") or 0)
-    return (bool(COSMETIC_PREFIX.search(first))
-            or (size <= WORDS_MAX_CHANGE and bool(COSMETIC_WORDS.search(first)))
-            or (size <= TINY_CHANGE and bool(TEXT_WORDS.search(msg))))
+    return (
+        bool(COSMETIC_PREFIX.search(first))
+        or (size <= WORDS_MAX_CHANGE and bool(COSMETIC_WORDS.search(first)))
+        or (size <= TINY_CHANGE and bool(TEXT_WORDS.search(msg)))
+    )
 
 
 def is_substantive(commit: dict) -> bool:

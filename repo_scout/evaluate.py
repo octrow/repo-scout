@@ -1,4 +1,5 @@
 """`repo-scout eval`: run golden sets eval/*.toml and report recall metrics."""
+
 import argparse
 import atexit
 import contextlib
@@ -17,7 +18,17 @@ from repo_scout.semantic import MIN_CLOSENESS
 
 SWEEP = [round(0.50 + 0.01 * i, 2) for i in range(41)]
 
-COLUMNS = ["set", "positives", "found", "passed", "positions", "false drops", "not found", "negatives passed", "min closeness"]
+COLUMNS = [
+    "set",
+    "positives",
+    "found",
+    "passed",
+    "positions",
+    "false drops",
+    "not found",
+    "negatives passed",
+    "min closeness",
+]
 
 
 def metrics(spec: dict, rows: list[dict]) -> dict:
@@ -45,9 +56,17 @@ def summary_table(ms: list[dict]) -> str:
     lines = ["| " + " | ".join(COLUMNS) + " |", "|---" * len(COLUMNS) + "|"]
     for m in ms:
         pos = ", ".join(str(i) for _, i in m["kept"]) or "—"
-        cells = [m["name"], m["positives"], m["found"], len(m["kept"]), pos,
-                 len(m["false_drops"]), len(m["not_found"]), len(m["negatives_passed"]),
-                 "—" if m["min_close"] is None else f"{m['min_close']:.2f}"]
+        cells = [
+            m["name"],
+            m["positives"],
+            m["found"],
+            len(m["kept"]),
+            pos,
+            len(m["false_drops"]),
+            len(m["not_found"]),
+            len(m["negatives_passed"]),
+            "—" if m["min_close"] is None else f"{m['min_close']:.2f}",
+        ]
         lines.append("| " + " | ".join(map(str, cells)) + " |")
     return "\n".join(lines)
 
@@ -78,10 +97,18 @@ def sweep(sets: list[tuple[dict, list[dict]]]) -> str:
     return "\n".join(lines)
 
 
-def eval_set(path: Path, mode: str, task: str | None = None, queries: list[str] | None = None,
-             index: Index | None = None, from_index: int = FROM_INDEX,
-             round2: bool = True, overrides: dict | None = None,
-             snap_dir: Path | None = None, details_dir: Path | None = None) -> tuple[dict, list[dict]]:
+def eval_set(
+    path: Path,
+    mode: str,
+    task: str | None = None,
+    queries: list[str] | None = None,
+    index: Index | None = None,
+    from_index: int = FROM_INDEX,
+    round2: bool = True,
+    overrides: dict | None = None,
+    snap_dir: Path | None = None,
+    details_dir: Path | None = None,
+) -> tuple[dict, list[dict]]:
     """Run evaluation for a set. Uses a fresh temporary Index by default to isolate from user's index."""
     spec = {**tomllib.loads(path.read_text()), **(overrides or {})}
     if missing := [k for k in ("name", "task", "queries", "expected") if k not in spec]:
@@ -95,9 +122,21 @@ def eval_set(path: Path, mode: str, task: str | None = None, queries: list[str] 
     now = github.recorded_at()
     with tempfile.TemporaryDirectory() as tmp:
         idx = index or Index(Path(tmp) / "index.db")
-        rows = run(queries or spec["queries"], months=6, new_days=60, limit=50, lang=spec.get("lang") or None,
-                    now=now, exclude=exclude, must=must, task=task or spec["task"], min_closeness=0, index=idx,
-                    from_index=from_index, round2=round2)
+        rows = run(
+            queries or spec["queries"],
+            months=6,
+            new_days=60,
+            limit=50,
+            lang=spec.get("lang") or None,
+            now=now,
+            exclude=exclude,
+            must=must,
+            task=task or spec["task"],
+            min_closeness=0,
+            index=idx,
+            from_index=from_index,
+            round2=round2,
+        )
         if not index:
             idx.db.close()
     spec["calls"] = dict(github.calls)
@@ -117,12 +156,16 @@ def index_check(path: Path, mode: str, from_index: int = FROM_INDEX) -> str:
     pos = {e["repo"].lower() for e in spec["expected"] if e["verdict"].startswith(("→", "->"))}
     live = [r for r in rows if r["source"] in ("query", "\u0437\u0430\u043f\u0440\u043e\u0441")]
     from_idx = [r for r in rows if r["source"] in ("index", "\u0438\u043d\u0434\u0435\u043a\u0441")]
+
     def hit(rs):
         return sorted(r["repo"] for r in rs if r["repo"].lower() in pos and not r["stop"])
-    return (f"{spec['name']}: Index after first run {sum(not r['stop'] for r in first)} rows; second run "
-            f"(2 queries, alternative task): live search {len(live)}, from Index {len(from_idx)} "
-            f"(passed stop rules {sum(not r['stop'] for r in from_idx)}); positives in live {hit(live) or '—'}, "
-            f"positives from Index {hit(from_idx) or '—'} of {len(pos)}")
+
+    return (
+        f"{spec['name']}: Index after first run {sum(not r['stop'] for r in first)} rows; second run "
+        f"(2 queries, alternative task): live search {len(live)}, from Index {len(from_idx)} "
+        f"(passed stop rules {sum(not r['stop'] for r in from_idx)}); positives in live {hit(live) or '—'}, "
+        f"positives from Index {hit(from_idx) or '—'} of {len(pos)}"
+    )
 
 
 def _one_line(text: str) -> str:
@@ -136,13 +179,18 @@ def export_verdicts(index: Index, project: str | None) -> str:
         if proj != current:
             out.append(f"\n# project: {_one_line(proj)}")
             current = proj
-        out += ["[[expected]]", f"repo = {json.dumps(name, ensure_ascii=False)}",
-                f"verdict = {json.dumps(verdict, ensure_ascii=False)}", f"# {date}: {_one_line(task)}"]
+        out += [
+            "[[expected]]",
+            f"repo = {json.dumps(name, ensure_ascii=False)}",
+            f"verdict = {json.dumps(verdict, ensure_ascii=False)}",
+            f"# {date}: {_one_line(task)}",
+        ]
     return "\n".join(out).strip()
 
 
 def main(argv: list[str]) -> None:
     from repo_scout import log
+
     log.setup(quiet=True)
     ap = argparse.ArgumentParser(prog="repo-scout eval")
     ap.add_argument("sets", nargs="*", type=Path)
@@ -155,11 +203,18 @@ def main(argv: list[str]) -> None:
     ap.add_argument("--task", metavar="TEXT", help="override task description")
     ap.add_argument("--no-round2", action="store_true", help="disable round two")
     ap.add_argument("--calls", action="store_true", help="API call counts (search, details) per set")
-    ap.add_argument("--llm-draft", action="store_true",
-                    help="Phase 9: recall of agent queries / LLM draft / union (snapshots in eval/snapshots-llm)")
+    ap.add_argument(
+        "--llm-draft",
+        action="store_true",
+        help="Phase 9: recall of agent queries / LLM draft / union (snapshots in eval/snapshots-llm)",
+    )
     ap.add_argument("--index-check", action="store_true", help="Phase 5 criterion: rephrased query + Index")
     ap.add_argument("--export-verdicts", action="store_true", help="Index verdicts as [[expected]] (TOML)")
-    ap.add_argument("--fake-stars", action="store_true", help="Phase 7: precision/recall/FPR of 'burst★' flag on eval/fake-stars (network with --record)")
+    ap.add_argument(
+        "--fake-stars",
+        action="store_true",
+        help="Phase 7: precision/recall/FPR of 'burst★' flag on eval/fake-stars (network with --record)",
+    )
     ap.add_argument("--all-grid", action="store_true", help="with --fake-stars: full threshold grid")
     ap.add_argument("--from-index", type=int, default=FROM_INDEX, metavar="N", help="with --index-check")
     ap.add_argument("--project", help="with --export-verdicts: filter by project")
@@ -176,6 +231,7 @@ def _report(a: argparse.Namespace, ap: argparse.ArgumentParser) -> None:
         return print(export_verdicts(Index(default_path()), a.project))
     if a.fake_stars:
         from repo_scout import fake_stars
+
         try:
             return print(fake_stars.run("record" if a.record else "replay", a.all_grid))
         except (ValueError, GitHubError) as e:
@@ -185,13 +241,18 @@ def _report(a: argparse.Namespace, ap: argparse.ArgumentParser) -> None:
     atexit.register(github.log_usage)
     if a.llm_draft:
         from repo_scout import eval_llm
+
         try:
             return print(eval_llm.report(a.sets, "record" if a.record else "replay"))
         except (ValueError, GitHubError, eval_llm.LLMError) as e:
             sys.exit(f"eval: {e}")
     try:
         if a.index_check:
-            return print("\n".join(filter(None, (index_check(p, "record" if a.record else "replay", a.from_index) for p in a.sets))))
+            return print(
+                "\n".join(
+                    filter(None, (index_check(p, "record" if a.record else "replay", a.from_index) for p in a.sets))
+                )
+            )
         sets = [eval_set(p, "record" if a.record else "replay", a.task, round2=not a.no_round2) for p in a.sets]
     except (ValueError, GitHubError) as e:
         sys.exit(f"eval: {e}")
@@ -200,11 +261,16 @@ def _report(a: argparse.Namespace, ap: argparse.ArgumentParser) -> None:
         capped = [dict(r) for r in rows]
         apply_closeness(capped, MIN_CLOSENESS)
         ms.append(metrics(spec, capped))
-        tops.append([r["repo"] for r in capped if not r["stop"]][:a.top or 0])
+        tops.append([r["repo"] for r in capped if not r["stop"]][: a.top or 0])
     print(summary_table(ms))
     if a.calls:
-        print("\n" + "\n".join(f"{s['name']}: search {s['calls'].get('search', 0)}, details {s['calls'].get('details', 0)}"
-                              for s, _ in sets))
+        print(
+            "\n"
+            + "\n".join(
+                f"{s['name']}: search {s['calls'].get('search', 0)}, details {s['calls'].get('details', 0)}"
+                for s, _ in sets
+            )
+        )
     if a.sweep:
         print("\n" + sweep(sets))
     for m, top in zip(ms, tops):

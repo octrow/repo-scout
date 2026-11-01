@@ -4,6 +4,7 @@ Standard library only. One request per run with one yes/no question per candidat
 Fit is a column: it never drops or reorders rows; without a key `available()` = False and nothing is sent.
 The key is never printed: errors mention the variable name only.
 """
+
 import http.client
 import json
 import urllib.error
@@ -18,8 +19,10 @@ KEYS_URL = "https://console.typesafe.ai/keys"
 FIT_K = 20  # top kept rows judged per run: one request, ~5k input tokens
 MAX_TEXT = 1000  # chars of name/description/topics/README per candidate
 TIMEOUT_S = 60
-QUESTION = ("Could `repo` serve as the base for the `task` in the state, so the user builds on it "
-            "instead of writing their own? Judge from its description and README.")
+QUESTION = (
+    "Could `repo` serve as the base for the `task` in the state, so the user builds on it "
+    "instead of writing their own? Judge from its description and README."
+)
 
 
 class SystemOneError(Exception):
@@ -35,9 +38,11 @@ def model() -> str:
 
 
 def _post(body: dict) -> dict:
-    req = urllib.request.Request(llm.setting(URL_VAR, DEFAULT_URL), data=json.dumps(body).encode(),
-                                 headers={"Authorization": f"Bearer {llm.setting(KEY_VAR)}",
-                                          "Content-Type": "application/json"})
+    req = urllib.request.Request(
+        llm.setting(URL_VAR, DEFAULT_URL),
+        data=json.dumps(body).encode(),
+        headers={"Authorization": f"Bearer {llm.setting(KEY_VAR)}", "Content-Type": "application/json"},
+    )
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT_S) as resp:
             data = json.load(resp)
@@ -53,8 +58,10 @@ def _post(body: dict) -> dict:
 def fit(task: str, texts: dict[str, str]) -> dict[str, float]:
     """repo -> probability that it is a usable base for the task; malformed answers are skipped."""
     ids = {f"r{i}": repo for i, repo in enumerate(texts)}
-    questions = {qid: {"type": "noul", "instructions": {"repo": texts[repo][:MAX_TEXT], "question": QUESTION}}
-                 for qid, repo in ids.items()}
+    questions = {
+        qid: {"type": "noul", "instructions": {"repo": texts[repo][:MAX_TEXT], "question": QUESTION}}
+        for qid, repo in ids.items()
+    }
     answers = _post({"model": model(), "state": {"task": task}, "questions": questions})["answers"]
     out = {}
     for qid, repo in ids.items():

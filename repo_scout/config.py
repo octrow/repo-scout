@@ -2,6 +2,7 @@
 
 Basic mode needs none of this: search, triage and ranking work without any key or external model.
 """
+
 import argparse
 import getpass
 import os
@@ -13,17 +14,23 @@ from repo_scout import llm, systemone
 OMNIROUTE_URL = "https://github.com/diegosouzapw/OmniRoute"
 # (title, hint, fields); field = (variable, prompt, default, secret); the first field is the section's key
 SECTIONS = (
-    ("LLM draft: a model writes search queries from your request in any language.",
-     "Any OpenAI-compatible endpoint works.\n"
-     f"Free: OmniRoute ({OMNIROUTE_URL}) runs on your computer. The defaults below point at it.\n"
-     "Ollama: base URL http://localhost:11434/v1, any key (for example ollama), a model such as qwen3.",
-     ((llm.KEY_VAR, "API key", "", True),
-      (llm.URL_VAR, "Base URL", llm.DEFAULT_URL, False),
-      (llm.MODEL_VAR, "Model", llm.DEFAULT_MODEL, False),
-      (llm.GUI_VAR, "Show the Draft button in the GUI? 1 = yes, 0 = no", "0", False))),
-    ("Fit: Jev by TypeSafe rates how well each top result fits your task.",
-     f"Get a key: {systemone.KEYS_URL}",
-     ((systemone.KEY_VAR, "TypeSafe API key", "", True),)),
+    (
+        "LLM draft: a model writes search queries from your request in any language.",
+        "Any OpenAI-compatible endpoint works.\n"
+        f"Free: OmniRoute ({OMNIROUTE_URL}) runs on your computer. The defaults below point at it.\n"
+        "Ollama: base URL http://localhost:11434/v1, any key (for example ollama), a model such as qwen3.",
+        (
+            (llm.KEY_VAR, "API key", "", True),
+            (llm.URL_VAR, "Base URL", llm.DEFAULT_URL, False),
+            (llm.MODEL_VAR, "Model", llm.DEFAULT_MODEL, False),
+            (llm.GUI_VAR, "Show the Draft button in the GUI? 1 = yes, 0 = no", "0", False),
+        ),
+    ),
+    (
+        "Fit: Jev by TypeSafe rates how well each top result fits your task.",
+        f"Get a key: {systemone.KEYS_URL}",
+        ((systemone.KEY_VAR, "TypeSafe API key", "", True),),
+    ),
 )
 CLEAR = "-"
 INTRO = """Advanced mode adds external models. Basic search works without them.
@@ -60,8 +67,12 @@ def _shown(value: str, secret: bool) -> str:
     return f"…{value[-4:]}" if secret and value else value
 
 
-def ask_values(current: dict[str, str], ask: Callable[[str], str], ask_secret: Callable[[str], str],
-               say: Callable[[str], None] = lambda _: None) -> dict[str, str]:
+def ask_values(
+    current: dict[str, str],
+    ask: Callable[[str], str],
+    ask_secret: Callable[[str], str],
+    say: Callable[[str], None] = lambda _: None,
+) -> dict[str, str]:
     """Prompt each section; an empty key skips the rest of its section."""
     out = {}
     for title, hint, fields in SECTIONS:

@@ -4,6 +4,7 @@ The language is a setting like the others (`REPO_SCOUT_LANG`: environment, then 
 switch saves it to the user settings file. Keys are the English strings themselves; a missing key shows English.
 Domain values (verdicts, stop reasons, flags), repo names and commands are never translated.
 """
+
 import os
 
 from .. import config, llm
@@ -31,10 +32,8 @@ RU = {
     "Repos to check for star bursts": "Репо для проверки всплеска звёзд",
     "Skip round 2": "Без второго круга",
     "Skip star burst check": "Без проверки всплеска звёзд",
-    "Could not load the draft: the file is damaged or unreadable":
-        "Не удалось загрузить черновик: файл повреждён или не читается",
-    "Draft failed: the model did not answer or sent an invalid answer. See the log.":
-        "Черновик не получился: модель не ответила или ответила с ошибкой. Подробности в логе.",
+    "Could not load the draft: the file is damaged or unreadable": "Не удалось загрузить черновик: файл повреждён или не читается",
+    "Draft failed: the model did not answer or sent an invalid answer. See the log.": "Черновик не получился: модель не ответила или ответила с ошибкой. Подробности в логе.",
     "Describe what to find": "Опишите, что найти",
     "Draft ready. Check it, then launch the search.": "Черновик готов. Проверьте его и запустите поиск.",
     "What to search for (any language)": "Что найти (на любом языке)",
@@ -145,8 +144,7 @@ RU = {
     "Rename": "Переименовать",
     "Forget": "Забыть",
     "Rename repo": "Переименовать репо",
-    "Old record will be removed from Index; verdicts will move to the new name.":
-        "Старая запись уйдёт из Индекса, вердикты перейдут на новое имя.",
+    "Old record will be removed from Index; verdicts will move to the new name.": "Старая запись уйдёт из Индекса, вердикты перейдут на новое имя.",
     "New name": "Новое имя",
     "Renamed: {name}": "Переименовано: {name}",
     "Forget repo?": "Забыть репо?",
