@@ -44,33 +44,40 @@ def check_repo(value: str) -> str | None:
 
 def index_rows(idx: Index, *, project: str = "", kind: str = "", text: str = "") -> list[dict]:
     """Table rows: Index repos matching project, Verdict kind, and text filters."""
-    verdicts = idx.verdicts(project or None)
-    prefix = rl.VERDICT_PREFIX.get(kind, "")
-    allowed = {v[1] for v in verdicts if v[2].startswith(prefix)} if (project or prefix) else None
+    allowed = _allowed_keys(idx, project, kind)
     all_rows = idx.rows()
     seen = idx.seen([r["name"] for r in all_rows])
     needle = text.strip().lower()
-    out = []
-    for r in all_rows:
-        m = r["meta"]
-        if allowed is not None and r["key"] not in allowed:
-            continue
-        if needle and needle not in f"{r['name']} {m.get('desc', '')} {m.get('lang', '')}".lower():
-            continue
-        out.append(
-            {
-                "key": r["key"],
-                "name": r["name"],
-                "desc": rl.plain_desc(m.get("desc")),
-                "stars": m.get("stars"),
-                "lang": m.get("lang") or "—",
-                "date": (r["fetched_at"] or "")[:10],
-                "readme": bool(r["has_readme"]),
-                "seen": seen.get(r["key"], "—"),
-                "url": m.get("url") or f"https://github.com/{r['name']}",
-            }
-        )
-    return out
+    return [_table_row(r, seen) for r in all_rows if _index_row_matches(r, allowed, needle)]
+
+
+def _allowed_keys(idx: Index, project: str, kind: str) -> set[str] | None:
+    """Keys with a Verdict in the project and of the kind; None when neither filter is set."""
+    verdicts = idx.verdicts(project or None)
+    prefix = rl.VERDICT_PREFIX.get(kind, "")
+    return {v[1] for v in verdicts if v[2].startswith(prefix)} if (project or prefix) else None
+
+
+def _index_row_matches(r: dict, allowed: set[str] | None, needle: str) -> bool:
+    if allowed is not None and r["key"] not in allowed:
+        return False
+    m = r["meta"]
+    return not needle or needle in f"{r['name']} {m.get('desc', '')} {m.get('lang', '')}".lower()
+
+
+def _table_row(r: dict, seen: dict[str, str]) -> dict:
+    m = r["meta"]
+    return {
+        "key": r["key"],
+        "name": r["name"],
+        "desc": rl.plain_desc(m.get("desc")),
+        "stars": m.get("stars"),
+        "lang": m.get("lang") or "—",
+        "date": (r["fetched_at"] or "")[:10],
+        "readme": bool(r["has_readme"]),
+        "seen": seen.get(r["key"], "—"),
+        "url": m.get("url") or f"https://github.com/{r['name']}",
+    }
 
 
 class IndexPage:
