@@ -334,17 +334,19 @@ def _alias_full(i: int, name: str) -> str:
     )
 
 
-def _split_full(repo: dict) -> dict:
+def _recent_details(repo: dict) -> dict:
+    """{"readme", "commits"} from the README aliases and the "recent" branch alias of _alias_full."""
     texts = (repo.get(f"m{k}") for k in range(len(README_NAMES)))
     target = (repo.get("recent") or {}).get("target") or {}
-    node = {k: v for k, v in repo.items() if k != "recent" and not re.fullmatch(r"m\d+", k)}
     return {
-        "node": node,
-        "details": {
-            "readme": next((t["text"] for t in texts if t), None),
-            "commits": (target.get("history") or {}).get("nodes") or [],
-        },
+        "readme": next((t["text"] for t in texts if t), None),
+        "commits": (target.get("history") or {}).get("nodes") or [],
     }
+
+
+def _split_full(repo: dict) -> dict:
+    node = {k: v for k, v in repo.items() if k != "recent" and not re.fullmatch(r"m\d+", k)}
+    return {"node": node, "details": _recent_details(repo)}
 
 
 def refresh(names: list[str]) -> dict[str, dict]:
