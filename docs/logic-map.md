@@ -62,7 +62,7 @@ Module: repo_scout/cli.py::build_query, repo_scout/cli.py::validate_query, repo_
 
 Each query gets `in:name,description,topics,readme` (unless it is all qualifiers or has its own `in:`),
 `mirror:false` and `language:<--lang>` (unless the query has its own), and `pushed:>=<now − months>`
-(unless `--months 0` or the query has its own `pushed:`). `--lang` is appended unquoted.
+(unless `--months 0` or the query has its own `pushed:`). A `--lang` with a space is quoted.
 All queries are validated before the first request: over 256 text chars or more than 5 AND/OR/NOT →
 exit 2, nothing sent.
 Results are merged into the Pool by `owner/name`.

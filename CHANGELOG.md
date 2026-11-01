@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 
 ## [Unreleased]
 
+### Fixed
+- `--lang "Jupyter Notebook"` and other multi-word languages are quoted in the query.
+- Negative `--months`, `--new-days`, `--limit`, `--from-index`, `--round2-k` and `--stars-k` are rejected; before, `--stars-k -1` checked every row but the last. The GUI number fields stop at 0.
+
 ## [0.1.11] - 2026-11-01
 
 ### Fixed

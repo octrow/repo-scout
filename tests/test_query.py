@@ -70,3 +70,17 @@ def test_all_queries_are_checked_before_the_first_request(monkeypatch):
             ["ok query", "w" * 300], months=6, new_days=60, limit=5, lang=None, now=datetime(2026, 10, 11, tzinfo=UTC)
         )
     assert sent == []
+
+
+def test_multi_word_lang_is_quoted():
+    q = build_query("x", months=0, since="s", lang="Jupyter Notebook")
+    assert q.endswith('language:"Jupyter Notebook"')
+
+
+@pytest.mark.parametrize("opt", ["--months", "--new-days", "--limit", "--from-index", "--round2-k", "--stars-k"])
+def test_negative_counts_are_rejected(opt):
+    """A negative K used to slice from the end (`rows[:-1]`): --stars-k -1 checked every row but the last."""
+    from repo_scout import cli
+
+    with pytest.raises(SystemExit):
+        cli._parser().parse_args(["--task", "t", "q", opt, "-1"])

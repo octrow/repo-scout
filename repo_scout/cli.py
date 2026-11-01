@@ -52,6 +52,14 @@ def _has(tokens: list[str], name: str) -> bool:
     return any(t.startswith(f"{name}:") for t in tokens)
 
 
+def non_negative(text: str) -> int:
+    """argparse type for counts: a negative K would slice rows from the end."""
+    n = int(text)
+    if n < 0:
+        raise argparse.ArgumentTypeError(f"must be 0 or more, got {n}")
+    return n
+
+
 def build_query(q: str, *, months: int, since: str, lang: str | None) -> str:
     tokens = TOKEN.findall(q)
     parts = [q]
@@ -60,7 +68,7 @@ def build_query(q: str, *, months: int, since: str, lang: str | None) -> str:
     if not _has(tokens, "mirror"):
         parts.append("mirror:false")
     if lang and not _has(tokens, "language"):
-        parts.append(f"language:{lang}")
+        parts.append(f'language:"{lang}"' if " " in lang else f"language:{lang}")
     if months and not _has(tokens, "pushed"):
         parts.append(f"pushed:>={since}")
     return " ".join(parts)
@@ -535,12 +543,12 @@ def _parser() -> _Parser:
     )
     ap.add_argument(
         "--months",
-        type=int,
+        type=non_negative,
         default=6,
         help="only repos pushed to within N months (0 = any); above 6 the dead rule allows the same age, 0 turns it off",
     )
-    ap.add_argument("--new-days", type=int, default=60, help="flag repos younger than N days as 'new'")
-    ap.add_argument("--limit", type=int, default=50, help="results per query (max 100)")
+    ap.add_argument("--new-days", type=non_negative, default=60, help="flag repos younger than N days as 'new'")
+    ap.add_argument("--limit", type=non_negative, default=50, help="results per query (max 100)")
     ap.add_argument("--lang", help="add language:<X> to each query")
     ap.add_argument(
         "--exclude",
@@ -558,21 +566,21 @@ def _parser() -> _Parser:
     )
     ap.add_argument(
         "--from-index",
-        type=int,
+        type=non_negative,
         default=FROM_INDEX,
         metavar="N",
         help="add the N closest repos from the Index (0 = off, default %(default)s)",
     )
     ap.add_argument(
         "--round2-k",
-        type=int,
+        type=non_negative,
         default=ROUND2_K,
         metavar="K",
         help="round two takes topics from the top K rows (default %(default)s)",
     )
     ap.add_argument(
         "--stars-k",
-        type=int,
+        type=non_negative,
         default=STARS_K,
         metavar="K",
         help="check the top K rows with 50+ stars for a star burst (default %(default)s)",

@@ -157,7 +157,7 @@ def _advanced(form: SearchForm) -> None:
             for key, label in NUMBER_LABELS.items():
                 form.add(
                     key,
-                    ui.number(t(label), value=defaults[key])
+                    ui.number(t(label), value=defaults[key], min=0)
                     .props("outlined dense stack-label")
                     .classes("ic-span-4 w-full"),
                 )
