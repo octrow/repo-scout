@@ -31,24 +31,44 @@ COLUMNS = [
 ]
 
 
-def metrics(spec: dict, rows: list[dict]) -> dict:
-    """Compute set metrics from triage rows. Repo names are compared case-insensitively."""
+POSITIVE = ("→", "->")
+NEGATIVE = ("\u043e\u0442\u0441\u0435\u0432", "drop", "rejected")
+
+
+def _repos_with(spec: dict, prefixes: tuple[str, ...]) -> list[str]:
+    """Expected repos whose verdict starts with one of the prefixes."""
+    return [e["repo"] for e in spec["expected"] if e["verdict"].startswith(prefixes)]
+
+
+def _by_repo(rows: list[dict]) -> tuple[list[str], dict, dict]:
+    """Lower-cased repo names: kept in rank order, stop reason of stopped rows, closeness of every row."""
     kept = [r["repo"].lower() for r in rows if not r["stop"]]
     stops = {r["repo"].lower(): r["stop"] for r in rows if r["stop"]}
     close = {r["repo"].lower(): r.get("closeness") for r in rows}
-    exp = spec["expected"]
-    pos = [e["repo"] for e in exp if e["verdict"].startswith(("→", "->"))]
-    neg = [e["repo"] for e in exp if e["verdict"].startswith(("\u043e\u0442\u0441\u0435\u0432", "drop", "rejected"))]
+    return kept, stops, close
+
+
+def _min_closeness(kept_pos: list[tuple[str, int]], close: dict) -> float | None:
+    values = [close[p.lower()] for p, _ in kept_pos]
+    return min((c for c in values if c is not None), default=None)
+
+
+def metrics(spec: dict, rows: list[dict]) -> dict:
+    """Compute set metrics from triage rows. Repo names are compared case-insensitively."""
+    kept, stops, close = _by_repo(rows)
+    seen = set(kept) | stops.keys()
+    pos = _repos_with(spec, POSITIVE)
     kept_pos = [(p, kept.index(p.lower()) + 1) for p in pos if p.lower() in kept]
+    not_found = [p for p in pos if p.lower() not in seen]
     return {
         "name": spec["name"],
         "positives": len(pos),
-        "found": sum(p.lower() in kept or p.lower() in stops for p in pos),
+        "found": len(pos) - len(not_found),
         "kept": kept_pos,
         "false_drops": [(p, stops[p.lower()]) for p in pos if p.lower() in stops],
-        "not_found": [p for p in pos if p.lower() not in kept and p.lower() not in stops],
-        "negatives_passed": [n for n in neg if n.lower() in kept],
-        "min_close": min((close[p.lower()] for p, _ in kept_pos if close[p.lower()] is not None), default=None),
+        "not_found": not_found,
+        "negatives_passed": [n for n in _repos_with(spec, NEGATIVE) if n.lower() in kept],
+        "min_close": _min_closeness(kept_pos, close),
     }
 
 
