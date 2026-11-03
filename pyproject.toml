@@ -19,7 +19,7 @@ repo-scout = "repo_scout.cli:main"
 dev = [
     "pytest",
     "pytest-asyncio",
-    "ruff>=0.17.1",
+    "ruff>=0.17.3",
     "ty==0.0.95",
 ]
 
