@@ -45,7 +45,7 @@ def _rest(path: str) -> list | None:
         out = github.run_gh(cmd)
         err = out.stderr
         if not out.returncode:
-            return json.loads(out.stdout)
+            return _page(path, out.stdout)
         if "HTTP 404" in err or "HTTP 422" in err:
             return None
         if not _retryable(err):
@@ -53,6 +53,17 @@ def _rest(path: str) -> list | None:
         if attempt < github.MAX_RETRIES:
             _back_off(attempt, err)
     raise GitHubError(f"star history {path}: GitHub did not respond")
+
+
+def _page(path: str, text: str) -> list:
+    """Decoded history page; a reply that is not a list of objects is a GitHubError, not a crash."""
+    try:
+        page = json.loads(text)
+    except ValueError as e:
+        raise GitHubError(f"star history {path}: reply is not JSON") from e
+    if not isinstance(page, list) or not all(isinstance(w, dict) for w in page):
+        raise GitHubError(f"star history {path}: unexpected reply")
+    return page
 
 
 def _retryable(err: str) -> bool:

@@ -160,6 +160,7 @@ def _screen_details(
         d = info.get(row["repo"])
         if d is None:
             row["flags"].append("no details")
+            _stop(row, must_stop(meta_text(row), must))
             continue
         _recheck_fresh(row, nodes[row["repo"]], d["commits"], now, new_days, dead_days)
         readmes[row["repo"]] = d["readme"]
@@ -623,12 +624,16 @@ def _save_run(a: argparse.Namespace, rows: list[dict], now: datetime) -> None:
 
 def _main(a: argparse.Namespace) -> None:
     try:
+        if a.task:
+            semantic.preload()
         rows, now = _search(a)
     except ValueError as e:
         print(e, file=sys.stderr)
         sys.exit(2)
     except GitHubError as e:
         sys.exit(f"GitHub: {e}")
+    except semantic.ModelError as e:
+        sys.exit(str(e))
     github.log_usage()
     _report(a, rows)
     _save_run(a, rows, now)

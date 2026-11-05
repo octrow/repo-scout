@@ -258,3 +258,30 @@ def test_main_record_replay_turn_off_index_and_fit(monkeypatch, mode):
     assert kw["index"] is None and kw["fit_k"] == 0
     assert kw["now"] == "REC"  # record and replay share the snapshot date, so a replay repeats the recording
     assert runs.list_runs() == []
+
+
+def test_missing_model_exits_before_any_search(monkeypatch, capsys):
+    from repo_scout import semantic
+
+    def no_model():
+        raise semantic.ModelError("embedding model not available (x). Run: repo-scout doctor --fix")
+
+    searched = []
+    monkeypatch.setattr(semantic, "preload", no_model)
+    monkeypatch.setattr(cli, "run", lambda *a, **k: searched.append(1))
+    monkeypatch.setattr(sys, "argv", _argv("--no-save"))
+    with pytest.raises(SystemExit) as e:
+        cli.main()
+    assert "doctor --fix" in str(e.value.code) and not searched
+
+
+def test_preload_wraps_a_cache_miss(monkeypatch):
+    from repo_scout import semantic
+
+    def boom():
+        raise ValueError("Could not load model")
+
+    monkeypatch.undo()  # drop the autouse no-op preload
+    monkeypatch.setattr(semantic, "_get", boom)
+    with pytest.raises(semantic.ModelError, match="doctor --fix"):
+        semantic.preload()

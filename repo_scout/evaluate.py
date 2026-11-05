@@ -10,7 +10,7 @@ import tomllib
 from pathlib import Path
 
 from repo_scout import github
-from repo_scout.cli import FROM_INDEX, apply_closeness, run
+from repo_scout.cli import FROM_INDEX, apply_closeness, non_negative, run
 from repo_scout.conditions import compile_all
 from repo_scout.github import GitHubError
 from repo_scout.index import Index, default_path
@@ -255,7 +255,7 @@ def main(argv: list[str]) -> None:
     mode.add_argument("--replay", action="store_true", help="replay snapshots (default)")
     ap.add_argument("--detail", action="store_true", help="list repos for each set")
     ap.add_argument("--sweep", action="store_true", help="closeness threshold table 0.50..0.90")
-    ap.add_argument("--top", type=int, metavar="N", help="output top-N results of each set")
+    ap.add_argument("--top", type=non_negative, metavar="N", help="output top-N results of each set")
     ap.add_argument("--task", metavar="TEXT", help="override task description")
     ap.add_argument("--no-round2", action="store_true", help="disable round two")
     ap.add_argument("--calls", action="store_true", help="API call counts (search, details) per set")
@@ -272,7 +272,7 @@ def main(argv: list[str]) -> None:
         help="Phase 7: precision/recall/FPR of 'burst★' flag on eval/fake-stars (network with --record)",
     )
     ap.add_argument("--all-grid", action="store_true", help="with --fake-stars: full threshold grid")
-    ap.add_argument("--from-index", type=int, default=FROM_INDEX, metavar="N", help="with --index-check")
+    ap.add_argument("--from-index", type=non_negative, default=FROM_INDEX, metavar="N", help="with --index-check")
     ap.add_argument("--project", help="with --export-verdicts: filter by project")
     ap.add_argument("--out", type=Path, metavar="PATH", help="output report to file instead of stdout")
     a = ap.parse_args(argv)

@@ -161,6 +161,19 @@ def test_add_stars_flag_survives_github_error(monkeypatch):
     assert rows[0]["flags"] == []
 
 
+@pytest.mark.parametrize("reply", ["not json", "{}", '{"week": 1}', "null"])
+def test_malformed_history_reply_is_a_github_error(monkeypatch, reply):
+    """A bad reply skips the optional flag instead of aborting the run."""
+    from repo_scout.cli import add_stars_flag
+
+    fake_gh(monkeypatch, {1: reply})
+    rows = [{"repo": "a/a", "stars": 500, "stop": None, "flags": []}]
+    with pytest.raises(GitHubError):
+        stars.history("a/a", NOW)
+    add_stars_flag(rows, 5, NOW)
+    assert rows[0]["flags"] == []
+
+
 def _burst_days(counts, min_count=MIN_BURST, complete=True):
     return [i for i, f in enumerate(bursts(counts, min_count, complete)) if f]
 
@@ -197,8 +210,8 @@ def fake_gh_seq(monkeypatch, replies: list[tuple[int, str]]):
 )
 def test_rest_retries_transient_and_rate_limit(monkeypatch, err):
     before = github.calls["stars"]
-    calls, sleeps = fake_gh_seq(monkeypatch, [(1, err), (1, err), (0, "[1]")])
-    assert stars._rest("p") == [1]
+    calls, sleeps = fake_gh_seq(monkeypatch, [(1, err), (1, err), (0, "[{}]")])
+    assert stars._rest("p") == [{}]
     assert len(calls) == 3 and sleeps == [5, 10] and github.calls["stars"] - before == 3
 
 

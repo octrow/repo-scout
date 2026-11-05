@@ -39,9 +39,13 @@ Markdown table / JSON + run JSON
 | `repo-scout eval eval/<set>.toml` | `evaluate.main` | `--replay` by default; fixed `months=6`, `new_days=60`, `limit=50`, stars and fit off |
 | `repo-scout config`, `repo-scout doctor` | `config.main`, `doctor.main` | `config` writes `~/.config/repo-scout/.env` (0600); `doctor --fix` downloads the model |
 
-Keys and settings: real environment first, then the checkout's `.env`, then `~/.config/repo-scout/.env`.
+Keys and settings: real environment first, then the checkout's `.env`, then `~/.config/repo-scout/.env`
+(`REPO_SCOUT_ENV` moves that file).
 GUI port: 8790; held by another program → asks (no TTY: moves on), held by our GUI → asks to restart
 (no TTY: prints the link and exits); scans up to 50 ports.
+Count flags (`--months`, `--new-days`, `--limit`, `--from-index`, `--round2-k`, `--stars-k`) reject a negative
+value at parse time (argparse error, exit 2); `--min-closeness` is not range-checked; `eval --top` and
+`eval --from-index` use the same check.
 `--record DIR` / `--replay DIR` switch off the Index, run saving and fit; the star burst still runs (step 9).
 `--out` is ignored under them.
 
@@ -52,7 +56,9 @@ GUI port: 8790; held by another program → asks (no TTY: moves on), held by our
 Module: repo_scout/cli.py::_main, repo_scout/conditions.py::compile_all
 
 `--exclude` / `--must` are compiled as regexes. A bad regex → `ValueError` → message on stderr, exit 2.
-Any later `ValueError` inside the run also exits 2, with no table and no save.
+Any later `ValueError` inside the run also exits 2, with no table and no save; Index writes made so far
+stay. The embedding model is loaded before step 2 (`semantic.preload`); not cached and offline → exit 1 with a
+`repo-scout doctor --fix` hint, no quota spent.
 In record and replay, `now` is the snapshot date (`github.recorded_at`, kept from the first recording
 into that dir), so a replay computes the same freshness as its recording.
 
@@ -111,7 +117,8 @@ Freshness and `dead` are recomputed from the last substantive commit (bots, cosm
 ignored; commits dated after `now` ignored). None of the 20 substantive → `cosmetic only` flag and
 freshness from the oldest of the 20, which can make the row `dead`.
 `--exclude` runs on the README too. `--must` runs on README + name + description + topics; without a
-README the row gets `no README` and `--must` checks the metadata only. `no details` rows skip both.
+README the row gets `no README` and `--must` checks the metadata only. `no details` rows skip the README checks, but `--must`
+runs on their metadata (name, description, topics) like a `no README` row.
 
 ### 7. Closeness
 
@@ -136,7 +143,8 @@ Module: repo_scout/cli.py::sort_key, repo_scout/index.py::Index.seen, repo_scout
 
 Sort: Closeness, then score, then fewer days since push. `seen` = past verdicts from the Index.
 Star burst: top `--stars-k` kept rows with 50+★ (REST star history, up to 20 pages per repo; needs a
-complete history and 30+★); a GitHub error skips the flag with a warning.
+complete history and 30+★); a `GitHubError` skips the flag with a warning. A reply that is not JSON or not a list of
+objects is a `GitHubError`, so the flag is skipped too.
 Fit: top 20 kept rows, one TypeSafe request, text capped at 1000 chars per row; without a key nothing is
 sent; any error is a warning. Neither flag nor fit drops or reorders rows.
 
@@ -178,7 +186,7 @@ raise at once. Without a key: off. In the GUI the button shows only with the key
 Module: repo_scout/gui/app.py::main, repo_scout/gui/search_page.py::search, repo_scout/gui/runs_logic.py::sorted_rows
 
 The Search page builds the same argv (`cli.to_argv`) and runs `python -m repo_scout … --out PATH` (or the
-frozen binary) as a subprocess with a live log. The form has no `--json`, `--all`; they are
+frozen binary) as a subprocess with a live log. The form has no `--json`, `--all`, `--out`, `--no-save`, `--record`, `--replay`, `-q`; they are
 dropped from a pasted command. It opens the Index on load for project autocomplete and lists `~/dev`.
 Runs pages read the saved run JSON. The Index page talks to `Index` directly (rename, forget).
 The Eval page runs `repo-scout eval … --out <runs>/../eval-reports/*.md`; its Record toggle uses the network.
@@ -192,7 +200,8 @@ Each `eval/*.toml` set runs the main flow on recorded snapshots with a fresh tem
 `min_closeness=0`; the threshold is applied afterwards so `--sweep` can vary it. Positives are verdicts
 starting with `→` or `->` (e.g. `→ Разбор`); recall counts positives present in the rows, kept or dropped.
 Other modes: `--record`, `--fake-stars`, `--llm-draft`, `--index-check` (two runs on one temp Index),
-`--export-verdicts` (opens the real Index).
+`--export-verdicts` (opens the real Index). Plain sets keep details in `<snapshots>/<set>/details`;
+`--llm-draft` shares one `snapshots-llm/_shared/details` across sets while `now` is each set's date (#16).
 
 ## Where the flow splits by mode
 
@@ -213,14 +222,16 @@ Other modes: `--record`, `--fake-stars`, `--llm-draft`, `--index-check` (two run
 | Query over GitHub limits | exit 2, no request sent |
 | `gh` not installed | `GitHub: gh (GitHub CLI) not found…`, exit 1 |
 | `gh` not logged in, plain 403 | `GitHub: …`, exit 1 |
-| 429 / 502 / rate limit / empty reply on search | retries after 5, 10, 20 s, then exit 1 |
+| 429 / 502–504 / rate limit / empty reply on search | retries after 5, 10, 20 s, then exit 1 |
+| GraphQL `errors` with no `data` on search | `GitHub: GraphQL: …`, exit 1 at once |
 | Rate limit on details / refresh batches | same retries, then exit 1 |
 | 502 / empty reply on details / refresh batches | split down to single repos, skipped with a warning; no exit |
 | One repo keeps failing | step 6: kept with `no details`; step 3: left out of the run, kept in the Index |
-| Star history, fit, run save errors | warning; the table is still printed |
+| Star history `GitHubError`, fit, run save errors | warning; the table is still printed |
+| Star history reply not JSON / not a list | warning; the table is still printed |
+| Embedding model not cached and not downloadable | before the search: exit 1 with a `doctor --fix` hint |
 
 ## Known gaps
 
 Open HIGH and MEDIUM findings; details in `PLAN.md` → "Logic map findings".
-- Hand-edited run JSON with wrong-typed fields (`score: null`, `flags: null`) breaks the GUI run page.
-- Shared eval details are not tied to each set's snapshot date (`PLAN.md`, Phase 9.1).
+None. Open LOW findings: #16 (eval `--llm-draft` shares details across sets).

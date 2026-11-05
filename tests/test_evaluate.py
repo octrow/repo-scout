@@ -1,3 +1,5 @@
+import pytest
+
 from repo_scout.evaluate import metrics, summary_table
 
 SPEC = {
@@ -53,3 +55,12 @@ def test_set_without_required_keys_is_a_clean_error(tmp_path):
     bad.write_text('name = "s"\n')
     with pytest.raises(ValueError, match="missing task, queries, expected"):
         eval_set(bad, "replay")
+
+
+@pytest.mark.parametrize("flag", ["--top", "--from-index"])
+def test_eval_counts_reject_negative(flag, capsys):
+    from repo_scout import evaluate
+
+    with pytest.raises(SystemExit) as e:
+        evaluate.main([flag, "-1"])
+    assert e.value.code == 2 and "must be 0 or more" in capsys.readouterr().err

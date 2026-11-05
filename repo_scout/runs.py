@@ -75,8 +75,19 @@ def _list_of(value, kind: type) -> bool:
 
 
 def _valid_structure(data: dict) -> bool:
-    """params is a dict, rows a list of dicts, round2_topics a list of strings."""
-    return isinstance(data["params"], dict) and _list_of(data["rows"], dict) and _list_of(data["round2_topics"], str)
+    """params is a dict, rows a list of dicts with sane flags and score, round2_topics a list of strings."""
+    return (
+        isinstance(data["params"], dict)
+        and _list_of(data["rows"], dict)
+        and all(_valid_row(r) for r in data["rows"])
+        and _list_of(data["round2_topics"], str)
+    )
+
+
+def _valid_row(row: dict) -> bool:
+    """flags a list and score a number when present: the GUI sorts and filters on them."""
+    score = row.get("score", 0)
+    return isinstance(row.get("flags", []), list) and isinstance(score, int | float) and not isinstance(score, bool)
 
 
 def list_runs() -> list[Summary]:

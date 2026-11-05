@@ -110,3 +110,10 @@ def test_load_returns_valid_data_unchanged(tmp_path):
     p = tmp_path / "x.json"
     p.write_text(json.dumps(GOOD))
     assert runs.load(p) == GOOD
+
+
+@pytest.mark.parametrize("bad", [{"flags": None}, {"score": None}, {"flags": "x"}, {"score": "1"}])
+def test_load_rejects_wrong_row_field_types(bad):
+    path = runs.save(PARAMS, [{"repo": "a/b", "stop": None, "flags": [], "score": 1, **bad}], [], NOW)
+    with pytest.raises(ValueError, match="invalid Run structure"):
+        runs.load(path)

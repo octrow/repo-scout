@@ -106,8 +106,14 @@ def test_conditions_ignore_the_owner_login(monkeypatch):
 
 
 def test_pipeline_missing_details_flag(monkeypatch):
-    rows = run_pipeline(monkeypatch, {"a/gone": None}, must=compile_all("--must", ["x"]))
+    rows = run_pipeline(monkeypatch, {"a/gone": None}, must=compile_all("--must", ["gone"]))
     assert rows["a/gone"]["stop"] is None and "no details" in rows["a/gone"]["flags"]
+
+
+def test_pipeline_missing_details_checks_must_on_metadata(monkeypatch):
+    """A repo whose details failed still has to pass --must on name, description and topics."""
+    rows = run_pipeline(monkeypatch, {"a/gone": None}, must=compile_all("--must", ["postgres"]))
+    assert rows["a/gone"]["stop"] == "missing required: postgres" and "no details" in rows["a/gone"]["flags"]
 
 
 def test_json_output_has_dropped_by_must(monkeypatch, capsys):

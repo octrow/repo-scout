@@ -1,6 +1,6 @@
 import pytest
 
-from repo_scout import llm
+from repo_scout import llm, semantic
 
 pytest_plugins = ["nicegui.testing.user_plugin"]
 
@@ -40,3 +40,9 @@ def isolated_llm(tmp_path, monkeypatch):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setattr(llm, "ENV_FILE", tmp_path / "no-such.env")
     monkeypatch.setenv("REPO_SCOUT_ENV", str(tmp_path / "user.env"))
+
+
+@pytest.fixture(autouse=True)
+def no_model_preload(monkeypatch):
+    """The CLI loads the embedding model before searching; tests do not."""
+    monkeypatch.setattr(semantic, "preload", lambda: None)

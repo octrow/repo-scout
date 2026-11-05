@@ -14,6 +14,10 @@ EMBED_BATCH = 32  # fastembed default 256: same speed, ~1.5x memory and arena gr
 _model = None
 
 
+class ModelError(RuntimeError):
+    """The embedding model cannot be loaded (first run offline)."""
+
+
 def cache_dir() -> str:
     """fastembed defaults to the temp dir, which reboots and cleaners wipe; keep the model next to our data."""
     return os.environ.get("FASTEMBED_CACHE_PATH") or str(Path.home() / ".cache/repo-scout/fastembed")
@@ -29,6 +33,14 @@ def _get():
 
         _model = TextEmbedding(MODEL, cache_dir=cache_dir())
     return _model
+
+
+def preload() -> None:
+    """Load the model now, so a missing one fails before the search quota is spent. Raises ModelError."""
+    try:
+        _get()
+    except Exception as e:  # noqa: BLE001 — fastembed raises ValueError/OSError/ONNX errors for a cache miss
+        raise ModelError(f"embedding model not available ({e}). Run: repo-scout doctor --fix") from e
 
 
 def _norm(vecs) -> np.ndarray:
