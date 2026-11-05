@@ -1,7 +1,8 @@
 """Run logging: stderr and file. Each invocation writes to its own logs/<timestamp>-<pid>.log
 next to run.log ($REPO_SCOUT_LOG or ~/.local/state/repo-scout/run.log), while run.log symlinks to the latest:
 concurrent runs do not overwrite each other, and `tail -F run.log` follows the latest.
-Old logs are pruned until the total size is within LOG_DIR_MAX_BYTES."""
+Old logs are pruned until the total size is within LOG_DIR_MAX_BYTES; one run file is capped by
+RUN_MAX_BYTES x (1 + RUN_BACKUPS). Secrets are masked in every record; uncaught errors go through the logger."""
 
 import functools
 import logging
@@ -10,12 +11,51 @@ import sys
 import time
 from collections.abc import Callable
 from datetime import datetime
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 log = logging.getLogger("repo_scout")
 
 LIVE_SECONDS = 3600  # a log touched within the last hour may belong to a running process
-LOG_DIR_MAX_BYTES = 1 << 30  # 1 GiB for all logs; single large run is never truncated
+MB = 1 << 20
+LOG_DIR_MAX_BYTES = 50 * MB  # budget for the whole logs/ folder (pruned at start-up)
+RUN_MAX_BYTES, RUN_BACKUPS = 20 * MB, 1  # one run: log + one rotated .log.1 = 40 MB at most
+MIN_SECRET_LEN = 8  # shorter values would match ordinary text
+SECRET_VARS = ("LLM_API_KEY", "TYPESAFE_API_KEY", "GH_TOKEN", "GITHUB_TOKEN")  # masked by value in every record
+NEWLINE_MARK = " ⏎ "  # one record = one line (file tracebacks stay multi-line)
+_secrets: set[str] = set()
+
+
+def register_secrets() -> None:
+    """Mask the configured keys by value (call after config load: .env values count, not only os.environ)."""
+    from repo_scout import llm
+
+    _secrets.update(v for v in (llm.setting(n) for n in SECRET_VARS) if len(v) >= MIN_SECRET_LEN)
+
+
+def _redact(text: str) -> str:
+    for sec in _secrets:
+        text = text.replace(sec, "***")
+    return text
+
+
+class RedactFilter(logging.Filter):
+    """Masks secrets (args and traceback included); newlines in the message become NEWLINE_MARK."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        if _secrets or "\n" in msg:
+            record.msg, record.args = _redact(msg).replace("\n", NEWLINE_MARK), None
+        if _secrets and record.exc_info and not record.exc_text:  # Formatter reuses exc_text
+            record.exc_text = _redact(logging.Formatter().formatException(record.exc_info))
+        return True
+
+
+def _excepthook(et, ev, tb) -> None:
+    if issubclass(et, KeyboardInterrupt):
+        sys.__excepthook__(et, ev, tb)
+        return
+    log.critical("uncaught exception", exc_info=(et, ev, tb))
 
 
 def log_path() -> Path:
@@ -27,7 +67,7 @@ def prune(logs: Path, keep: Path, limit: int = LOG_DIR_MAX_BYTES, now: float | N
     LIVE_SECONDS (likely a parallel run) are kept; files removed by a parallel prune are skipped."""
     now = time.time() if now is None else now
     stats = []
-    for p in logs.glob("*.log"):
+    for p in logs.glob("*.log*"):
         try:
             st = p.stat()
         except FileNotFoundError:
@@ -58,13 +98,16 @@ def setup(quiet: bool = False) -> Path:
         h.close()
     log.handlers.clear()
     log.setLevel(logging.INFO)
-    file = logging.FileHandler(path, encoding="utf-8")
+    register_secrets()
+    file = RotatingFileHandler(path, maxBytes=RUN_MAX_BYTES, backupCount=RUN_BACKUPS, encoding="utf-8")
     file.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s", "%Y-%m-%d %H:%M:%S"))
     err = logging.StreamHandler(sys.stderr)
     err.setLevel(logging.WARNING if quiet else logging.INFO)
     err.setFormatter(logging.Formatter("%(asctime)s %(message)s", "%H:%M:%S"))
-    log.addHandler(file)
-    log.addHandler(err)
+    for h in (file, err):
+        h.addFilter(RedactFilter())
+        log.addHandler(h)
+    sys.excepthook = _excepthook
     _link(link, path)
     prune(logs, path)
     log.info("log: %s · command: %s", path, " ".join(sys.argv))

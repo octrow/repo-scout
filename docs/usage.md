@@ -22,7 +22,7 @@ repo-scout gui [--port 8790]   # Search, Runs, Index, Eval
 
 A verdict is stored in the Index and shown on later searches. It never hides a repo.
 
-Progress goes to stderr and to `~/.local/state/repo-scout/run.log` (`$REPO_SCOUT_LOG`), so you can `tail -f` it from another terminal. Use `-q` to send it only to the log file.
+Progress goes to stderr and to `~/.local/state/repo-scout/run.log` (`$REPO_SCOUT_LOG`), so you can `tail -f` it from another terminal. Each run writes its own `logs/<time>-<pid>.log` next to it (`run.log` links to the latest), capped at 20 MB (+ one rotated `.log.1`); the folder is pruned to 50 MB at start-up. API keys are masked in every record. Use `-q` to send it only to the log file.
 
 ## Evaluation
 
