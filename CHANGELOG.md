@@ -6,6 +6,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-11-05
+
+### Changed
+- Run logs are capped (20 MB per run, 50 MB in total), API keys and GitHub tokens are masked, and each record is one line.
+
 ## [0.1.14] - 2026-11-05
 
 ### Documentation
@@ -126,7 +131,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 ## [0.1.0] - 2026-10-12
 First public release.
 
-[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.14...HEAD
+[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.15...HEAD
+[0.1.15]: https://github.com/octrow/repo-scout/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/octrow/repo-scout/compare/v0.1.13...v0.1.14
 [0.1.13]: https://github.com/octrow/repo-scout/compare/v0.1.12...v0.1.13
 [0.1.12]: https://github.com/octrow/repo-scout/compare/v0.1.11...v0.1.12

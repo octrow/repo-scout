@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-11-05
+
+### Изменено
+- Логи запусков ограничены (20 МБ на запуск, 50 МБ всего), ключи API и токены GitHub маскируются, каждая запись — одна строка.
+
 ## [0.1.14] - 2026-11-05
 
 ### Документация
@@ -126,7 +131,8 @@
 ## [0.1.0] - 2026-10-12
 Первый публичный релиз.
 
-[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.14...HEAD
+[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.15...HEAD
+[0.1.15]: https://github.com/octrow/repo-scout/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/octrow/repo-scout/compare/v0.1.13...v0.1.14
 [0.1.13]: https://github.com/octrow/repo-scout/compare/v0.1.12...v0.1.13
 [0.1.12]: https://github.com/octrow/repo-scout/compare/v0.1.11...v0.1.12
