@@ -6,6 +6,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-11-05
+
+### Fixed
+- The embedding model is loaded before the first search; offline with no cached model it exits 1 with a `repo-scout doctor --fix` hint and spends no quota.
+- `--must` also runs on the metadata of `no details` rows.
+- `eval --top` and `eval --from-index` reject negative values.
+- A star-history reply that is not a list of objects is a clean error, not a crash.
+- A saved run with malformed `flags` or `score` is rejected on load.
+
 ## [0.1.12] - 2026-11-01
 
 ### Fixed
@@ -112,7 +121,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 ## [0.1.0] - 2026-10-12
 First public release.
 
-[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.12...HEAD
+[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.13...HEAD
+[0.1.13]: https://github.com/octrow/repo-scout/compare/v0.1.12...v0.1.13
 [0.1.12]: https://github.com/octrow/repo-scout/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/octrow/repo-scout/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/octrow/repo-scout/compare/v0.1.9...v0.1.10
