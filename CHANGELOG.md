@@ -6,6 +6,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-11-05
+
+### Documentation
+- README refreshed: shorter and in plain language.
+
 ## [0.1.13] - 2026-11-05
 
 ### Fixed
@@ -121,7 +126,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 ## [0.1.0] - 2026-10-12
 First public release.
 
-[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.13...HEAD
+[Unreleased]: https://github.com/octrow/repo-scout/compare/v0.1.14...HEAD
+[0.1.14]: https://github.com/octrow/repo-scout/compare/v0.1.13...v0.1.14
 [0.1.13]: https://github.com/octrow/repo-scout/compare/v0.1.12...v0.1.13
 [0.1.12]: https://github.com/octrow/repo-scout/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/octrow/repo-scout/compare/v0.1.10...v0.1.11
