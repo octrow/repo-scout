@@ -17,6 +17,7 @@ from repo_scout.log import log
 MAX_RETRIES = 3
 EVAL_SINGLE_RETRIES = 1  # when recording eval, don't wait 35s for single failing repo: skip is recorded in snapshot
 TRANSIENT = (502, 503, 504)
+GH_TIMEOUT_S = 60  # a stalled gh must not hang the run or hold a GUI run-pool slot
 # ponytail: --must/--exclude match the whole stored README; the cap only guards against huge READMEs
 # (snapshot and Index size). A word past 100 KB is still missed; match before the cap if that shows up.
 README_MAX_CHARS = 100_000
@@ -51,7 +52,9 @@ class RateLimited(GitHubError):
 
 def run_gh(cmd: list[str]) -> subprocess.CompletedProcess:
     try:
-        return subprocess.run(cmd, check=False, capture_output=True, text=True)
+        return subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=GH_TIMEOUT_S)
+    except subprocess.TimeoutExpired:  # looks like a gateway timeout: retried by the existing transient path
+        return subprocess.CompletedProcess(cmd, 1, "", f"HTTP 504: gh did not answer within {GH_TIMEOUT_S}s")
     except FileNotFoundError:
         raise GitHubError(
             "gh (GitHub CLI) not found: install it from https://cli.github.com, then `gh auth login`"

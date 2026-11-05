@@ -272,3 +272,11 @@ def test_dead_and_noise_repos_leave_the_index(tmp_path, monkeypatch):
     names = {r[0] for r in idx.db.execute("SELECT name FROM repos")}
     assert "dead/repo" not in names and "far/repo" in names
     assert "dead/repo" in idx.seen(["dead/repo"])
+
+
+def test_index_uses_wal_and_busy_timeout(tmp_path):
+    from repo_scout.index import Index
+
+    idx = Index(tmp_path / "i.db", model="m")
+    assert idx.db.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+    assert idx.db.execute("PRAGMA busy_timeout").fetchone()[0] >= 30000

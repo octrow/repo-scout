@@ -221,6 +221,7 @@ Other modes: `--record`, `--fake-stars`, `--llm-draft`, `--index-check` (two run
 | Bad regex | exit 2 with the reason, no request sent |
 | Query over GitHub limits | exit 2, no request sent |
 | `gh` not installed | `GitHub: gh (GitHub CLI) not found…`, exit 1 |
+| `gh` does not answer in 60 s | treated as HTTP 504: retried with back-off, then `GitHubError`, exit 1 |
 | `gh` not logged in, plain 403 | `GitHub: …`, exit 1 |
 | 429 / 502–504 / rate limit / empty reply on search | retries after 5, 10, 20 s, then exit 1 |
 | GraphQL `errors` with no `data` on search | `GitHub: GraphQL: …`, exit 1 at once |

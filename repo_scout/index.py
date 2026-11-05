@@ -11,6 +11,7 @@ import numpy as np
 
 from repo_scout import semantic
 
+BUSY_TIMEOUT_S = 30  # wait for another run's write lock instead of failing at 5 s
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS repos(name TEXT PRIMARY KEY, display_name TEXT, meta TEXT, readme TEXT,
                                  fetched_at TEXT, vec BLOB, model TEXT);
@@ -43,7 +44,8 @@ class Index:
     def __init__(self, path: Path | str, model: str | None = None):
         self.model = model or semantic.MODEL
         Path(path).parent.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(path)
+        self.db = sqlite3.connect(path, timeout=BUSY_TIMEOUT_S)
+        self.db.execute("PRAGMA journal_mode=WAL")  # parallel GUI-spawned runs: readers do not block the writer
         self.db.executescript(SCHEMA)
         self._reembed()
 

@@ -240,3 +240,20 @@ def test_missing_gh_is_a_github_error(monkeypatch):
 
     with pytest.raises(github.GitHubError, match="cli.github.com"):
         stars._rest("repos/a/b/stargazers")
+
+
+def test_gh_timeout_is_passed_and_retried_as_transient(monkeypatch):
+    seen, sleeps = [], []
+    results = iter([subprocess.TimeoutExpired("gh", 1), subprocess.CompletedProcess("gh", 0, OK, "")])
+
+    def fake_run(cmd, **kw):
+        seen.append(kw.get("timeout"))
+        r = next(results)
+        if isinstance(r, Exception):
+            raise r
+        return r
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(github.time, "sleep", sleeps.append)
+    assert github.search("q", 5)
+    assert seen == [github.GH_TIMEOUT_S] * 2 and len(sleeps) == 1
