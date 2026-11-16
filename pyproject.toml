@@ -8,7 +8,7 @@ requires-python = ">=3.11"
 dependencies = [
     "emoji>=2.16.0",
     "fastembed>=0.9.0",
-    "nicegui>=3.15,<4",
+    "nicegui>=4.0.0,<5",
     "numpy>=2.4.6",
 ]
 
@@ -19,8 +19,8 @@ repo-scout = "repo_scout.cli:main"
 dev = [
     "pytest",
     "pytest-asyncio",
-    "ruff>=0.17.3",
-    "ty==0.0.95",
+    "ruff>=0.17.4",
+    "ty==0.0.99",
 ]
 
 [build-system]
